@@ -1,7 +1,8 @@
-import { releases } from "@/data/releases";
+import { getPublishedReleases } from "@/lib/cms";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
 
 export function LatestReleases() {
+  const releases = getPublishedReleases();
   return (
     <section
       id="releases"

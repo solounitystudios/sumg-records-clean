@@ -1,73 +1,10 @@
-export interface Release {
-  id: string;
-  title: string;
-  artist: string;
-  type: "Single" | "EP" | "Album" | "Mixtape";
-  genre: string;
-  releaseDate: string;
-  description: string;
-  tracklist?: string[];
-}
+import { CMSRelease } from "@/lib/types";
 
-export const releases: Release[] = [
-  {
-    id: "afterglow-zyson",
-    title: "Afterglow",
-    artist: "Zyson",
-    type: "Single",
-    genre: "Dark R&B",
-    releaseDate: "2025",
-    description: "A cold, cinematic descent into aftermath — Zyson at his most precise.",
-    tracklist: ["Afterglow"],
-  },
-  {
-    id: "veil-lysandra",
-    title: "Veil",
-    artist: "Lysandra Noir",
-    type: "EP",
-    genre: "Noir Pop",
-    releaseDate: "2025",
-    description: "Five movements through grief, power, and transformation.",
-    tracklist: ["Entry Point", "Glass Hours", "Veil", "Undone", "Exit Ritual"],
-  },
-  {
-    id: "monument-turkz",
-    title: "Monument",
-    artist: "Turkz",
-    type: "Single",
-    genre: "Cinematic Rap",
-    releaseDate: "2025",
-    description: "Hard-hitting and visually sonic — Turkz erects a legacy in real time.",
-    tracklist: ["Monument"],
-  },
-  {
-    id: "signal-marrick",
-    title: "Signal",
-    artist: "Marrick",
-    type: "EP",
-    genre: "Electronic Soul",
-    releaseDate: "2025",
-    description: "A transmission from the edge — layered, textured, irreducible.",
-    tracklist: ["Carrier", "Signal", "Static Hours", "Last Frequency"],
-  },
-  {
-    id: "pressure-jayno",
-    title: "Pressure",
-    artist: "Jayno",
-    type: "Single",
-    genre: "Street Minimalism",
-    releaseDate: "2025",
-    description: "Minimal but immense — Jayno channels focus into form.",
-    tracklist: ["Pressure"],
-  },
-  {
-    id: "hollow-sorin",
-    title: "Hollow",
-    artist: "Sorin",
-    type: "Single",
-    genre: "Atmospheric Hip-Hop",
-    releaseDate: "2025",
-    description: "Quiet devastation. Sorin's most introspective offering to date.",
-    tracklist: ["Hollow"],
-  },
+export const releases: CMSRelease[] = [
+  { id: "afterglow-zyson", slug: "afterglow", title: "Afterglow", artistSlug: "zyson", artistName: "Zyson", type: "Single", genre: "Dark R&B", releaseDate: "2025-03-01", status: "published", isVisible: true, description: "A cold, cinematic descent into aftermath — Zyson at his most precise.", tracklist: [{ id: "afterglow-t1", title: "Afterglow", releaseSlug: "afterglow", artistSlug: "zyson", trackNumber: 1 }], createdAt: "2025-01-01", updatedAt: "2025-03-01" },
+  { id: "veil-lysandra", slug: "veil", title: "Veil", artistSlug: "lysandra-noir", artistName: "Lysandra Noir", type: "EP", genre: "Noir Pop", releaseDate: "2025-04-01", status: "published", isVisible: true, description: "Five movements through grief, power, and transformation.", tracklist: [ { id: "veil-t1", title: "Entry Point", releaseSlug: "veil", artistSlug: "lysandra-noir", trackNumber: 1 }, { id: "veil-t2", title: "Glass Hours", releaseSlug: "veil", artistSlug: "lysandra-noir", trackNumber: 2 }, { id: "veil-t3", title: "Veil", releaseSlug: "veil", artistSlug: "lysandra-noir", trackNumber: 3 }, { id: "veil-t4", title: "Undone", releaseSlug: "veil", artistSlug: "lysandra-noir", trackNumber: 4 }, { id: "veil-t5", title: "Exit Ritual", releaseSlug: "veil", artistSlug: "lysandra-noir", trackNumber: 5 } ], createdAt: "2025-01-01", updatedAt: "2025-04-01" },
+  { id: "monument-turkz", slug: "monument", title: "Monument", artistSlug: "turkz", artistName: "Turkz", type: "Single", genre: "Cinematic Rap", releaseDate: "2025-02-15", status: "published", isVisible: true, description: "Hard-hitting and visually sonic — Turkz erects a legacy in real time.", tracklist: [{ id: "monument-t1", title: "Monument", releaseSlug: "monument", artistSlug: "turkz", trackNumber: 1 }], createdAt: "2025-01-01", updatedAt: "2025-02-15" },
+  { id: "signal-marrick", slug: "signal", title: "Signal", artistSlug: "marrick", artistName: "Marrick", type: "EP", genre: "Electronic Soul", releaseDate: "2025-05-01", status: "published", isVisible: true, description: "A transmission from the edge — layered, textured, irreducible.", tracklist: [ { id: "signal-t1", title: "Carrier", releaseSlug: "signal", artistSlug: "marrick", trackNumber: 1 }, { id: "signal-t2", title: "Signal", releaseSlug: "signal", artistSlug: "marrick", trackNumber: 2 }, { id: "signal-t3", title: "Static Hours", releaseSlug: "signal", artistSlug: "marrick", trackNumber: 3 }, { id: "signal-t4", title: "Last Frequency", releaseSlug: "signal", artistSlug: "marrick", trackNumber: 4 } ], createdAt: "2025-01-01", updatedAt: "2025-05-01" },
+  { id: "pressure-jayno", slug: "pressure", title: "Pressure", artistSlug: "jayno", artistName: "Jayno", type: "Single", genre: "Street Minimalism", releaseDate: "2025-04-15", status: "published", isVisible: true, description: "Minimal but immense — Jayno channels focus into form.", tracklist: [{ id: "pressure-t1", title: "Pressure", releaseSlug: "pressure", artistSlug: "jayno", trackNumber: 1 }], createdAt: "2025-01-01", updatedAt: "2025-04-15" },
+  { id: "hollow-sorin", slug: "hollow", title: "Hollow", artistSlug: "sorin", artistName: "Sorin", type: "Single", genre: "Atmospheric Hip-Hop", releaseDate: "2025-03-20", status: "published", isVisible: true, description: "Quiet devastation. Sorin's most introspective offering to date.", tracklist: [{ id: "hollow-t1", title: "Hollow", releaseSlug: "hollow", artistSlug: "sorin", trackNumber: 1 }], createdAt: "2025-01-01", updatedAt: "2025-03-20" },
 ];

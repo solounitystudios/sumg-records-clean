@@ -1,7 +1,7 @@
-import { Release } from "@/data/releases";
+import { CMSRelease } from "@/lib/types";
 
 interface ReleaseCardProps {
-  release: Release;
+  release: CMSRelease;
 }
 
 export function ReleaseCard({ release }: ReleaseCardProps) {
@@ -35,7 +35,7 @@ export function ReleaseCard({ release }: ReleaseCardProps) {
       {/* Content */}
       <div className="p-5">
         <p className="text-[9px] tracking-[0.25em] uppercase text-white/25 mb-1.5">
-          {release.artist} · {release.genre}
+          {release.artistName} · {release.genre}
         </p>
         <h3 className="text-xl font-bold tracking-tight text-white leading-tight mb-2">
           {release.title}
