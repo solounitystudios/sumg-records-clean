@@ -3,15 +3,16 @@
 /**
  * Supabase-backed CMS store.
  *
- * Design: optimistic-update pattern.
+ * Design: optimistic-update pattern with rollback.
  *   • React state is updated synchronously (no consumer changes needed).
- *   • Every mutation also fires an async Supabase call in the background.
- *   • On mount the provider loads real data from Supabase if env vars are
- *     present; otherwise it falls back to the static seed files so the UI
- *     still works without a DB (local dev, Storybook, preview deploys, etc.).
+ *   • Every mutation fires an async Supabase call via bgSync().
+ *   • On failure the optional rollback fn is called to revert state + a toast
+ *     is shown, ensuring UI and DB remain consistent.
+ *   • On mount the provider loads real data from Supabase when env vars are
+ *     present; otherwise it falls back to static seed files (local dev /
+ *     preview deploys without a DB).
  *
- * Public interface is identical to the previous in-memory version — all
- * consumer pages and components continue to work without modification.
+ * Public interface is identical to the previous in-memory version.
  */
 
 import React, {
@@ -34,6 +35,7 @@ import {
   CMSAsset,
   CMSHomepageConfig,
   CMSSong,
+  AssetAttachment,
 } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -229,6 +231,12 @@ export interface AdminNotification {
   message: string;
 }
 
+/** Visible sync status for the UI indicator. */
+export type SyncState = "idle" | "syncing" | "error";
+
+/** Where the currently-displayed data originated from. */
+export type DataSource = "db" | "seed";
+
 interface CmsStoreState {
   artists: CMSArtist[];
   producers: CMSProducer[];
@@ -239,6 +247,10 @@ interface CmsStoreState {
   notifications: AdminNotification[];
   /** True while the initial Supabase data load is in flight. */
   isLoading: boolean;
+  /** Reflects the state of the most recent background write. */
+  syncState: SyncState;
+  /** Whether live data is from Supabase or the static seed files. */
+  dataSource: DataSource;
 }
 
 interface CmsStoreActions {
@@ -275,9 +287,19 @@ interface CmsStoreActions {
 
   // Assets
   getAssetById: (id: string) => CMSAsset | undefined;
+  getAssetsForEntity: (entityType: AssetAttachment["entityType"], entityId: string) => CMSAsset[];
   addAsset: (asset: Omit<CMSAsset, "id" | "createdAt">) => CMSAsset;
   updateAsset: (id: string, data: Partial<CMSAsset>) => CMSAsset | undefined;
   deleteAsset: (id: string) => void;
+  /**
+   * Attaches an asset to an entity. Adds the attachment entry to the asset's
+   * `attachedTo` array (no duplicates) and persists to DB.
+   */
+  attachAssetToEntity: (assetId: string, attachment: AssetAttachment) => void;
+  /**
+   * Removes a specific entity attachment from an asset's `attachedTo` array.
+   */
+  detachAssetFromEntity: (assetId: string, entityType: AssetAttachment["entityType"], entityId: string) => void;
 
   // Homepage
   updateHomepageConfig: (data: Partial<CMSHomepageConfig>) => void;
@@ -321,6 +343,8 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [syncState, setSyncState] = useState<SyncState>("idle");
+  const [dataSource, setDataSource] = useState<DataSource>("seed");
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -366,20 +390,31 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         if (b.error) console.error("[CMS] brands load:", b.error.message);
         if (r.error) console.error("[CMS] releases load:", r.error.message);
         if (as.error) console.error("[CMS] assets load:", as.error.message);
+        setDataSource("db");
       })
       .catch((err) => console.error("[CMS] initial load failed:", err))
       .finally(() => setIsLoading(false));
   }, []); // run once on mount
 
-  // ── Supabase background sync helper ──────────────────────────────────────
+  // ── Supabase background sync helper (with rollback) ───────────────────────
 
-  function bgSync(dbOperation: (sb: ReturnType<typeof createClient>) => PromiseLike<{ error: { message: string } | null }>) {
+  function bgSync(
+    dbOperation: (sb: ReturnType<typeof createClient>) => PromiseLike<{ error: { message: string } | null }>,
+    rollback?: () => void
+  ) {
     if (!hasSupabase()) return;
     const sb = createClient();
+    setSyncState("syncing");
     Promise.resolve(dbOperation(sb)).then(({ error }) => {
       if (error) {
         console.error("[CMS] sync error:", error.message);
-        notify("error", `Sync error: ${error.message}`);
+        notify("error", `Sync failed: ${error.message}`);
+        setSyncState("error");
+        if (rollback) rollback();
+        // Auto-clear error state after 4 s so the indicator resets
+        setTimeout(() => setSyncState("idle"), 4000);
+      } else {
+        setSyncState("idle");
       }
     });
   }
@@ -405,25 +440,27 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         updatedAt: now(),
       };
       setArtists((prev) => [...prev, artist]);
-      bgSync((sb) =>
-        sb.from("artists").insert({
-          id: artist.id,
-          slug: artist.slug,
-          name: artist.name,
-          role: artist.role,
-          genre: artist.genre,
-          bio: artist.bio,
-          long_bio: artist.longBio ?? null,
-          featured: artist.featured,
-          featured_on_homepage: artist.featuredOnHomepage ?? false,
-          tier: artist.tier,
-          status: artist.status ?? "active",
-          sort_order: artist.sortOrder ?? 0,
-          hero_image_url: artist.heroImageUrl ?? null,
-          profile_image_url: artist.profileImageUrl ?? null,
-          social_links: artist.socialLinks ?? null,
-          associated_brands: artist.associatedBrands ?? null,
-        })
+      bgSync(
+        (sb) =>
+          sb.from("artists").insert({
+            id: artist.id,
+            slug: artist.slug,
+            name: artist.name,
+            role: artist.role,
+            genre: artist.genre,
+            bio: artist.bio,
+            long_bio: artist.longBio ?? null,
+            featured: artist.featured,
+            featured_on_homepage: artist.featuredOnHomepage ?? false,
+            tier: artist.tier,
+            status: artist.status ?? "active",
+            sort_order: artist.sortOrder ?? 0,
+            hero_image_url: artist.heroImageUrl ?? null,
+            profile_image_url: artist.profileImageUrl ?? null,
+            social_links: artist.socialLinks ?? null,
+            associated_brands: artist.associatedBrands ?? null,
+          }),
+        () => setArtists((prev) => prev.filter((a) => a.id !== artist.id))
       );
       return artist;
     },
@@ -433,34 +470,39 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
 
   const updateArtist = useCallback(
     (id: string, data: Partial<CMSArtist>): CMSArtist | undefined => {
+      let original: CMSArtist | undefined;
       let updated: CMSArtist | undefined;
       setArtists((prev) =>
         prev.map((a) => {
           if (a.id !== id) return a;
+          original = a;
           updated = { ...a, ...data, updatedAt: now() };
           return updated;
         })
       );
       if (updated) {
         const u = updated;
-        bgSync((sb) =>
-          sb.from("artists").update({
-            name: u.name,
-            role: u.role,
-            genre: u.genre,
-            bio: u.bio,
-            long_bio: u.longBio ?? null,
-            featured: u.featured,
-            featured_on_homepage: u.featuredOnHomepage ?? false,
-            tier: u.tier,
-            status: u.status ?? "active",
-            sort_order: u.sortOrder ?? 0,
-            hero_image_url: u.heroImageUrl ?? null,
-            profile_image_url: u.profileImageUrl ?? null,
-            social_links: u.socialLinks ?? null,
-            associated_brands: u.associatedBrands ?? null,
-            updated_at: u.updatedAt,
-          }).eq("id", id)
+        const orig = original;
+        bgSync(
+          (sb) =>
+            sb.from("artists").update({
+              name: u.name,
+              role: u.role,
+              genre: u.genre,
+              bio: u.bio,
+              long_bio: u.longBio ?? null,
+              featured: u.featured,
+              featured_on_homepage: u.featuredOnHomepage ?? false,
+              tier: u.tier,
+              status: u.status ?? "active",
+              sort_order: u.sortOrder ?? 0,
+              hero_image_url: u.heroImageUrl ?? null,
+              profile_image_url: u.profileImageUrl ?? null,
+              social_links: u.socialLinks ?? null,
+              associated_brands: u.associatedBrands ?? null,
+              updated_at: u.updatedAt,
+            }).eq("id", id),
+          orig ? () => setArtists((prev) => prev.map((a) => (a.id === id ? orig : a))) : undefined
         );
       }
       return updated;
@@ -470,8 +512,15 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteArtist = useCallback((id: string) => {
-    setArtists((prev) => prev.filter((a) => a.id !== id));
-    bgSync((sb) => sb.from("artists").delete().eq("id", id));
+    let removed: CMSArtist | undefined;
+    setArtists((prev) => {
+      removed = prev.find((a) => a.id === id);
+      return prev.filter((a) => a.id !== id);
+    });
+    bgSync(
+      (sb) => sb.from("artists").delete().eq("id", id),
+      removed ? () => setArtists((prev) => [...prev, removed!]) : undefined
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -496,22 +545,24 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         updatedAt: now(),
       };
       setProducers((prev) => [...prev, producer]);
-      bgSync((sb) =>
-        sb.from("producers").insert({
-          id: producer.id,
-          slug: producer.slug,
-          name: producer.name,
-          specialty: producer.specialty,
-          credits: producer.credits,
-          signature: producer.signature,
-          bio: producer.bio ?? null,
-          status: producer.status ?? "active",
-          sort_order: producer.sortOrder ?? 0,
-          featured_on_homepage: producer.featuredOnHomepage ?? false,
-          profile_image_url: producer.profileImageUrl ?? null,
-          hero_image_url: producer.heroImageUrl ?? null,
-          social_links: producer.socialLinks ?? null,
-        })
+      bgSync(
+        (sb) =>
+          sb.from("producers").insert({
+            id: producer.id,
+            slug: producer.slug,
+            name: producer.name,
+            specialty: producer.specialty,
+            credits: producer.credits,
+            signature: producer.signature,
+            bio: producer.bio ?? null,
+            status: producer.status ?? "active",
+            sort_order: producer.sortOrder ?? 0,
+            featured_on_homepage: producer.featuredOnHomepage ?? false,
+            profile_image_url: producer.profileImageUrl ?? null,
+            hero_image_url: producer.heroImageUrl ?? null,
+            social_links: producer.socialLinks ?? null,
+          }),
+        () => setProducers((prev) => prev.filter((p) => p.id !== producer.id))
       );
       return producer;
     },
@@ -521,31 +572,36 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
 
   const updateProducer = useCallback(
     (id: string, data: Partial<CMSProducer>): CMSProducer | undefined => {
+      let original: CMSProducer | undefined;
       let updated: CMSProducer | undefined;
       setProducers((prev) =>
         prev.map((p) => {
           if (p.id !== id) return p;
+          original = p;
           updated = { ...p, ...data, updatedAt: now() };
           return updated;
         })
       );
       if (updated) {
         const u = updated;
-        bgSync((sb) =>
-          sb.from("producers").update({
-            name: u.name,
-            specialty: u.specialty,
-            credits: u.credits,
-            signature: u.signature,
-            bio: u.bio ?? null,
-            status: u.status ?? "active",
-            sort_order: u.sortOrder ?? 0,
-            featured_on_homepage: u.featuredOnHomepage ?? false,
-            profile_image_url: u.profileImageUrl ?? null,
-            hero_image_url: u.heroImageUrl ?? null,
-            social_links: u.socialLinks ?? null,
-            updated_at: u.updatedAt,
-          }).eq("id", id)
+        const orig = original;
+        bgSync(
+          (sb) =>
+            sb.from("producers").update({
+              name: u.name,
+              specialty: u.specialty,
+              credits: u.credits,
+              signature: u.signature,
+              bio: u.bio ?? null,
+              status: u.status ?? "active",
+              sort_order: u.sortOrder ?? 0,
+              featured_on_homepage: u.featuredOnHomepage ?? false,
+              profile_image_url: u.profileImageUrl ?? null,
+              hero_image_url: u.heroImageUrl ?? null,
+              social_links: u.socialLinks ?? null,
+              updated_at: u.updatedAt,
+            }).eq("id", id),
+          orig ? () => setProducers((prev) => prev.map((p) => (p.id === id ? orig : p))) : undefined
         );
       }
       return updated;
@@ -555,8 +611,15 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteProducer = useCallback((id: string) => {
-    setProducers((prev) => prev.filter((p) => p.id !== id));
-    bgSync((sb) => sb.from("producers").delete().eq("id", id));
+    let removed: CMSProducer | undefined;
+    setProducers((prev) => {
+      removed = prev.find((p) => p.id === id);
+      return prev.filter((p) => p.id !== id);
+    });
+    bgSync(
+      (sb) => sb.from("producers").delete().eq("id", id),
+      removed ? () => setProducers((prev) => [...prev, removed!]) : undefined
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -581,25 +644,27 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         updatedAt: now(),
       };
       setBrands((prev) => [...prev, brand]);
-      bgSync((sb) =>
-        sb.from("brands").insert({
-          id: brand.id,
-          slug: brand.slug,
-          name: brand.name,
-          category: brand.category,
-          descriptor: brand.descriptor,
-          tagline: brand.tagline,
-          manifesto: brand.manifesto ?? null,
-          hero_copy: brand.heroCopy ?? null,
-          long_description: brand.longDescription ?? null,
-          hero_image_url: brand.heroImageUrl ?? null,
-          logo_url: brand.logoUrl ?? null,
-          accent_color: brand.accentColor ?? null,
-          hero_style: brand.heroStyle ?? null,
-          is_active: brand.isActive,
-          featured_on_homepage: brand.featuredOnHomepage ?? false,
-          sort_order: brand.sortOrder ?? 0,
-        })
+      bgSync(
+        (sb) =>
+          sb.from("brands").insert({
+            id: brand.id,
+            slug: brand.slug,
+            name: brand.name,
+            category: brand.category,
+            descriptor: brand.descriptor,
+            tagline: brand.tagline,
+            manifesto: brand.manifesto ?? null,
+            hero_copy: brand.heroCopy ?? null,
+            long_description: brand.longDescription ?? null,
+            hero_image_url: brand.heroImageUrl ?? null,
+            logo_url: brand.logoUrl ?? null,
+            accent_color: brand.accentColor ?? null,
+            hero_style: brand.heroStyle ?? null,
+            is_active: brand.isActive,
+            featured_on_homepage: brand.featuredOnHomepage ?? false,
+            sort_order: brand.sortOrder ?? 0,
+          }),
+        () => setBrands((prev) => prev.filter((b) => b.id !== brand.id))
       );
       return brand;
     },
@@ -609,34 +674,39 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
 
   const updateBrand = useCallback(
     (id: string, data: Partial<CMSBrand>): CMSBrand | undefined => {
+      let original: CMSBrand | undefined;
       let updated: CMSBrand | undefined;
       setBrands((prev) =>
         prev.map((b) => {
           if (b.id !== id) return b;
+          original = b;
           updated = { ...b, ...data, updatedAt: now() };
           return updated;
         })
       );
       if (updated) {
         const u = updated;
-        bgSync((sb) =>
-          sb.from("brands").update({
-            name: u.name,
-            category: u.category,
-            descriptor: u.descriptor,
-            tagline: u.tagline,
-            manifesto: u.manifesto ?? null,
-            hero_copy: u.heroCopy ?? null,
-            long_description: u.longDescription ?? null,
-            hero_image_url: u.heroImageUrl ?? null,
-            logo_url: u.logoUrl ?? null,
-            accent_color: u.accentColor ?? null,
-            hero_style: u.heroStyle ?? null,
-            is_active: u.isActive,
-            featured_on_homepage: u.featuredOnHomepage ?? false,
-            sort_order: u.sortOrder ?? 0,
-            updated_at: u.updatedAt,
-          }).eq("id", id)
+        const orig = original;
+        bgSync(
+          (sb) =>
+            sb.from("brands").update({
+              name: u.name,
+              category: u.category,
+              descriptor: u.descriptor,
+              tagline: u.tagline,
+              manifesto: u.manifesto ?? null,
+              hero_copy: u.heroCopy ?? null,
+              long_description: u.longDescription ?? null,
+              hero_image_url: u.heroImageUrl ?? null,
+              logo_url: u.logoUrl ?? null,
+              accent_color: u.accentColor ?? null,
+              hero_style: u.heroStyle ?? null,
+              is_active: u.isActive,
+              featured_on_homepage: u.featuredOnHomepage ?? false,
+              sort_order: u.sortOrder ?? 0,
+              updated_at: u.updatedAt,
+            }).eq("id", id),
+          orig ? () => setBrands((prev) => prev.map((b) => (b.id === id ? orig : b))) : undefined
         );
       }
       return updated;
@@ -646,8 +716,15 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteBrand = useCallback((id: string) => {
-    setBrands((prev) => prev.filter((b) => b.id !== id));
-    bgSync((sb) => sb.from("brands").delete().eq("id", id));
+    let removed: CMSBrand | undefined;
+    setBrands((prev) => {
+      removed = prev.find((b) => b.id === id);
+      return prev.filter((b) => b.id !== id);
+    });
+    bgSync(
+      (sb) => sb.from("brands").delete().eq("id", id),
+      removed ? () => setBrands((prev) => [...prev, removed!]) : undefined
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -677,27 +754,29 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         updatedAt: now(),
       };
       setReleases((prev) => [...prev, release]);
-      bgSync((sb) =>
-        sb.from("releases").insert({
-          id: release.id,
-          slug: release.slug,
-          title: release.title,
-          artist_slug: release.artistSlug,
-          artist_name: release.artistName,
-          featured_artist_slugs: release.featuredArtistSlugs ?? null,
-          producer_slugs: release.producerSlugs ?? null,
-          type: release.type,
-          genre: release.genre,
-          release_date: release.releaseDate,
-          publish_at: release.publishAt ?? null,
-          status: release.status,
-          is_visible: release.isVisible,
-          featured_on_homepage: release.featuredOnHomepage ?? false,
-          description: release.description,
-          cover_art_url: release.coverArtUrl ?? null,
-          tracklist: release.tracklist ?? null,
-          streaming_links: release.streamingLinks ?? null,
-        })
+      bgSync(
+        (sb) =>
+          sb.from("releases").insert({
+            id: release.id,
+            slug: release.slug,
+            title: release.title,
+            artist_slug: release.artistSlug,
+            artist_name: release.artistName,
+            featured_artist_slugs: release.featuredArtistSlugs ?? null,
+            producer_slugs: release.producerSlugs ?? null,
+            type: release.type,
+            genre: release.genre,
+            release_date: release.releaseDate,
+            publish_at: release.publishAt ?? null,
+            status: release.status,
+            is_visible: release.isVisible,
+            featured_on_homepage: release.featuredOnHomepage ?? false,
+            description: release.description,
+            cover_art_url: release.coverArtUrl ?? null,
+            tracklist: release.tracklist ?? null,
+            streaming_links: release.streamingLinks ?? null,
+          }),
+        () => setReleases((prev) => prev.filter((r) => r.id !== release.id))
       );
       return release;
     },
@@ -707,36 +786,41 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
 
   const updateRelease = useCallback(
     (id: string, data: Partial<CMSRelease>): CMSRelease | undefined => {
+      let original: CMSRelease | undefined;
       let updated: CMSRelease | undefined;
       setReleases((prev) =>
         prev.map((r) => {
           if (r.id !== id) return r;
+          original = r;
           updated = { ...r, ...data, updatedAt: now() };
           return updated;
         })
       );
       if (updated) {
         const u = updated;
-        bgSync((sb) =>
-          sb.from("releases").update({
-            title: u.title,
-            artist_slug: u.artistSlug,
-            artist_name: u.artistName,
-            featured_artist_slugs: u.featuredArtistSlugs ?? null,
-            producer_slugs: u.producerSlugs ?? null,
-            type: u.type,
-            genre: u.genre,
-            release_date: u.releaseDate,
-            publish_at: u.publishAt ?? null,
-            status: u.status,
-            is_visible: u.isVisible,
-            featured_on_homepage: u.featuredOnHomepage ?? false,
-            description: u.description,
-            cover_art_url: u.coverArtUrl ?? null,
-            tracklist: u.tracklist ?? null,
-            streaming_links: u.streamingLinks ?? null,
-            updated_at: u.updatedAt,
-          }).eq("id", id)
+        const orig = original;
+        bgSync(
+          (sb) =>
+            sb.from("releases").update({
+              title: u.title,
+              artist_slug: u.artistSlug,
+              artist_name: u.artistName,
+              featured_artist_slugs: u.featuredArtistSlugs ?? null,
+              producer_slugs: u.producerSlugs ?? null,
+              type: u.type,
+              genre: u.genre,
+              release_date: u.releaseDate,
+              publish_at: u.publishAt ?? null,
+              status: u.status,
+              is_visible: u.isVisible,
+              featured_on_homepage: u.featuredOnHomepage ?? false,
+              description: u.description,
+              cover_art_url: u.coverArtUrl ?? null,
+              tracklist: u.tracklist ?? null,
+              streaming_links: u.streamingLinks ?? null,
+              updated_at: u.updatedAt,
+            }).eq("id", id),
+          orig ? () => setReleases((prev) => prev.map((r) => (r.id === id ? orig : r))) : undefined
         );
       }
       return updated;
@@ -762,23 +846,36 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteRelease = useCallback((id: string) => {
-    setReleases((prev) => prev.filter((r) => r.id !== id));
-    bgSync((sb) => sb.from("releases").delete().eq("id", id));
+    let removed: CMSRelease | undefined;
+    setReleases((prev) => {
+      removed = prev.find((r) => r.id === id);
+      return prev.filter((r) => r.id !== id);
+    });
+    bgSync(
+      (sb) => sb.from("releases").delete().eq("id", id),
+      removed ? () => setReleases((prev) => [...prev, removed!]) : undefined
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateTracklist = useCallback(
     (releaseId: string, tracklist: CMSSong[]) => {
+      let original: CMSRelease | undefined;
       setReleases((prev) =>
-        prev.map((r) =>
-          r.id === releaseId ? { ...r, tracklist, updatedAt: now() } : r
-        )
+        prev.map((r) => {
+          if (r.id !== releaseId) return r;
+          original = r;
+          return { ...r, tracklist, updatedAt: now() };
+        })
       );
-      bgSync((sb) =>
-        sb.from("releases").update({
-          tracklist,
-          updated_at: now(),
-        }).eq("id", releaseId)
+      const orig = original;
+      bgSync(
+        (sb) =>
+          sb.from("releases").update({
+            tracklist,
+            updated_at: now(),
+          }).eq("id", releaseId),
+        orig ? () => setReleases((prev) => prev.map((r) => (r.id === releaseId ? orig : r))) : undefined
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -792,22 +889,34 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
     [assets]
   );
 
+  const getAssetsForEntity = useCallback(
+    (entityType: AssetAttachment["entityType"], entityId: string) =>
+      assets.filter((a) =>
+        a.attachedTo?.some(
+          (att) => att.entityType === entityType && att.entityId === entityId
+        )
+      ),
+    [assets]
+  );
+
   const addAsset = useCallback(
     (data: Omit<CMSAsset, "id" | "createdAt">): CMSAsset => {
       const asset: CMSAsset = { ...data, id: generateId(), createdAt: now() };
       setAssets((prev) => [...prev, asset]);
-      bgSync((sb) =>
-        sb.from("assets").insert({
-          id: asset.id,
-          type: asset.type,
-          url: asset.url,
-          filename: asset.filename,
-          mime_type: asset.mimeType,
-          size_bytes: asset.sizeBytes ?? null,
-          alt_text: asset.altText ?? null,
-          attached_to: asset.attachedTo ?? null,
-          uploaded_by: asset.uploadedBy ?? null,
-        })
+      bgSync(
+        (sb) =>
+          sb.from("assets").insert({
+            id: asset.id,
+            type: asset.type,
+            url: asset.url,
+            filename: asset.filename,
+            mime_type: asset.mimeType,
+            size_bytes: asset.sizeBytes ?? null,
+            alt_text: asset.altText ?? null,
+            attached_to: asset.attachedTo ?? null,
+            uploaded_by: asset.uploadedBy ?? null,
+          }),
+        () => setAssets((prev) => prev.filter((a) => a.id !== asset.id))
       );
       return asset;
     },
@@ -817,21 +926,26 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
 
   const updateAsset = useCallback(
     (id: string, data: Partial<CMSAsset>): CMSAsset | undefined => {
+      let original: CMSAsset | undefined;
       let updated: CMSAsset | undefined;
       setAssets((prev) =>
         prev.map((a) => {
           if (a.id !== id) return a;
+          original = a;
           updated = { ...a, ...data };
           return updated;
         })
       );
       if (updated) {
         const u = updated;
-        bgSync((sb) =>
-          sb.from("assets").update({
-            alt_text: u.altText ?? null,
-            attached_to: u.attachedTo ?? null,
-          }).eq("id", id)
+        const orig = original;
+        bgSync(
+          (sb) =>
+            sb.from("assets").update({
+              alt_text: u.altText ?? null,
+              attached_to: u.attachedTo ?? null,
+            }).eq("id", id),
+          orig ? () => setAssets((prev) => prev.map((a) => (a.id === id ? orig : a))) : undefined
         );
       }
       return updated;
@@ -841,31 +955,118 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteAsset = useCallback((id: string) => {
-    setAssets((prev) => prev.filter((a) => a.id !== id));
-    bgSync((sb) => sb.from("assets").delete().eq("id", id));
+    let removed: CMSAsset | undefined;
+    setAssets((prev) => {
+      removed = prev.find((a) => a.id === id);
+      return prev.filter((a) => a.id !== id);
+    });
+    bgSync(
+      (sb) => sb.from("assets").delete().eq("id", id),
+      removed ? () => setAssets((prev) => [...prev, removed!]) : undefined
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const attachAssetToEntity = useCallback(
+    (assetId: string, attachment: AssetAttachment) => {
+      let original: CMSAsset | undefined;
+      setAssets((prev) =>
+        prev.map((a) => {
+          if (a.id !== assetId) return a;
+          original = a;
+          const existing = a.attachedTo ?? [];
+          // Prevent duplicate for the same entity + role
+          const isDuplicate = existing.some(
+            (att) =>
+              att.entityType === attachment.entityType &&
+              att.entityId === attachment.entityId &&
+              att.role === attachment.role
+          );
+          if (isDuplicate) return a;
+          return { ...a, attachedTo: [...existing, attachment] };
+        })
+      );
+      const orig = original;
+      bgSync(
+        (sb) => {
+          const current = assets.find((a) => a.id === assetId);
+          const existing = current?.attachedTo ?? [];
+          const isDuplicate = existing.some(
+            (att) =>
+              att.entityType === attachment.entityType &&
+              att.entityId === attachment.entityId &&
+              att.role === attachment.role
+          );
+          const newAttachments = isDuplicate ? existing : [...existing, attachment];
+          return sb.from("assets").update({ attached_to: newAttachments }).eq("id", assetId);
+        },
+        orig ? () => setAssets((prev) => prev.map((a) => (a.id === assetId ? orig : a))) : undefined
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [assets]
+  );
+
+  const detachAssetFromEntity = useCallback(
+    (
+      assetId: string,
+      entityType: AssetAttachment["entityType"],
+      entityId: string
+    ) => {
+      let original: CMSAsset | undefined;
+      setAssets((prev) =>
+        prev.map((a) => {
+          if (a.id !== assetId) return a;
+          original = a;
+          const filtered = (a.attachedTo ?? []).filter(
+            (att) =>
+              !(att.entityType === entityType && att.entityId === entityId)
+          );
+          return { ...a, attachedTo: filtered };
+        })
+      );
+      const orig = original;
+      bgSync(
+        (sb) => {
+          const current = assets.find((a) => a.id === assetId);
+          const filtered = (current?.attachedTo ?? []).filter(
+            (att) =>
+              !(att.entityType === entityType && att.entityId === entityId)
+          );
+          return sb.from("assets").update({ attached_to: filtered }).eq("id", assetId);
+        },
+        orig ? () => setAssets((prev) => prev.map((a) => (a.id === assetId ? orig : a))) : undefined
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [assets]
+  );
 
   // ── Homepage ───────────────────────────────────────────────────────────────
 
   const updateHomepageConfig = useCallback(
     (data: Partial<CMSHomepageConfig>) => {
+      let original: CMSHomepageConfig | undefined;
       setHomepageConfig((prev) => {
+        original = prev;
         const updated = { ...prev, ...data, updatedAt: now() };
-        bgSync((sb) =>
-          sb.from("homepage_config").upsert({
-            id: "homepage",
-            featured_artist_slugs: updated.featuredArtistSlugs,
-            featured_brand_slugs: updated.featuredBrandSlugs ?? [],
-            featured_release_slugs: updated.featuredReleaseSlugs ?? [],
-            hero_headline: updated.heroHeadline,
-            hero_subtext: updated.heroSubtext,
-            show_latest_releases: updated.showLatestReleases,
-            latest_releases_count: updated.latestReleasesCount,
-            section_order: updated.sectionOrder ?? null,
-            section_visibility: updated.sectionVisibility ?? null,
-            updated_at: updated.updatedAt,
-          })
+        const orig = original;
+        bgSync(
+          (sb) =>
+            sb.from("homepage_config").upsert({
+              id: "homepage",
+              featured_artist_slugs: updated.featuredArtistSlugs,
+              featured_brand_slugs: updated.featuredBrandSlugs ?? [],
+              featured_release_slugs: updated.featuredReleaseSlugs ?? [],
+              hero_headline: updated.heroHeadline,
+              hero_subtext: updated.heroSubtext,
+              show_latest_releases: updated.showLatestReleases,
+              latest_releases_count: updated.latestReleasesCount,
+              section_order: updated.sectionOrder ?? null,
+              section_visibility: updated.sectionVisibility ?? null,
+              updated_at: updated.updatedAt,
+            }),
+          orig ? () => setHomepageConfig(orig) : undefined
         );
         return updated;
       });
@@ -883,6 +1084,8 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
     homepageConfig,
     notifications,
     isLoading,
+    syncState,
+    dataSource,
     getArtistById,
     getArtistBySlug,
     createArtist,
@@ -907,9 +1110,12 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
     deleteRelease,
     updateTracklist,
     getAssetById,
+    getAssetsForEntity,
     addAsset,
     updateAsset,
     deleteAsset,
+    attachAssetToEntity,
+    detachAssetFromEntity,
     updateHomepageConfig,
     notify,
     dismissNotification,

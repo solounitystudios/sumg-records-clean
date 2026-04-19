@@ -7,19 +7,82 @@ import { useCmsStore } from "@/lib/cms/store";
 
 const DEFAULT_SECTIONS = ["hero", "artists", "releases", "brands", "producers"];
 
-export default function AdminHomepage() {
-  const { homepageConfig, updateHomepageConfig, artists, brands, releases, notify } =
-    useCmsStore();
+// ─── Multi-entity toggle picker ───────────────────────────────────────────────
 
-  const [form, setForm] = useState({
-    heroHeadline: "",
-    heroSubtext: "",
-    featuredArtistSlugs: "",
-    featuredBrandSlugs: "",
-    featuredReleaseSlugs: "",
-    showLatestReleases: true,
-    latestReleasesCount: "4",
-  });
+function EntityTogglePicker({
+  label,
+  items,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  items: { id: string; slug: string; name: string; badge?: string }[];
+  selected: string[];
+  onToggle: (slug: string) => void;
+}) {
+  return (
+    <div>
+      <p className="text-[10px] tracking-[0.15em] uppercase text-white/25 mb-3">
+        {label}{" "}
+        <span className="text-white/15">
+          ({selected.length} selected)
+        </span>
+      </p>
+      {items.length === 0 ? (
+        <p className="text-[10px] text-white/20 italic">
+          No {label.toLowerCase()} in library yet.
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {items.map((item) => {
+            const isActive = selected.includes(item.slug);
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onToggle(item.slug)}
+                className={`border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase transition-all duration-150 flex items-center gap-1.5 ${
+                  isActive
+                    ? "border-white/30 bg-white/[0.06] text-white"
+                    : "border-white/[0.06] text-white/30 hover:border-white/15 hover:text-white/60"
+                }`}
+              >
+                {isActive && <span>✓</span>}
+                {item.name}
+                {item.badge && (
+                  <span className="text-[9px] text-white/20 tracking-wider normal-case ml-1">
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function AdminHomepage() {
+  const {
+    homepageConfig,
+    updateHomepageConfig,
+    artists,
+    brands,
+    releases,
+    notify,
+  } = useCmsStore();
+
+  const [heroHeadline, setHeroHeadline] = useState("");
+  const [heroSubtext, setHeroSubtext] = useState("");
+  const [showLatestReleases, setShowLatestReleases] = useState(true);
+  const [latestReleasesCount, setLatestReleasesCount] = useState("4");
+
+  const [featuredArtistSlugs, setFeaturedArtistSlugs] = useState<string[]>([]);
+  const [featuredBrandSlugs, setFeaturedBrandSlugs] = useState<string[]>([]);
+  const [featuredReleaseSlugs, setFeaturedReleaseSlugs] = useState<string[]>([]);
 
   const [sectionVisibility, setSectionVisibility] = useState<Record<string, boolean>>({
     hero: true,
@@ -31,47 +94,64 @@ export default function AdminHomepage() {
 
   useEffect(() => {
     const cfg = homepageConfig;
-    setForm({
-      heroHeadline: cfg.heroHeadline,
-      heroSubtext: cfg.heroSubtext,
-      featuredArtistSlugs: (cfg.featuredArtistSlugs ?? []).join(", "),
-      featuredBrandSlugs: (cfg.featuredBrandSlugs ?? []).join(", "),
-      featuredReleaseSlugs: (cfg.featuredReleaseSlugs ?? []).join(", "),
-      showLatestReleases: cfg.showLatestReleases,
-      latestReleasesCount: String(cfg.latestReleasesCount),
-    });
+    setHeroHeadline(cfg.heroHeadline);
+    setHeroSubtext(cfg.heroSubtext);
+    setShowLatestReleases(cfg.showLatestReleases);
+    setLatestReleasesCount(String(cfg.latestReleasesCount));
+    setFeaturedArtistSlugs(cfg.featuredArtistSlugs ?? []);
+    setFeaturedBrandSlugs(cfg.featuredBrandSlugs ?? []);
+    setFeaturedReleaseSlugs(cfg.featuredReleaseSlugs ?? []);
     if (cfg.sectionVisibility) {
       setSectionVisibility(cfg.sectionVisibility);
     }
   }, [homepageConfig]);
 
-  function set(key: string, value: string | boolean) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function parseSlugs(str: string): string[] {
-    return str
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+  function toggleSlug(
+    slug: string,
+    list: string[],
+    setList: (v: string[]) => void
+  ) {
+    setList(list.includes(slug) ? list.filter((s) => s !== slug) : [...list, slug]);
   }
 
   function handleSave() {
     updateHomepageConfig({
-      heroHeadline: form.heroHeadline,
-      heroSubtext: form.heroSubtext,
-      featuredArtistSlugs: parseSlugs(form.featuredArtistSlugs),
-      featuredBrandSlugs: parseSlugs(form.featuredBrandSlugs),
-      featuredReleaseSlugs: parseSlugs(form.featuredReleaseSlugs),
-      showLatestReleases: form.showLatestReleases,
-      latestReleasesCount: parseInt(form.latestReleasesCount) || 4,
+      heroHeadline,
+      heroSubtext,
+      featuredArtistSlugs,
+      featuredBrandSlugs,
+      featuredReleaseSlugs,
+      showLatestReleases,
+      latestReleasesCount: parseInt(latestReleasesCount) || 4,
       sectionVisibility,
     });
     notify("success", "Homepage config saved.");
   }
 
-  const publishedReleases = releases.filter((r) => r.status === "published");
-  const featuredArtists = artists.filter((a) => a.featured);
+  // Derive display lists from live DB records
+  const artistItems = artists.map((a) => ({
+    id: a.id,
+    slug: a.slug,
+    name: a.name,
+    badge: a.featured ? "featured" : undefined,
+  }));
+
+  const brandItems = brands
+    .filter((b) => b.isActive)
+    .map((b) => ({
+      id: b.id,
+      slug: b.slug,
+      name: b.name,
+    }));
+
+  const releaseItems = releases.map((r) => ({
+    id: r.id,
+    slug: r.slug,
+    name: r.title,
+    badge: r.status === "published" ? "live" : r.status,
+  }));
+
+  const publishedCount = releases.filter((r) => r.status === "published").length;
 
   return (
     <AdminShell title="Homepage">
@@ -96,41 +176,48 @@ export default function AdminHomepage() {
           <FormField
             type="text"
             label="Hero Headline"
-            value={form.heroHeadline}
-            onChange={(v) => set("heroHeadline", v)}
+            value={heroHeadline}
+            onChange={setHeroHeadline}
           />
           <FormField
             type="textarea"
             label="Hero Subtext"
             rows={2}
-            value={form.heroSubtext}
-            onChange={(v) => set("heroSubtext", v)}
+            value={heroSubtext}
+            onChange={setHeroSubtext}
           />
         </FormSection>
 
-        {/* Featured content */}
+        {/* Featured content — DB-backed pickers */}
         <FormSection title="Featured Content">
-          <FormField
-            type="text"
-            label="Featured Artist Slugs"
-            value={form.featuredArtistSlugs}
-            hint="Comma-separated slugs. Available: zyson, lysandra-noir, turkz, marrick, sorin, yosin, jayno"
-            onChange={(v) => set("featuredArtistSlugs", v)}
+          <EntityTogglePicker
+            label="Featured Artists"
+            items={artistItems}
+            selected={featuredArtistSlugs}
+            onToggle={(slug) =>
+              toggleSlug(slug, featuredArtistSlugs, setFeaturedArtistSlugs)
+            }
           />
-          <FormField
-            type="text"
-            label="Featured Brand Slugs"
-            value={form.featuredBrandSlugs}
-            hint="Comma-separated slugs. Available: woronoff, unity-standard, moon-spell, concrete-borough, salt-current"
-            onChange={(v) => set("featuredBrandSlugs", v)}
-          />
-          <FormField
-            type="text"
-            label="Featured Release Slugs"
-            value={form.featuredReleaseSlugs}
-            hint="Comma-separated slugs."
-            onChange={(v) => set("featuredReleaseSlugs", v)}
-          />
+          <div className="border-t border-white/5 pt-5">
+            <EntityTogglePicker
+              label="Featured Brands"
+              items={brandItems}
+              selected={featuredBrandSlugs}
+              onToggle={(slug) =>
+                toggleSlug(slug, featuredBrandSlugs, setFeaturedBrandSlugs)
+              }
+            />
+          </div>
+          <div className="border-t border-white/5 pt-5">
+            <EntityTogglePicker
+              label="Featured Releases"
+              items={releaseItems}
+              selected={featuredReleaseSlugs}
+              onToggle={(slug) =>
+                toggleSlug(slug, featuredReleaseSlugs, setFeaturedReleaseSlugs)
+              }
+            />
+          </div>
         </FormSection>
 
         {/* Latest releases */}
@@ -138,17 +225,17 @@ export default function AdminHomepage() {
           <FormField
             type="toggle"
             label="Show Latest Releases"
-            value={form.showLatestReleases}
-            onChange={(v) => set("showLatestReleases", v)}
+            value={showLatestReleases}
+            onChange={setShowLatestReleases}
           />
           <FormField
             type="number"
             label="Number of Releases to Show"
-            value={form.latestReleasesCount}
-            onChange={(v) => set("latestReleasesCount", v)}
+            value={latestReleasesCount}
+            onChange={setLatestReleasesCount}
           />
           <p className="text-[10px] text-white/20">
-            {publishedReleases.length} published release{publishedReleases.length !== 1 ? "s" : ""} available.
+            {publishedCount} published release{publishedCount !== 1 ? "s" : ""} available.
           </p>
         </FormSection>
 
@@ -171,28 +258,6 @@ export default function AdminHomepage() {
           </div>
         </FormSection>
 
-        {/* Quick reference */}
-        <FormSection title="Quick Reference">
-          <div className="space-y-3">
-            <div>
-              <p className="text-[10px] tracking-[0.15em] uppercase text-white/20 mb-1.5">Featured Artists ({featuredArtists.length})</p>
-              <div className="flex flex-wrap gap-2">
-                {featuredArtists.map((a) => (
-                  <span key={a.id} className="border border-white/5 px-2 py-0.5 text-[10px] font-mono text-white/30">{a.slug}</span>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-[10px] tracking-[0.15em] uppercase text-white/20 mb-1.5">Published Releases ({publishedReleases.length})</p>
-              <div className="flex flex-wrap gap-2">
-                {publishedReleases.map((r) => (
-                  <span key={r.id} className="border border-white/5 px-2 py-0.5 text-[10px] font-mono text-white/30">{r.slug}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </FormSection>
-
         <div className="pt-4 border-t border-white/5">
           <SaveButton onClick={handleSave} />
         </div>
@@ -200,3 +265,4 @@ export default function AdminHomepage() {
     </AdminShell>
   );
 }
+

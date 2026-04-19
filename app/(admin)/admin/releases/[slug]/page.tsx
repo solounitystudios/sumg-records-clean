@@ -11,15 +11,316 @@ import {
   StatusBadge,
 } from "@/components/admin/FormField";
 import { TracklistEditor } from "@/components/admin/TracklistEditor";
+import { MediaLibraryGrid } from "@/components/admin/MediaLibraryGrid";
 import { useCmsStore, isReleasePublic } from "@/lib/cms/store";
-import { CMSRelease, CMSSong, ReleaseStatus } from "@/lib/types";
+import { CMSArtist, CMSProducer, CMSRelease, CMSSong, ReleaseStatus, CMSAsset, AssetAttachment } from "@/lib/types";
+
+// ─── Artist multi-picker ─────────────────────────────────────────────────────
+
+function ArtistRelationPanel({
+  release,
+  allArtists,
+  onChangePrimary,
+  onToggleFeatured,
+}: {
+  release: CMSRelease;
+  allArtists: CMSArtist[];
+  onChangePrimary: (slug: string, name: string) => void;
+  onToggleFeatured: (slug: string) => void;
+}) {
+  const featured = release.featuredArtistSlugs ?? [];
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-[10px] tracking-[0.15em] uppercase text-white/25 mb-3">Primary Artist</p>
+        <select
+          value={release.artistSlug}
+          onChange={(e) => {
+            const a = allArtists.find((x) => x.slug === e.target.value);
+            onChangePrimary(e.target.value, a?.name ?? e.target.value);
+          }}
+          className="w-full bg-transparent border border-white/10 px-4 py-2.5 text-sm text-white focus:border-white/30 focus:outline-none transition-colors"
+        >
+          <option value="" className="bg-neutral-900">— Select artist —</option>
+          {allArtists.map((a) => (
+            <option key={a.id} value={a.slug} className="bg-neutral-900">
+              {a.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <p className="text-[10px] tracking-[0.15em] uppercase text-white/25 mb-3">
+          Featured Artists <span className="text-white/15">(toggle to add/remove)</span>
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {allArtists.map((a) => {
+            const isActive = featured.includes(a.slug);
+            const isPrimary = a.slug === release.artistSlug;
+            return (
+              <button
+                key={a.id}
+                type="button"
+                disabled={isPrimary}
+                onClick={() => onToggleFeatured(a.slug)}
+                title={isPrimary ? "Primary artist" : undefined}
+                className={`border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase transition-all duration-150 ${
+                  isPrimary
+                    ? "border-white/20 text-white/50 cursor-default"
+                    : isActive
+                    ? "border-white/30 bg-white/[0.06] text-white"
+                    : "border-white/[0.06] text-white/30 hover:border-white/15 hover:text-white/60"
+                }`}
+              >
+                {isActive && !isPrimary && <span className="mr-1">✓</span>}
+                {isPrimary && <span className="mr-1">★</span>}
+                {a.name}
+              </button>
+            );
+          })}
+          {allArtists.length === 0 && (
+            <p className="text-[10px] text-white/20 italic">No artists in library yet.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Producer multi-picker ───────────────────────────────────────────────────
+
+function ProducerRelationPanel({
+  release,
+  allProducers,
+  onToggle,
+}: {
+  release: CMSRelease;
+  allProducers: CMSProducer[];
+  onToggle: (slug: string) => void;
+}) {
+  const attached = release.producerSlugs ?? [];
+  return (
+    <div>
+      <p className="text-[10px] tracking-[0.15em] uppercase text-white/25 mb-3">
+        Producers <span className="text-white/15">(toggle to add/remove)</span>
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {allProducers.map((p) => {
+          const isActive = attached.includes(p.slug);
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onToggle(p.slug)}
+              className={`border px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase transition-all duration-150 ${
+                isActive
+                  ? "border-white/30 bg-white/[0.06] text-white"
+                  : "border-white/[0.06] text-white/30 hover:border-white/15 hover:text-white/60"
+              }`}
+            >
+              {isActive && <span className="mr-1">✓</span>}
+              {p.name}
+            </button>
+          );
+        })}
+        {allProducers.length === 0 && (
+          <p className="text-[10px] text-white/20 italic">No producers in library yet.</p>
+        )}
+      </div>
+      {attached.length > 0 && (
+        <p className="text-[10px] text-white/20 mt-2">
+          {attached.length} producer{attached.length !== 1 ? "s" : ""} attached
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Media attachment panel ──────────────────────────────────────────────────
+
+const ASSET_ROLES: AssetAttachment["role"][] = [
+  "cover",
+  "gallery",
+  "video",
+  "audio",
+];
+
+function MediaRelationPanel({
+  release,
+  attachedAssets,
+  onDetach,
+  onAttach,
+}: {
+  release: CMSRelease;
+  attachedAssets: CMSAsset[];
+  onDetach: (assetId: string) => void;
+  onAttach: (asset: CMSAsset, role: AssetAttachment["role"]) => void;
+}) {
+  const [showPicker, setShowPicker] = useState(false);
+  const [pendingAsset, setPendingAsset] = useState<CMSAsset | null>(null);
+  const [pendingRole, setPendingRole] = useState<AssetAttachment["role"]>("cover");
+
+  function handleSelect(asset: CMSAsset) {
+    setPendingAsset(asset);
+    setPendingRole("cover");
+  }
+
+  function confirmAttach() {
+    if (!pendingAsset) return;
+    onAttach(pendingAsset, pendingRole);
+    setPendingAsset(null);
+    setShowPicker(false);
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Attached assets list */}
+      {attachedAssets.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] tracking-[0.15em] uppercase text-white/25 mb-2">Attached Assets</p>
+          {attachedAssets.map((a) => {
+            const attachment = a.attachedTo?.find(
+              (att) => att.entityType === "release" && att.entityId === release.id
+            );
+            return (
+              <div
+                key={a.id}
+                className="flex items-center gap-3 border border-white/5 px-3 py-2 bg-white/[0.01]"
+              >
+                {a.type === "image" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={a.url}
+                    alt={a.filename}
+                    className="w-8 h-8 object-cover border border-white/10 flex-shrink-0"
+                  />
+                ) : (
+                  <span className="w-8 h-8 flex items-center justify-center text-white/20 text-base border border-white/5 flex-shrink-0">
+                    {a.type === "audio" ? "♫" : a.type === "video" ? "▶" : "▤"}
+                  </span>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-white/60 truncate">{a.filename}</p>
+                  {attachment && (
+                    <p className="text-[10px] text-white/20 capitalize">{attachment.role}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onDetach(a.id)}
+                  className="text-[10px] text-red-900 hover:text-red-400 transition-colors px-2"
+                >
+                  Detach
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Attach button */}
+      {!showPicker && (
+        <button
+          type="button"
+          onClick={() => { setShowPicker(true); setPendingAsset(null); }}
+          className="border border-white/10 px-4 py-2 text-[10px] tracking-[0.15em] uppercase text-white/40 hover:border-white/25 hover:text-white/70 transition-colors"
+        >
+          + Attach Media Asset
+        </button>
+      )}
+
+      {/* Media picker drawer */}
+      {showPicker && (
+        <div className="border border-white/10 p-4 bg-white/[0.01] space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] tracking-[0.2em] uppercase text-white/30">
+              Select Asset to Attach
+            </p>
+            <button
+              type="button"
+              onClick={() => { setShowPicker(false); setPendingAsset(null); }}
+              className="text-white/25 hover:text-white text-xs transition-colors"
+            >
+              ✕ Cancel
+            </button>
+          </div>
+
+          {/* Role picker (shown when asset selected) */}
+          {pendingAsset && (
+            <div className="border border-white/10 p-3 bg-white/[0.02] space-y-3">
+              <div className="flex items-center gap-3">
+                {pendingAsset.type === "image" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={pendingAsset.url} alt={pendingAsset.filename}
+                    className="w-10 h-10 object-cover border border-white/10" />
+                ) : (
+                  <span className="w-10 h-10 flex items-center justify-center text-white/20 border border-white/5">
+                    {pendingAsset.type === "audio" ? "♫" : "▶"}
+                  </span>
+                )}
+                <p className="text-xs text-white/60 flex-1 truncate">{pendingAsset.filename}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <p className="text-[10px] tracking-wider uppercase text-white/20">Role</p>
+                <div className="flex gap-2">
+                  {ASSET_ROLES.map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setPendingRole(r)}
+                      className={`border px-3 py-1 text-[10px] tracking-wider uppercase transition-colors ${
+                        pendingRole === r
+                          ? "border-white/30 text-white"
+                          : "border-white/10 text-white/30 hover:border-white/20"
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={confirmAttach}
+                className="bg-white text-black text-[10px] tracking-[0.2em] uppercase px-5 py-2 font-semibold hover:bg-white/90 transition-colors"
+              >
+                Attach
+              </button>
+            </div>
+          )}
+
+          <div className="max-h-72 overflow-y-auto">
+            <MediaLibraryGrid
+              onSelect={handleSelect}
+              selectedId={pendingAsset?.id}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function EditReleasePage() {
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug as string;
-  const { getReleaseBySlug, updateRelease, deleteRelease, publishRelease, updateTracklist, notify } =
-    useCmsStore();
+  const {
+    getReleaseBySlug,
+    updateRelease,
+    deleteRelease,
+    publishRelease,
+    updateTracklist,
+    notify,
+    artists,
+    producers,
+    getAssetsForEntity,
+    attachAssetToEntity,
+    detachAssetFromEntity,
+  } = useCmsStore();
 
   const release = getReleaseBySlug(slug);
   const [form, setForm] = useState<{
@@ -43,6 +344,8 @@ export default function EditReleasePage() {
     "streamingLinks.youtube": string;
   } | null>(null);
   const [tracklist, setTracklist] = useState<CMSSong[]>([]);
+  const [featuredArtistSlugs, setFeaturedArtistSlugs] = useState<string[]>([]);
+  const [producerSlugs, setProducerSlugs] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
@@ -69,6 +372,8 @@ export default function EditReleasePage() {
       "streamingLinks.youtube": release.streamingLinks?.youtube ?? "",
     });
     setTracklist(release.tracklist ?? []);
+    setFeaturedArtistSlugs(release.featuredArtistSlugs ?? []);
+    setProducerSlugs(release.producerSlugs ?? []);
   }, [release]);
 
   if (!release || !form) {
@@ -82,6 +387,8 @@ export default function EditReleasePage() {
     );
   }
 
+  const attachedAssets = getAssetsForEntity("release", release.id);
+
   function set(key: string, value: string | boolean) {
     setForm((prev) => prev ? { ...prev, [key]: value } : prev);
   }
@@ -90,29 +397,31 @@ export default function EditReleasePage() {
     if (!release || !form) return;
     setSaving(true);
     updateRelease(release.id, {
-      title: form!.title,
-      slug: form!.slug,
-      artistSlug: form!.artistSlug,
-      artistName: form!.artistName,
-      type: form!.type,
-      genre: form!.genre,
-      releaseDate: form!.releaseDate,
-      publishAt: form!.publishAt || undefined,
-      status: form!.status,
-      isVisible: form!.isVisible,
-      featuredOnHomepage: form!.featuredOnHomepage,
-      description: form!.description,
-      coverArtUrl: form!.coverArtUrl || undefined,
+      title: form.title,
+      slug: form.slug,
+      artistSlug: form.artistSlug,
+      artistName: form.artistName,
+      type: form.type,
+      genre: form.genre,
+      releaseDate: form.releaseDate,
+      publishAt: form.publishAt || undefined,
+      status: form.status,
+      isVisible: form.isVisible,
+      featuredOnHomepage: form.featuredOnHomepage,
+      description: form.description,
+      coverArtUrl: form.coverArtUrl || undefined,
+      featuredArtistSlugs: featuredArtistSlugs.length ? featuredArtistSlugs : undefined,
+      producerSlugs: producerSlugs.length ? producerSlugs : undefined,
       streamingLinks: {
-        spotify: form!["streamingLinks.spotify"] || undefined,
-        appleMusic: form!["streamingLinks.appleMusic"] || undefined,
-        tidal: form!["streamingLinks.tidal"] || undefined,
-        soundcloud: form!["streamingLinks.soundcloud"] || undefined,
-        youtube: form!["streamingLinks.youtube"] || undefined,
+        spotify: form["streamingLinks.spotify"] || undefined,
+        appleMusic: form["streamingLinks.appleMusic"] || undefined,
+        tidal: form["streamingLinks.tidal"] || undefined,
+        soundcloud: form["streamingLinks.soundcloud"] || undefined,
+        youtube: form["streamingLinks.youtube"] || undefined,
       },
     });
     updateTracklist(release.id, tracklist);
-    notify("success", `Release "${form!.title}" saved.`);
+    notify("success", `Release "${form.title}" saved.`);
     setSaving(false);
   }
 
@@ -134,6 +443,32 @@ export default function EditReleasePage() {
       notify("success", `Release "${release.title}" deleted.`);
       router.push("/admin/releases");
     }
+  }
+
+  function handleToggleFeaturedArtist(slug: string) {
+    setFeaturedArtistSlugs((prev) =>
+      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+    );
+  }
+
+  function handleToggleProducer(slug: string) {
+    setProducerSlugs((prev) =>
+      prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]
+    );
+  }
+
+  function handleAttachAsset(asset: CMSAsset, role: AssetAttachment["role"]) {
+    attachAssetToEntity(asset.id, {
+      entityType: "release",
+      entityId: release!.id,
+      role,
+    });
+    notify("success", `"${asset.filename}" attached as ${role}.`);
+  }
+
+  function handleDetachAsset(assetId: string) {
+    detachAssetFromEntity(assetId, "release", release!.id);
+    notify("info", "Asset detached.");
   }
 
   const isLive = isReleasePublic(release);
@@ -193,6 +528,35 @@ export default function EditReleasePage() {
           </div>
           <FormField type="textarea" label="Description" rows={3} value={form.description}
             onChange={(v) => set("description", v)} />
+        </FormSection>
+
+        {/* ── Relations ─────────────────────────────────────────────────────── */}
+        <FormSection title="Relations">
+          <ArtistRelationPanel
+            release={{ ...release, featuredArtistSlugs, artistSlug: form.artistSlug }}
+            allArtists={artists}
+            onChangePrimary={(slug, name) => {
+              set("artistSlug", slug);
+              set("artistName", name);
+            }}
+            onToggleFeatured={handleToggleFeaturedArtist}
+          />
+          <div className="border-t border-white/5 pt-5">
+            <ProducerRelationPanel
+              release={{ ...release, producerSlugs }}
+              allProducers={producers}
+              onToggle={handleToggleProducer}
+            />
+          </div>
+          <div className="border-t border-white/5 pt-5">
+            <p className="text-[10px] tracking-[0.15em] uppercase text-white/25 mb-3">Media Assets</p>
+            <MediaRelationPanel
+              release={release}
+              attachedAssets={attachedAssets}
+              onDetach={handleDetachAsset}
+              onAttach={handleAttachAsset}
+            />
+          </div>
         </FormSection>
 
         {/* Publish settings */}
@@ -274,3 +638,4 @@ export default function EditReleasePage() {
     </AdminShell>
   );
 }
+

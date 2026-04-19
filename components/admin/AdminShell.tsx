@@ -21,7 +21,30 @@ interface AdminShellProps {
 
 export function AdminShell({ children, title }: AdminShellProps) {
   const pathname = usePathname();
-  const { notifications, dismissNotification } = useCmsStore();
+  const { notifications, dismissNotification, isLoading, syncState, dataSource } =
+    useCmsStore();
+
+  // ── Derive indicator values ─────────────────────────────────────────────────
+
+  const syncDot =
+    isLoading || syncState === "syncing"
+      ? "bg-yellow-400 animate-pulse"
+      : syncState === "error"
+      ? "bg-red-500"
+      : dataSource === "db"
+      ? "bg-green-500"
+      : "bg-white/20";
+
+  const syncLabel =
+    isLoading
+      ? "Loading from DB…"
+      : syncState === "syncing"
+      ? "Saving…"
+      : syncState === "error"
+      ? "Sync error"
+      : dataSource === "db"
+      ? "DB"
+      : "Seed data";
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex">
@@ -72,7 +95,17 @@ export function AdminShell({ children, title }: AdminShellProps) {
       <main className="flex-1 ml-56">
         {/* Top bar */}
         <div className="h-14 border-b border-white/5 flex items-center px-8 sticky top-0 bg-neutral-950/90 backdrop-blur z-30">
-          <h1 className="text-xs font-semibold tracking-[0.2em] uppercase text-white/60">{title}</h1>
+          <h1 className="text-xs font-semibold tracking-[0.2em] uppercase text-white/60 flex-1">
+            {title}
+          </h1>
+
+          {/* DB sync indicator */}
+          <div className="flex items-center gap-2" title={syncLabel}>
+            <span className={`inline-block w-1.5 h-1.5 rounded-full ${syncDot}`} />
+            <span className="text-[10px] tracking-[0.15em] uppercase text-white/20 select-none">
+              {syncLabel}
+            </span>
+          </div>
         </div>
 
         {/* Content */}
