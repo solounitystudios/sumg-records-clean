@@ -16,7 +16,7 @@ export default function BrandsPage() {
           The SUMG Portfolio
         </p>
         <h1 className="text-5xl md:text-6xl font-bold font-serif text-white mb-4">
-          Brands &amp; Storefront
+          Brands & Storefront
         </h1>
         <p className="text-gray-400 text-lg max-w-2xl mx-auto">
           Explore the full suite of SUMG brands — each one a pillar of our growing empire in music, culture, and commerce.

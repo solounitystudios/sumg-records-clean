@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { ReactNode } from "react";
+import { formatDate } from "@/lib/utils";
 
 interface CardProps {
   children?: ReactNode;
@@ -89,7 +90,7 @@ export function ReleaseCard({ title, artist, coverArt, releaseDate, type }: Rele
       <div className="p-5">
         <h3 className="text-lg font-bold font-serif text-white mb-1">{title}</h3>
         <p className="text-gold-500 text-sm mb-2">{artist}</p>
-        <p className="text-gray-500 text-xs">{new Date(releaseDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+        <p className="text-gray-500 text-xs">{formatDate(releaseDate)}</p>
       </div>
     </Card>
   );
