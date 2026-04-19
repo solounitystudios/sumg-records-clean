@@ -200,3 +200,40 @@ alter table brands add column if not exists collection_name     text;
 alter table brands add column if not exists featured_release_slugs jsonb;
 alter table brands add column if not exists featured_song_slugs    jsonb;
 alter table brands add column if not exists featured_asset_ids     jsonb;
+
+-- ─── Phase 7 migration — DSP links, Provider config, Artist timeline ──────────
+-- Safe to run multiple times (IF NOT EXISTS / DO NOTHING).
+
+-- DSP links on songs and releases
+alter table songs    add column if not exists dsp_links       jsonb;
+alter table releases add column if not exists dsp_links       jsonb;
+
+-- Provider / business config on artists and releases
+alter table artists  add column if not exists provider_config jsonb;
+alter table releases add column if not exists provider_config jsonb;
+
+-- Artist timeline items
+create table if not exists artist_timeline_items (
+  id                    text primary key,
+  artist_slug           text not null,
+  type                  text not null,
+  title                 text not null,
+  description           text,
+  event_date            text not null,
+  end_date              text,
+  status                text not null default 'draft',
+  visibility            text not null default 'private',
+  linked_release_slug   text,
+  linked_song_slug      text,
+  linked_asset_ids      jsonb,
+  tags                  jsonb,
+  importance            integer not null default 5,
+  lyric_engine_eligible boolean not null default false,
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now()
+);
+
+alter table artist_timeline_items enable row level security;
+create policy "public read timeline"  on artist_timeline_items for select using (true);
+create policy "auth write timeline"   on artist_timeline_items for all    using (auth.role() = 'authenticated');
+

@@ -5,8 +5,11 @@ import {
   getSongBySlug,
   getAllPublicSongSlugs,
   getSongsForRelease,
+  getSongsForArtist,
   getReleaseBySlug,
+  getAllProducers,
 } from "@/lib/cms";
+import { DSPButtonGroup } from "@/components/admin/DSPLinksPanel";
 import Link from "next/link";
 
 interface Props {
@@ -36,6 +39,18 @@ export default async function SongPage({ params }: Props) {
   const releaseTracks = song.releaseSlug
     ? getSongsForRelease(song.releaseSlug)
     : [];
+
+  // Resolve producer names from the producers table
+  const allProducers = getAllProducers();
+  const producerCredits = (song.producerSlugs ?? []).map((pSlug) => ({
+    slug: pSlug,
+    name: allProducers.find((p) => p.slug === pSlug)?.name ?? pSlug,
+  }));
+
+  // Related songs — other songs by this artist (excluding current)
+  const relatedSongs = getSongsForArtist(song.artistSlug)
+    .filter((s) => s.slug !== song.slug)
+    .slice(0, 5);
 
   return (
     <>
@@ -119,23 +134,66 @@ export default async function SongPage({ params }: Props) {
         )}
 
         {/* Credits */}
-        {(song.producerSlugs ?? []).length > 0 && (
+        {producerCredits.length > 0 && (
           <section className="py-12 border-b border-white/5">
             <div className="max-w-7xl mx-auto px-6 lg:px-10">
               <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">
                 Credits
               </p>
               <div className="flex flex-wrap gap-4">
-                {(song.producerSlugs ?? []).map((slug) => (
+                {producerCredits.map(({ slug: pSlug, name }) => (
                   <Link
-                    key={slug}
-                    href={`/producers/${slug}`}
+                    key={pSlug}
+                    href={`/producers/${pSlug}`}
                     className="border border-white/10 px-4 py-2 text-[10px] tracking-[0.2em] uppercase text-white/40 hover:border-white/25 hover:text-white transition-colors"
                   >
-                    {slug}
+                    {name}
                   </Link>
                 ))}
               </div>
+            </div>
+          </section>
+        )}
+
+        {/* DSP Links */}
+        {song.dspLinks && Object.values(song.dspLinks).some(Boolean) && (
+          <section className="py-12 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">
+                Listen On
+              </p>
+              <DSPButtonGroup links={song.dspLinks} />
+            </div>
+          </section>
+        )}
+
+        {/* Linked release CTA */}
+        {release && (
+          <section className="py-12 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10 flex items-center justify-between gap-6">
+              <div className="flex items-center gap-5">
+                {release.coverArtUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={release.coverArtUrl}
+                    alt={release.title}
+                    className="w-16 h-16 object-cover border border-white/10 flex-shrink-0"
+                  />
+                )}
+                <div>
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-1">
+                    {release.type}
+                  </p>
+                  <p className="text-sm text-white font-medium">{release.title}</p>
+                  <p className="text-[10px] text-white/30">{release.artistName}</p>
+                </div>
+              </div>
+              <Link
+                href={`/releases/${release.slug}`}
+                className="border border-white/10 px-5 py-2.5 text-[10px] tracking-[0.2em] uppercase text-white/40 hover:border-white/30 hover:text-white transition-colors shrink-0"
+              >
+                View Release →
+              </Link>
             </div>
           </section>
         )}
@@ -204,7 +262,63 @@ export default async function SongPage({ params }: Props) {
           </section>
         )}
 
-        {/* Back to artist */}
+        {/* Related songs by same artist */}
+        {relatedSongs.length > 0 && (
+          <section className="py-12 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">
+                More by {song.artistName}
+              </p>
+              <div className="space-y-1">
+                {relatedSongs.map((s) => (
+                  <Link
+                    key={s.id}
+                    href={`/songs/${s.slug}`}
+                    className="flex items-center gap-5 py-3 px-3 border border-transparent hover:border-white/[0.06] hover:bg-white/[0.02] group transition-all"
+                  >
+                    <span className="flex-1 text-sm text-white/50 group-hover:text-white/80 transition-colors truncate">
+                      {s.title}
+                    </span>
+                    {s.genre && (
+                      <span className="text-[10px] tracking-[0.1em] uppercase text-white/20">
+                        {s.genre}
+                      </span>
+                    )}
+                    {s.duration && (
+                      <span className="text-[11px] font-mono text-white/20">
+                        {s.duration}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Artist CTA */}
+        <section className="py-12 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-6 lg:px-10">
+            <Link
+              href={`/artists/${song.artistSlug}`}
+              className="flex items-center justify-between group border border-white/[0.06] px-6 py-5 hover:border-white/15 transition-colors"
+            >
+              <div>
+                <p className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-1">
+                  Artist
+                </p>
+                <p className="text-lg font-semibold text-white/70 group-hover:text-white transition-colors">
+                  {song.artistName}
+                </p>
+              </div>
+              <span className="text-white/20 group-hover:text-white transition-colors text-xl">
+                →
+              </span>
+            </Link>
+          </div>
+        </section>
+
+        {/* Back + all songs */}
         <section className="py-12">
           <div className="max-w-7xl mx-auto px-6 lg:px-10 flex items-center justify-between">
             <Link

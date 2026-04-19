@@ -11,8 +11,9 @@ import {
   StatusBadge,
 } from "@/components/admin/FormField";
 import { EntityMediaPanel } from "@/components/admin/EntityMediaPanel";
+import { ProviderPanel } from "@/components/admin/ProviderPanel";
 import { useCmsStore } from "@/lib/cms/store";
-import { CMSArtist } from "@/lib/types";
+import { CMSArtist, ProviderConfig } from "@/lib/types";
 import { useRole } from "@/lib/auth/use-role";
 
 type FormState = {
@@ -113,6 +114,7 @@ export default function EditArtistPage() {
 
   const artist = getArtistBySlug(slug);
   const [form, setForm] = useState<FormState | null>(null);
+  const [providerConfig, setProviderConfig] = useState<ProviderConfig>({});
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -136,6 +138,7 @@ export default function EditArtistPage() {
       "socialLinks.spotify": artist.socialLinks?.spotify ?? "",
       "socialLinks.soundcloud": artist.socialLinks?.soundcloud ?? "",
     });
+    setProviderConfig(artist.providerConfig ?? {});
   }, [artist]);
 
   if (!artist || !form) {
@@ -186,6 +189,7 @@ export default function EditArtistPage() {
         spotify: form["socialLinks.spotify"] || undefined,
         soundcloud: form["socialLinks.soundcloud"] || undefined,
       },
+      providerConfig: Object.keys(providerConfig).length ? providerConfig : undefined,
     });
 
     notify("success", `Artist "${form.name}" saved.`);
@@ -321,6 +325,33 @@ export default function EditArtistPage() {
           <FormField type="url" label="SoundCloud" value={form["socialLinks.soundcloud"]}
             placeholder="https://soundcloud.com/…" mono onChange={(v) => set("socialLinks.soundcloud", v)} />
         </FormSection>
+
+        {/* Provider / Business config */}
+        <FormSection title="Provider & Distribution">
+          <ProviderPanel
+            value={providerConfig}
+            onChange={setProviderConfig}
+            context="artist"
+          />
+        </FormSection>
+
+        {/* Timeline */}
+        <div className="border border-white/[0.06] p-4 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] tracking-[0.2em] uppercase text-white/30 mb-1">
+              Artist Timeline
+            </p>
+            <p className="text-[11px] text-white/20">
+              Manage events, milestones, story seeds, and campaign phases.
+            </p>
+          </div>
+          <a
+            href={`/admin/artists/${artist.slug}/timeline`}
+            className="text-[10px] tracking-[0.2em] uppercase border border-white/10 px-4 py-2 text-white/40 hover:border-white/25 hover:text-white transition-colors"
+          >
+            Open Timeline →
+          </a>
+        </div>
 
         {/* Releases — linked read-only list */}
         <FormSection title="Releases">

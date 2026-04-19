@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
-import { getPublishedReleases, getReleaseBySlug, getSongsForRelease, getAllProducers } from "@/lib/cms";
+import { getPublishedReleases, getReleaseBySlug, getSongsForRelease, getAllProducers, getArtistBySlug } from "@/lib/cms";
+import { DSPButtonGroup } from "@/components/admin/DSPLinksPanel";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
@@ -30,6 +31,9 @@ export default async function ReleasePage({ params }: Props) {
     slug: pSlug,
     name: allProducers.find((p) => p.slug === pSlug)?.name ?? pSlug,
   }));
+
+  // Artist info for credits
+  const artist = getArtistBySlug(release.artistSlug);
 
   return (
     <>
@@ -198,9 +202,9 @@ export default async function ReleasePage({ params }: Props) {
 
         {/* Streaming links */}
         {release.streamingLinks && (
-          <section className="py-20">
+          <section className="py-12 border-b border-white/5">
             <div className="max-w-7xl mx-auto px-6 lg:px-10">
-              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-8">Stream</p>
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">Stream (Legacy)</p>
               <div className="flex flex-wrap gap-4">
                 {Object.entries(release.streamingLinks).map(([platform, url]) => (
                   url && (
@@ -211,6 +215,55 @@ export default async function ReleasePage({ params }: Props) {
                   )
                 ))}
               </div>
+            </div>
+          </section>
+        )}
+
+        {/* DSP links */}
+        {release.dspLinks && Object.values(release.dspLinks).some(Boolean) && (
+          <section className="py-12 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">
+                Listen On
+              </p>
+              <DSPButtonGroup links={release.dspLinks} />
+            </div>
+          </section>
+        )}
+
+        {/* Artist CTA */}
+        {artist && (
+          <section className="py-12 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <Link
+                href={`/artists/${release.artistSlug}`}
+                className="flex items-center justify-between group border border-white/[0.06] px-6 py-5 hover:border-white/15 transition-colors"
+              >
+                <div className="flex items-center gap-5">
+                  {artist.profileImageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={artist.profileImageUrl}
+                      alt={artist.name}
+                      className="w-12 h-12 object-cover rounded-full border border-white/10"
+                    />
+                  )}
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-0.5">
+                      Artist
+                    </p>
+                    <p className="text-base font-semibold text-white/70 group-hover:text-white transition-colors">
+                      {artist.name}
+                    </p>
+                    {artist.genre && (
+                      <p className="text-[10px] text-white/25">{artist.genre}</p>
+                    )}
+                  </div>
+                </div>
+                <span className="text-white/20 group-hover:text-white transition-colors text-xl">
+                  →
+                </span>
+              </Link>
             </div>
           </section>
         )}

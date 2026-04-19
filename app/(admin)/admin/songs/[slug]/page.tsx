@@ -11,13 +11,14 @@ import {
   StatusBadge,
 } from "@/components/admin/FormField";
 import { useCmsStore } from "@/lib/cms/store";
-import { CMSSong, ReleaseStatus, CMSAsset } from "@/lib/types";
+import { CMSSong, ReleaseStatus, CMSAsset, DSPLinks } from "@/lib/types";
 import { uploadAsset } from "@/lib/media";
 import { useRole } from "@/lib/auth/use-role";
 import {
   ACCEPTED_AUDIO_TYPES,
   MAX_AUDIO_SIZE,
 } from "@/lib/media";
+import { DSPLinksPanel } from "@/components/admin/DSPLinksPanel";
 
 // ─── Producer multi-picker ───────────────────────────────────────────────────
 
@@ -290,6 +291,7 @@ export default function EditSongPage() {
     mediaAssetId: string;
   } | null>(null);
   const [producerSlugs, setProducerSlugs] = useState<string[]>([]);
+  const [dspLinks, setDspLinks] = useState<DSPLinks>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -312,6 +314,7 @@ export default function EditSongPage() {
       mediaAssetId: song.mediaAssetId ?? "",
     });
     setProducerSlugs(song.producerSlugs ?? []);
+    setDspLinks(song.dspLinks ?? {});
   }, [song]);
 
   if (!song || !form) {
@@ -367,6 +370,7 @@ export default function EditSongPage() {
       publishAt: form.publishAt || undefined,
       featuredOnHomepage: form.featuredOnHomepage,
       mediaAssetId: form.mediaAssetId || undefined,
+      dspLinks: Object.keys(dspLinks).length ? dspLinks : undefined,
     });
     notify("success", `"${form.title}" saved.`);
     setSaving(false);
@@ -622,6 +626,11 @@ export default function EditSongPage() {
             hint="Required when status is Scheduled"
             onChange={(v) => set("publishAt", v)}
           />
+        </FormSection>
+
+        {/* DSP Links */}
+        <FormSection title="DSP Links">
+          <DSPLinksPanel value={dspLinks} onChange={setDspLinks} />
         </FormSection>
 
         {/* Actions */}

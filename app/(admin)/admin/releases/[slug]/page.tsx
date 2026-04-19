@@ -13,10 +13,12 @@ import {
 import { TracklistEditor } from "@/components/admin/TracklistEditor";
 import { MediaLibraryGrid } from "@/components/admin/MediaLibraryGrid";
 import { useCmsStore, isReleasePublic } from "@/lib/cms/store";
-import { CMSArtist, CMSProducer, CMSRelease, CMSSong, ReleaseStatus, CMSAsset, AssetAttachment } from "@/lib/types";
+import { CMSArtist, CMSProducer, CMSRelease, CMSSong, ReleaseStatus, CMSAsset, AssetAttachment, DSPLinks, ProviderConfig } from "@/lib/types";
 import { getReleaseReadiness } from "@/lib/cms/readiness";
 import { useRole } from "@/lib/auth/use-role";
 import { EntityMediaPanel } from "@/components/admin/EntityMediaPanel";
+import { DSPLinksPanel } from "@/components/admin/DSPLinksPanel";
+import { ProviderPanel } from "@/components/admin/ProviderPanel";
 
 // ─── Artist multi-picker ─────────────────────────────────────────────────────
 
@@ -401,6 +403,8 @@ export default function EditReleasePage() {
   const [tracklist, setTracklist] = useState<CMSSong[]>([]);
   const [featuredArtistSlugs, setFeaturedArtistSlugs] = useState<string[]>([]);
   const [producerSlugs, setProducerSlugs] = useState<string[]>([]);
+  const [dspLinks, setDspLinks] = useState<DSPLinks>({});
+  const [providerConfig, setProviderConfig] = useState<ProviderConfig>({});
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
@@ -429,6 +433,8 @@ export default function EditReleasePage() {
     setTracklist(release.tracklist ?? []);
     setFeaturedArtistSlugs(release.featuredArtistSlugs ?? []);
     setProducerSlugs(release.producerSlugs ?? []);
+    setDspLinks(release.dspLinks ?? {});
+    setProviderConfig(release.providerConfig ?? {});
   }, [release]);
 
   if (!release || !form) {
@@ -474,6 +480,12 @@ export default function EditReleasePage() {
         soundcloud: form["streamingLinks.soundcloud"] || undefined,
         youtube: form["streamingLinks.youtube"] || undefined,
       },
+      dspLinks: Object.keys(dspLinks).some((k) => dspLinks[k as keyof DSPLinks])
+        ? dspLinks
+        : undefined,
+      providerConfig: Object.keys(providerConfig).length
+        ? providerConfig
+        : undefined,
     });
     updateTracklist(release.id, tracklist);
     notify("success", `Release "${form.title}" saved.`);
@@ -714,7 +726,7 @@ export default function EditReleasePage() {
         </FormSection>
 
         {/* Streaming links */}
-        <FormSection title="Streaming Links">
+        <FormSection title="Streaming Links (legacy)">
           <FormField type="url" label="Spotify" value={form["streamingLinks.spotify"]}
             placeholder="https://open.spotify.com/…" mono onChange={(v) => set("streamingLinks.spotify", v)} />
           <FormField type="url" label="Apple Music" value={form["streamingLinks.appleMusic"]}
@@ -725,6 +737,20 @@ export default function EditReleasePage() {
             mono onChange={(v) => set("streamingLinks.soundcloud", v)} />
           <FormField type="url" label="YouTube" value={form["streamingLinks.youtube"]}
             mono onChange={(v) => set("streamingLinks.youtube", v)} />
+        </FormSection>
+
+        {/* DSP links */}
+        <FormSection title="DSP Links">
+          <DSPLinksPanel value={dspLinks} onChange={setDspLinks} />
+        </FormSection>
+
+        {/* Provider config */}
+        <FormSection title="Provider & Distribution">
+          <ProviderPanel
+            value={providerConfig}
+            onChange={setProviderConfig}
+            context="release"
+          />
         </FormSection>
 
         {/* Actions */}

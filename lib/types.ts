@@ -1,5 +1,96 @@
 export type ReleaseStatus = "draft" | "scheduled" | "published" | "archived";
 export type EntityStatus = "draft" | "active" | "archived";
+
+// ─── DSP / Streaming ─────────────────────────────────────────────────────────
+
+/** First-class DSP link set — used on both songs and releases. */
+export interface DSPLinks {
+  spotify?: string;
+  appleMusic?: string;
+  youtubeMusic?: string;
+  soundcloud?: string;
+  tidal?: string;
+  deezer?: string;
+}
+
+// ─── Provider / Business config ───────────────────────────────────────────────
+
+export type DistributorName =
+  | "DistroKid"
+  | "TuneCore"
+  | "CD Baby"
+  | "Stem"
+  | "AWAL"
+  | "UnitedMasters"
+  | "Other";
+
+export type PROName = "BMI" | "ASCAP" | "SESAC" | "PRS" | "SOCAN" | "Other";
+
+export interface ProviderConfig {
+  distributor?: string;
+  pro?: string;
+  publishingAdmin?: string;
+  neighboringRightsOrg?: string;
+  soundExchangeStatus?: "registered" | "pending" | "not_registered";
+  isrc?: string;
+  upc?: string;
+  submissionStatus?:
+    | "not_submitted"
+    | "pending"
+    | "submitted"
+    | "distributed"
+    | "rejected";
+  providerNotes?: string;
+  providerLinks?: Record<string, string>;
+}
+
+// ─── Artist timeline ──────────────────────────────────────────────────────────
+
+export type TimelineItemType =
+  | "release"
+  | "song"
+  | "video"
+  | "event"
+  | "performance"
+  | "milestone"
+  | "press"
+  | "relationship"
+  | "career"
+  | "creative_note"
+  | "story_seed"
+  | "personal_lore"
+  | "campaign_phase";
+
+export type TimelineItemStatus =
+  | "draft"
+  | "confirmed"
+  | "completed"
+  | "cancelled";
+
+export type TimelineItemVisibility = "private" | "team" | "public";
+
+export interface ArtistTimelineItem {
+  id: string;
+  artistSlug: string;
+  type: TimelineItemType;
+  title: string;
+  description?: string;
+  /** ISO date string for the primary date of the event */
+  eventDate: string;
+  endDate?: string;
+  status: TimelineItemStatus;
+  visibility: TimelineItemVisibility;
+  linkedReleaseSlug?: string;
+  linkedSongSlug?: string;
+  linkedAssetIds?: string[];
+  tags?: string[];
+  /** 1 (low) — 10 (critical) */
+  importance: number;
+  /** When true this item is eligible to inform the lyric engine */
+  lyricEngineEligible: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 /**
  * Admin user roles — controls what actions each user can perform.
  *
@@ -29,6 +120,7 @@ export interface CMSArtist {
   profileImageUrl?: string;
   socialLinks?: SocialLinks;
   associatedBrands?: string[];
+  providerConfig?: ProviderConfig;
   createdAt: string;
   updatedAt: string;
 }
@@ -105,6 +197,8 @@ export interface CMSRelease {
   coverArtUrl?: string;
   tracklist?: CMSSong[];
   streamingLinks?: StreamingLinks;
+  dspLinks?: DSPLinks;
+  providerConfig?: ProviderConfig;
   createdAt: string;
   updatedAt: string;
 }
@@ -143,6 +237,7 @@ export interface CMSSong {
   featuredOnHomepage?: boolean;
   /** ID of a linked CMSAsset (audio file in the media library) */
   mediaAssetId?: string;
+  dspLinks?: DSPLinks;
   createdAt: string;
   updatedAt: string;
 }

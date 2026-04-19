@@ -37,6 +37,7 @@ import {
   CMSHomepageConfig,
   CMSSong,
   AssetAttachment,
+  ArtistTimelineItem,
 } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -103,6 +104,7 @@ function rowToArtist(r: any): CMSArtist {
     profileImageUrl: r.profile_image_url ?? undefined,
     socialLinks: r.social_links ?? undefined,
     associatedBrands: r.associated_brands ?? undefined,
+    providerConfig: r.provider_config ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -181,6 +183,8 @@ function rowToRelease(r: any): CMSRelease {
     coverArtUrl: r.cover_art_url ?? undefined,
     tracklist: r.tracklist ?? undefined,
     streamingLinks: r.streaming_links ?? undefined,
+    dspLinks: r.dsp_links ?? undefined,
+    providerConfig: r.provider_config ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -241,6 +245,30 @@ function rowToSong(r: any): CMSSong {
     publishAt: r.publish_at ?? undefined,
     featuredOnHomepage: r.featured_on_homepage ?? false,
     mediaAssetId: r.media_asset_id ?? undefined,
+    dspLinks: r.dsp_links ?? undefined,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToTimelineItem(r: any): ArtistTimelineItem {
+  return {
+    id: r.id,
+    artistSlug: r.artist_slug,
+    type: r.type,
+    title: r.title,
+    description: r.description ?? undefined,
+    eventDate: r.event_date,
+    endDate: r.end_date ?? undefined,
+    status: r.status ?? "draft",
+    visibility: r.visibility ?? "private",
+    linkedReleaseSlug: r.linked_release_slug ?? undefined,
+    linkedSongSlug: r.linked_song_slug ?? undefined,
+    linkedAssetIds: r.linked_asset_ids ?? undefined,
+    tags: r.tags ?? undefined,
+    importance: r.importance ?? 5,
+    lyricEngineEligible: r.lyric_engine_eligible ?? false,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -290,6 +318,7 @@ interface CmsStoreState {
   releases: CMSRelease[];
   songs: CMSSong[];
   assets: CMSAsset[];
+  timelineItems: ArtistTimelineItem[];
   homepageConfig: CMSHomepageConfig;
   notifications: AdminNotification[];
   /** True while the initial Supabase data load is in flight. */
@@ -345,6 +374,17 @@ interface CmsStoreActions {
   createSong: (data: Omit<CMSSong, "id" | "createdAt" | "updatedAt">) => CMSSong;
   updateSong: (id: string, data: Partial<CMSSong>) => CMSSong | undefined;
   deleteSong: (id: string) => void;
+
+  // Timeline
+  getTimelineItemsForArtist: (artistSlug: string) => ArtistTimelineItem[];
+  createTimelineItem: (
+    data: Omit<ArtistTimelineItem, "id" | "createdAt" | "updatedAt">
+  ) => ArtistTimelineItem;
+  updateTimelineItem: (
+    id: string,
+    data: Partial<ArtistTimelineItem>
+  ) => ArtistTimelineItem | undefined;
+  deleteTimelineItem: (id: string) => void;
 
   // Assets
   getAssetById: (id: string) => CMSAsset | undefined;
@@ -402,6 +442,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
     () => seedSongs as CMSSong[]
   );
   const [assets, setAssets] = useState<CMSAsset[]>([]);
+  const [timelineItems, setTimelineItems] = useState<ArtistTimelineItem[]>([]);
   const [homepageConfig, setHomepageConfig] = useState<CMSHomepageConfig>(
     defaultHomepageConfig
   );
@@ -442,8 +483,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
       sb.from("songs").select("*").order("created_at", { ascending: false }),
       sb.from("assets").select("*").order("created_at", { ascending: false }),
       sb.from("homepage_config").select("*").eq("id", "homepage").single(),
+      sb.from("artist_timeline_items").select("*").order("event_date", { ascending: false }),
     ])
-      .then(([a, p, b, r, so, as, hp]) => {
+      .then(([a, p, b, r, so, as, hp, tl]) => {
         if (a.data) setArtists(a.data.map(rowToArtist));
         if (p.data) setProducers(p.data.map(rowToProducer));
         if (b.data) setBrands(b.data.map(rowToBrand));
@@ -451,6 +493,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         if (so.data) setSongs(so.data.map(rowToSong));
         if (as.data) setAssets(as.data.map(rowToAsset));
         if (hp.data) setHomepageConfig(rowToHomepageConfig(hp.data));
+        if (tl.data) setTimelineItems(tl.data.map(rowToTimelineItem));
         if (a.error) console.error("[CMS] artists load:", a.error.message);
         if (p.error) console.error("[CMS] producers load:", p.error.message);
         if (b.error) console.error("[CMS] brands load:", b.error.message);
@@ -526,6 +569,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             profile_image_url: artist.profileImageUrl ?? null,
             social_links: artist.socialLinks ?? null,
             associated_brands: artist.associatedBrands ?? null,
+            provider_config: artist.providerConfig ?? null,
           }),
         () => setArtists((prev) => prev.filter((a) => a.id !== artist.id))
       );
@@ -567,6 +611,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               profile_image_url: u.profileImageUrl ?? null,
               social_links: u.socialLinks ?? null,
               associated_brands: u.associatedBrands ?? null,
+              provider_config: u.providerConfig ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
           orig ? () => setArtists((prev) => prev.map((a) => (a.id === id ? orig : a))) : undefined
@@ -856,6 +901,8 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             cover_art_url: release.coverArtUrl ?? null,
             tracklist: release.tracklist ?? null,
             streaming_links: release.streamingLinks ?? null,
+            dsp_links: release.dspLinks ?? null,
+            provider_config: release.providerConfig ?? null,
           }),
         () => setReleases((prev) => prev.filter((r) => r.id !== release.id))
       );
@@ -899,6 +946,8 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               cover_art_url: u.coverArtUrl ?? null,
               tracklist: u.tracklist ?? null,
               streaming_links: u.streamingLinks ?? null,
+              dsp_links: u.dspLinks ?? null,
+              provider_config: u.providerConfig ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
           orig ? () => setReleases((prev) => prev.map((r) => (r.id === id ? orig : r))) : undefined
@@ -1057,6 +1106,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             publish_at: song.publishAt ?? null,
             featured_on_homepage: song.featuredOnHomepage ?? false,
             media_asset_id: song.mediaAssetId ?? null,
+            dsp_links: song.dspLinks ?? null,
           }),
         () => setSongs((prev) => prev.filter((s) => s.id !== song.id))
       );
@@ -1101,6 +1151,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               publish_at: u.publishAt ?? null,
               featured_on_homepage: u.featuredOnHomepage ?? false,
               media_asset_id: u.mediaAssetId ?? null,
+              dsp_links: u.dspLinks ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
           orig ? () => setSongs((prev) => prev.map((s) => (s.id === id ? orig : s))) : undefined
@@ -1121,6 +1172,124 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
     bgSync(
       (sb) => sb.from("songs").delete().eq("id", id),
       removed ? () => setSongs((prev) => [...prev, removed!]) : undefined
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Timeline ───────────────────────────────────────────────────────────────
+
+  const getTimelineItemsForArtist = useCallback(
+    (artistSlug: string) =>
+      timelineItems
+        .filter((t) => t.artistSlug === artistSlug)
+        .sort(
+          (a, b) =>
+            new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime()
+        ),
+    [timelineItems]
+  );
+
+  const createTimelineItem = useCallback(
+    (
+      data: Omit<ArtistTimelineItem, "id" | "createdAt" | "updatedAt">
+    ): ArtistTimelineItem => {
+      const item: ArtistTimelineItem = {
+        ...data,
+        id: generateId(),
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      setTimelineItems((prev) => [...prev, item]);
+      bgSync(
+        (sb) =>
+          sb.from("artist_timeline_items").insert({
+            id: item.id,
+            artist_slug: item.artistSlug,
+            type: item.type,
+            title: item.title,
+            description: item.description ?? null,
+            event_date: item.eventDate,
+            end_date: item.endDate ?? null,
+            status: item.status,
+            visibility: item.visibility,
+            linked_release_slug: item.linkedReleaseSlug ?? null,
+            linked_song_slug: item.linkedSongSlug ?? null,
+            linked_asset_ids: item.linkedAssetIds ?? null,
+            tags: item.tags ?? null,
+            importance: item.importance,
+            lyric_engine_eligible: item.lyricEngineEligible,
+          }),
+        () =>
+          setTimelineItems((prev) => prev.filter((t) => t.id !== item.id))
+      );
+      return item;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const updateTimelineItem = useCallback(
+    (
+      id: string,
+      data: Partial<ArtistTimelineItem>
+    ): ArtistTimelineItem | undefined => {
+      let original: ArtistTimelineItem | undefined;
+      let updated: ArtistTimelineItem | undefined;
+      setTimelineItems((prev) =>
+        prev.map((t) => {
+          if (t.id !== id) return t;
+          original = t;
+          updated = { ...t, ...data, updatedAt: now() };
+          return updated;
+        })
+      );
+      if (updated) {
+        const u = updated;
+        const orig = original;
+        bgSync(
+          (sb) =>
+            sb.from("artist_timeline_items").update({
+              artist_slug: u.artistSlug,
+              type: u.type,
+              title: u.title,
+              description: u.description ?? null,
+              event_date: u.eventDate,
+              end_date: u.endDate ?? null,
+              status: u.status,
+              visibility: u.visibility,
+              linked_release_slug: u.linkedReleaseSlug ?? null,
+              linked_song_slug: u.linkedSongSlug ?? null,
+              linked_asset_ids: u.linkedAssetIds ?? null,
+              tags: u.tags ?? null,
+              importance: u.importance,
+              lyric_engine_eligible: u.lyricEngineEligible,
+              updated_at: u.updatedAt,
+            }).eq("id", id),
+          orig
+            ? () =>
+                setTimelineItems((prev) =>
+                  prev.map((t) => (t.id === id ? orig! : t))
+                )
+            : undefined
+        );
+      }
+      return updated;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const deleteTimelineItem = useCallback((id: string) => {
+    let removed: ArtistTimelineItem | undefined;
+    setTimelineItems((prev) => {
+      removed = prev.find((t) => t.id === id);
+      return prev.filter((t) => t.id !== id);
+    });
+    bgSync(
+      (sb) => sb.from("artist_timeline_items").delete().eq("id", id),
+      removed
+        ? () => setTimelineItems((prev) => [...prev, removed!])
+        : undefined
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1325,6 +1494,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
     releases,
     songs,
     assets,
+    timelineItems,
     homepageConfig,
     notifications,
     isLoading,
@@ -1361,6 +1531,10 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
     createSong,
     updateSong,
     deleteSong,
+    getTimelineItemsForArtist,
+    createTimelineItem,
+    updateTimelineItem,
+    deleteTimelineItem,
     getAssetById,
     getAssetsForEntity,
     addAsset,
