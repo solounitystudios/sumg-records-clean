@@ -57,12 +57,14 @@ export function AdminShell({ children, title }: AdminShellProps) {
 
         {/* Sign out */}
         <div className="border-t border-white/5 p-4">
-          <Link
-            href="/login"
-            className="block text-center text-[10px] tracking-[0.2em] uppercase text-white/25 hover:text-white/50 transition-colors duration-200 py-2"
-          >
-            Sign Out
-          </Link>
+          <form action="/api/auth/signout" method="POST">
+            <button
+              type="submit"
+              className="w-full text-center text-[10px] tracking-[0.2em] uppercase text-white/25 hover:text-white/50 transition-colors duration-200 py-2 cursor-pointer"
+            >
+              Sign Out
+            </button>
+          </form>
         </div>
       </aside>
 
