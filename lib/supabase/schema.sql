@@ -187,3 +187,16 @@ create policy "auth write homepage"    on homepage_config for all using (auth.ro
 -- Run in Supabase Dashboard → Storage → New Bucket:
 -- Bucket name: "media"   → Public: true
 -- Or via CLI: supabase storage buckets create media --public
+
+-- ─── Phase 5 migration — Brand operations ────────────────────────────────────
+-- Run these ALTER TABLE statements after the initial schema above if upgrading
+-- an existing database.  They are safe to run multiple times (IF NOT EXISTS).
+
+alter table brands add column if not exists hero_headline       text;
+alter table brands add column if not exists hero_subcopy        text;
+alter table brands add column if not exists campaign_status     text
+  check (campaign_status in ('active', 'inactive', 'upcoming'));
+alter table brands add column if not exists collection_name     text;
+alter table brands add column if not exists featured_release_slugs jsonb;
+alter table brands add column if not exists featured_song_slugs    jsonb;
+alter table brands add column if not exists featured_asset_ids     jsonb;

@@ -13,6 +13,7 @@ import {
 import { useCmsStore } from "@/lib/cms/store";
 import { CMSSong, ReleaseStatus, CMSAsset } from "@/lib/types";
 import { uploadAsset } from "@/lib/media";
+import { useRole } from "@/lib/auth/use-role";
 import {
   ACCEPTED_AUDIO_TYPES,
   MAX_AUDIO_SIZE,
@@ -267,6 +268,7 @@ export default function EditSongPage() {
     producers,
     getAssetsForEntity,
   } = useCmsStore();
+  const role = useRole();
 
   const song = getSongBySlug(slug);
 
@@ -446,14 +448,24 @@ export default function EditSongPage() {
 
         {/* Audio Upload — native uploader, first section */}
         <FormSection title="Audio">
-          <AudioUploadPanel
-            songId={song.id}
-            songSlug={song.slug}
-            currentUrl={form.audioUrl || undefined}
-            currentAsset={primaryAudioAsset}
-            onUploaded={handleAudioUploaded}
-            onDelete={handleAudioDeleted}
-          />
+          {role.canUploadMedia ? (
+            <AudioUploadPanel
+              songId={song.id}
+              songSlug={song.slug}
+              currentUrl={form.audioUrl || undefined}
+              currentAsset={primaryAudioAsset}
+              onUploaded={handleAudioUploaded}
+              onDelete={handleAudioDeleted}
+            />
+          ) : (
+            <div className="border border-white/5 p-4 text-[11px] text-white/30">
+              {form.audioUrl ? (
+                <audio controls src={form.audioUrl} className="w-full h-8 opacity-60" />
+              ) : (
+                <p>No audio — your role ({role.roleLabel}) cannot manage media.</p>
+              )}
+            </div>
+          )}
 
           {/* Manual URL override */}
           <div className="pt-2">
@@ -615,8 +627,13 @@ export default function EditSongPage() {
         {/* Actions */}
         <div className="pt-4 border-t border-white/5 flex items-center justify-between">
           <SaveButton onClick={handleSave} saving={saving} />
-          <DangerButton onClick={handleDelete} label="Delete Song" />
+          <DangerButton onClick={handleDelete} label="Delete Song" disabled={!role.canDelete} />
         </div>
+        {!role.canDelete && (
+          <p className="text-[10px] text-white/20">
+            ◌ Your role ({role.roleLabel}) does not have permission to delete entities.
+          </p>
+        )}
       </div>
     </AdminShell>
   );

@@ -1,6 +1,14 @@
 export type ReleaseStatus = "draft" | "scheduled" | "published" | "archived";
 export type EntityStatus = "draft" | "active" | "archived";
-export type UserRole = "admin" | "editor";
+/**
+ * Admin user roles — controls what actions each user can perform.
+ *
+ *   admin           → full access (all CRUD, settings, delete, publish, upload)
+ *   release_manager → can publish releases and songs; cannot delete or change settings
+ *   media_manager   → can upload / replace / delete media assets; cannot publish or delete entities
+ *   editor          → can edit content (text, metadata) but cannot publish, delete, or manage media
+ */
+export type UserRole = "admin" | "editor" | "media_manager" | "release_manager";
 export type AssetType = "image" | "video" | "audio" | "document";
 export type HeroStyle = "editorial" | "minimal" | "mystic" | "industrial" | "coastal";
 
@@ -52,11 +60,25 @@ export interface CMSBrand {
   tagline: string;
   manifesto?: string;
   heroCopy?: string;
+  /** Primary headline text for the brand hero section (H1-level) */
+  heroHeadline?: string;
+  /** Subtitle / subcopy displayed beneath heroHeadline */
+  heroSubcopy?: string;
   longDescription?: string;
   heroImageUrl?: string;
   logoUrl?: string;
   accentColor?: string;
   heroStyle?: HeroStyle;
+  /** Lifecycle state of the brand's active campaign */
+  campaignStatus?: "active" | "inactive" | "upcoming";
+  /** Current collection or capsule name (e.g. "Spring 2025 — Void Series") */
+  collectionName?: string;
+  /** Slugs of releases featured on the brand page */
+  featuredReleaseSlugs?: string[];
+  /** Slugs of songs featured on the brand page */
+  featuredSongSlugs?: string[];
+  /** IDs of media assets featured on the brand page */
+  featuredAssetIds?: string[];
   isActive: boolean;
   featuredOnHomepage?: boolean;
   sortOrder?: number;
@@ -204,6 +226,10 @@ export interface AuthSession {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isEditor: boolean;
+  /** True for admin + media_manager */
+  isMediaManager: boolean;
+  /** True for admin + release_manager */
+  isReleaseManager: boolean;
 }
 
 export interface UploadResult {

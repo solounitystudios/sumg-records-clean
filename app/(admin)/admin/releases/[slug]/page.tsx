@@ -15,6 +15,7 @@ import { MediaLibraryGrid } from "@/components/admin/MediaLibraryGrid";
 import { useCmsStore, isReleasePublic } from "@/lib/cms/store";
 import { CMSArtist, CMSProducer, CMSRelease, CMSSong, ReleaseStatus, CMSAsset, AssetAttachment } from "@/lib/types";
 import { getReleaseReadiness } from "@/lib/cms/readiness";
+import { useRole } from "@/lib/auth/use-role";
 
 // ─── Artist multi-picker ─────────────────────────────────────────────────────
 
@@ -373,6 +374,7 @@ export default function EditReleasePage() {
     attachAssetToEntity,
     detachAssetFromEntity,
   } = useCmsStore();
+  const role = useRole();
 
   const release = getReleaseBySlug(slug);
   const [form, setForm] = useState<{
@@ -639,13 +641,15 @@ export default function EditReleasePage() {
               <button
                 type="button"
                 onClick={handlePublishNow}
-                disabled={publishing}
-                className="border border-yellow-800/60 text-yellow-400/80 text-[10px] tracking-[0.2em] uppercase px-6 py-2.5 hover:border-yellow-500/60 hover:text-yellow-400 transition-colors disabled:opacity-40"
+                disabled={publishing || !role.canPublish}
+                className="border border-yellow-800/60 text-yellow-400/80 text-[10px] tracking-[0.2em] uppercase px-6 py-2.5 hover:border-yellow-500/60 hover:text-yellow-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {publishing ? "Publishing…" : "⬆ Publish Now"}
               </button>
               <p className="text-[10px] text-white/15 mt-1.5">
-                Sets status to Published, isVisible to true, and surfaces this release across all public pages immediately.
+                {role.canPublish
+                  ? "Sets status to Published, isVisible to true, and surfaces this release across all public pages immediately."
+                  : `Your role (${role.roleLabel}) cannot publish releases.`}
               </p>
             </div>
           )}
@@ -689,8 +693,13 @@ export default function EditReleasePage() {
         {/* Actions */}
         <div className="pt-4 border-t border-white/5 flex items-center justify-between">
           <SaveButton onClick={handleSave} saving={saving} />
-          <DangerButton onClick={handleDelete} label="Delete Release" />
+          <DangerButton onClick={handleDelete} label="Delete Release" disabled={!role.canDelete} />
         </div>
+        {!role.canDelete && (
+          <p className="text-[10px] text-white/20">
+            ◌ Your role ({role.roleLabel}) does not have permission to delete entities.
+          </p>
+        )}
       </div>
     </AdminShell>
   );

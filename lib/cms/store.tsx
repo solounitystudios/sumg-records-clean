@@ -53,6 +53,17 @@ function generateId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+const VALID_CAMPAIGN_STATUSES = new Set<string>(["active", "inactive", "upcoming"]);
+
+/** Coerces a raw value to a valid CMSBrand campaignStatus or null. */
+function sanitizeCampaignStatus(
+  v: string | undefined | null
+): "active" | "inactive" | "upcoming" | null {
+  if (v && VALID_CAMPAIGN_STATUSES.has(v))
+    return v as "active" | "inactive" | "upcoming";
+  return null;
+}
+
 /** Returns true if a release should be visible on the public site. */
 export function isReleasePublic(r: CMSRelease): boolean {
   if (!r.isVisible) return false;
@@ -129,11 +140,18 @@ function rowToBrand(r: any): CMSBrand {
     tagline: r.tagline ?? "",
     manifesto: r.manifesto ?? undefined,
     heroCopy: r.hero_copy ?? undefined,
+    heroHeadline: r.hero_headline ?? undefined,
+    heroSubcopy: r.hero_subcopy ?? undefined,
     longDescription: r.long_description ?? undefined,
     heroImageUrl: r.hero_image_url ?? undefined,
     logoUrl: r.logo_url ?? undefined,
     accentColor: r.accent_color ?? undefined,
     heroStyle: r.hero_style ?? undefined,
+    campaignStatus: r.campaign_status ?? undefined,
+    collectionName: r.collection_name ?? undefined,
+    featuredReleaseSlugs: r.featured_release_slugs ?? undefined,
+    featuredSongSlugs: r.featured_song_slugs ?? undefined,
+    featuredAssetIds: r.featured_asset_ids ?? undefined,
     isActive: r.is_active ?? true,
     featuredOnHomepage: r.featured_on_homepage ?? false,
     sortOrder: r.sort_order ?? 0,
@@ -704,11 +722,18 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             tagline: brand.tagline,
             manifesto: brand.manifesto ?? null,
             hero_copy: brand.heroCopy ?? null,
+            hero_headline: brand.heroHeadline ?? null,
+            hero_subcopy: brand.heroSubcopy ?? null,
             long_description: brand.longDescription ?? null,
             hero_image_url: brand.heroImageUrl ?? null,
             logo_url: brand.logoUrl ?? null,
             accent_color: brand.accentColor ?? null,
             hero_style: brand.heroStyle ?? null,
+            campaign_status: sanitizeCampaignStatus(brand.campaignStatus),
+            collection_name: brand.collectionName ?? null,
+            featured_release_slugs: brand.featuredReleaseSlugs ?? null,
+            featured_song_slugs: brand.featuredSongSlugs ?? null,
+            featured_asset_ids: brand.featuredAssetIds ?? null,
             is_active: brand.isActive,
             featured_on_homepage: brand.featuredOnHomepage ?? false,
             sort_order: brand.sortOrder ?? 0,
@@ -745,11 +770,18 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               tagline: u.tagline,
               manifesto: u.manifesto ?? null,
               hero_copy: u.heroCopy ?? null,
+              hero_headline: u.heroHeadline ?? null,
+              hero_subcopy: u.heroSubcopy ?? null,
               long_description: u.longDescription ?? null,
               hero_image_url: u.heroImageUrl ?? null,
               logo_url: u.logoUrl ?? null,
               accent_color: u.accentColor ?? null,
               hero_style: u.heroStyle ?? null,
+              campaign_status: sanitizeCampaignStatus(u.campaignStatus),
+              collection_name: u.collectionName ?? null,
+              featured_release_slugs: u.featuredReleaseSlugs ?? null,
+              featured_song_slugs: u.featuredSongSlugs ?? null,
+              featured_asset_ids: u.featuredAssetIds ?? null,
               is_active: u.isActive,
               featured_on_homepage: u.featuredOnHomepage ?? false,
               sort_order: u.sortOrder ?? 0,

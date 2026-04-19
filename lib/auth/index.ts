@@ -13,20 +13,23 @@ export async function getSession(): Promise<AuthSession> {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return { user: null, isAuthenticated: false, isAdmin: false, isEditor: false };
+      return { user: null, isAuthenticated: false, isAdmin: false, isEditor: false, isMediaManager: false, isReleaseManager: false };
     }
 
     // Role is stored in user_metadata.role or app_metadata.role
-    const role =
+    const rawRole =
       (user.app_metadata?.role as string | undefined) ??
       (user.user_metadata?.role as string | undefined) ??
       "editor";
+
+    const validRoles = ["admin", "editor", "media_manager", "release_manager"];
+    const role = validRoles.includes(rawRole) ? rawRole : "editor";
 
     const cmsUser: CMSUser = {
       id: user.id,
       email: user.email ?? "",
       name: user.user_metadata?.name ?? user.email ?? "",
-      role: role === "admin" ? "admin" : "editor",
+      role: role as CMSUser["role"],
       createdAt: user.created_at,
     };
 
@@ -34,10 +37,12 @@ export async function getSession(): Promise<AuthSession> {
       user: cmsUser,
       isAuthenticated: true,
       isAdmin: cmsUser.role === "admin",
-      isEditor: cmsUser.role === "editor" || cmsUser.role === "admin",
+      isEditor: true, // all roles can edit content
+      isMediaManager: cmsUser.role === "admin" || cmsUser.role === "media_manager",
+      isReleaseManager: cmsUser.role === "admin" || cmsUser.role === "release_manager",
     };
   } catch {
-    return { user: null, isAuthenticated: false, isAdmin: false, isEditor: false };
+    return { user: null, isAuthenticated: false, isAdmin: false, isEditor: false, isMediaManager: false, isReleaseManager: false };
   }
 }
 

@@ -2,17 +2,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCmsStore } from "@/lib/cms/store";
+import { useRole } from "@/lib/auth/use-role";
 
 const adminNav = [
-  { label: "Dashboard", href: "/admin", icon: "◈" },
-  { label: "Artists", href: "/admin/artists", icon: "◎" },
-  { label: "Producers", href: "/admin/producers", icon: "◉" },
-  { label: "Songs", href: "/admin/songs", icon: "♫" },
-  { label: "Brands", href: "/admin/brands", icon: "◐" },
-  { label: "Releases", href: "/admin/releases", icon: "◑" },
-  { label: "Media", href: "/admin/media", icon: "◒" },
-  { label: "Homepage", href: "/admin/homepage", icon: "◇" },
-  { label: "Settings", href: "/admin/settings", icon: "◌" },
+  { label: "Dashboard",  href: "/admin",            icon: "◈" },
+  { label: "Artists",    href: "/admin/artists",    icon: "◎" },
+  { label: "Producers",  href: "/admin/producers",  icon: "◉" },
+  { label: "Songs",      href: "/admin/songs",      icon: "♫" },
+  { label: "Brands",     href: "/admin/brands",     icon: "◐" },
+  { label: "Releases",   href: "/admin/releases",   icon: "◑" },
+  { label: "Media",      href: "/admin/media",      icon: "◒" },
+  { label: "Calendar",   href: "/admin/calendar",   icon: "◫" },
+  { label: "Homepage",   href: "/admin/homepage",   icon: "◇" },
+  { label: "Settings",   href: "/admin/settings",   icon: "◌" },
 ];
 
 interface AdminShellProps {
@@ -24,6 +26,7 @@ export function AdminShell({ children, title }: AdminShellProps) {
   const pathname = usePathname();
   const { notifications, dismissNotification, isLoading, syncState, dataSource } =
     useCmsStore();
+  const role = useRole();
 
   // ── Derive indicator values ─────────────────────────────────────────────────
 
@@ -105,6 +108,13 @@ export function AdminShell({ children, title }: AdminShellProps) {
             <span className={`inline-block w-1.5 h-1.5 rounded-full ${syncDot}`} />
             <span className="text-[10px] tracking-[0.15em] uppercase text-white/20 select-none">
               {syncLabel}
+            </span>
+          </div>
+
+          {/* Role badge */}
+          <div className="ml-4 pl-4 border-l border-white/5 flex items-center gap-2">
+            <span className="text-[9px] tracking-[0.15em] uppercase text-white/15 select-none">
+              {role.roleLabel}
             </span>
           </div>
         </div>
