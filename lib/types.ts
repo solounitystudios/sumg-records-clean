@@ -87,15 +87,42 @@ export interface CMSRelease {
   updatedAt: string;
 }
 
+/**
+ * CMSSong — first-class entity.
+ *
+ * Songs are independently managed and linked to releases, artists, and
+ * producers.  When a release is published, all linked songs whose status
+ * is not "archived" are automatically set to "published".
+ *
+ * The `trackNumber` / `releaseSlug` fields are retained so that songs
+ * continue to work as inline tracklist items inside the release editor.
+ */
 export interface CMSSong {
   id: string;
+  /** URL-safe identifier — doubles as the public /songs/[slug] path */
+  slug: string;
   title: string;
-  releaseSlug: string;
+  /** Primary artist */
   artistSlug: string;
+  artistName: string;
+  /** Release this song belongs to (may be undefined for standalone singles) */
+  releaseSlug?: string;
+  releaseName?: string;
+  producerSlugs?: string[];
+  genre?: string;
   duration?: string;
   audioUrl?: string;
+  lyrics?: string;
   isExplicit?: boolean;
   trackNumber?: number;
+  status: ReleaseStatus;
+  isVisible: boolean;
+  publishAt?: string;
+  featuredOnHomepage?: boolean;
+  /** ID of a linked CMSAsset (audio file in the media library) */
+  mediaAssetId?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CMSAsset {
@@ -112,7 +139,7 @@ export interface CMSAsset {
 }
 
 export interface AssetAttachment {
-  entityType: "artist" | "producer" | "brand" | "release";
+  entityType: "artist" | "producer" | "brand" | "release" | "song";
   entityId: string;
   role: "hero" | "profile" | "cover" | "gallery" | "video" | "audio";
 }

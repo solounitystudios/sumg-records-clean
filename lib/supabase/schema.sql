@@ -106,6 +106,33 @@ create table if not exists assets (
   created_at    timestamptz not null default now()
 );
 
+-- ─── Songs ──────────────────────────────────────────────────────────────────
+-- First-class entity. Linked to artists, releases, and producers.
+-- When a release is published, the app automatically publishes all linked songs.
+create table if not exists songs (
+  id                    text primary key,
+  slug                  text unique not null,
+  title                 text not null,
+  artist_slug           text not null,
+  artist_name           text not null,
+  release_slug          text,
+  release_name          text,
+  producer_slugs        jsonb,
+  genre                 text,
+  duration              text,
+  audio_url             text,
+  lyrics                text,
+  is_explicit           boolean not null default false,
+  track_number          integer,
+  status                text not null default 'draft',
+  is_visible            boolean not null default false,
+  publish_at            text,
+  featured_on_homepage  boolean not null default false,
+  media_asset_id        text,
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now()
+);
+
 -- ─── Homepage Config ─────────────────────────────────────────────────────────
 create table if not exists homepage_config (
   id                      text primary key default 'homepage',
@@ -132,6 +159,7 @@ alter table artists enable row level security;
 alter table producers enable row level security;
 alter table brands enable row level security;
 alter table releases enable row level security;
+alter table songs enable row level security;
 alter table assets enable row level security;
 alter table homepage_config enable row level security;
 
@@ -141,6 +169,8 @@ create policy "public read producers"   on producers       for select using (tru
 create policy "public read brands"      on brands          for select using (true);
 create policy "public read releases"    on releases        for select using (is_visible = true and status = 'published');
 create policy "public read all releases" on releases       for select using (true); -- admin reads all
+create policy "public read songs"       on songs           for select using (is_visible = true and status = 'published');
+create policy "public read all songs"   on songs           for select using (true); -- admin reads all
 create policy "public read homepage"    on homepage_config for select using (true);
 create policy "public read assets"      on assets          for select using (true);
 
@@ -149,6 +179,7 @@ create policy "auth write artists"     on artists         for all using (auth.ro
 create policy "auth write producers"   on producers       for all using (auth.role() = 'authenticated');
 create policy "auth write brands"      on brands          for all using (auth.role() = 'authenticated');
 create policy "auth write releases"    on releases        for all using (auth.role() = 'authenticated');
+create policy "auth write songs"       on songs           for all using (auth.role() = 'authenticated');
 create policy "auth write assets"      on assets          for all using (auth.role() = 'authenticated');
 create policy "auth write homepage"    on homepage_config for all using (auth.role() = 'authenticated');
 

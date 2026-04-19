@@ -3,7 +3,8 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
 import { artists } from "@/data/artists";
-import { getPublishedReleases } from "@/lib/cms";
+import { getPublishedReleases, getSongsForArtist } from "@/lib/cms";
+import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
 
@@ -23,6 +24,7 @@ export default async function ArtistPage({ params }: Props) {
   if (!artist) notFound();
 
   const releases = getPublishedReleases().filter((r) => r.artistSlug === artist.slug);
+  const songs = getSongsForArtist(artist.slug);
 
   return (
     <>
@@ -47,6 +49,53 @@ export default async function ArtistPage({ params }: Props) {
               <div className="max-w-2xl">
                 <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">About</p>
                 <p className="text-base text-white/50 leading-loose">{artist.longBio}</p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Songs — first-class linked songs from songs table */}
+        {songs.length > 0 && (
+          <section className="py-20 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <div className="flex items-center justify-between mb-8">
+                <p className="text-[10px] tracking-[0.3em] uppercase text-white/25">
+                  Songs
+                </p>
+                <Link
+                  href="/songs"
+                  className="text-[10px] tracking-[0.2em] uppercase text-white/20 hover:text-white transition-colors"
+                >
+                  All Songs →
+                </Link>
+              </div>
+              <div className="space-y-0 max-w-2xl">
+                {songs.map((song, i) => (
+                  <Link
+                    key={song.id}
+                    href={`/songs/${song.slug}`}
+                    className="flex items-center gap-5 py-4 border-b border-white/[0.04] group hover:bg-white/[0.02] px-2 transition-colors"
+                  >
+                    <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-white/70 group-hover:text-white transition-colors">
+                        {song.title}
+                        {song.isExplicit && (
+                          <span className="ml-2 text-[9px] border border-white/15 text-white/20 px-1.5 py-0.5">E</span>
+                        )}
+                      </span>
+                      {song.releaseName && (
+                        <p className="text-[10px] text-white/20 mt-0.5">{song.releaseName}</p>
+                      )}
+                    </div>
+                    {song.duration && (
+                      <span className="text-[11px] font-mono text-white/20">{song.duration}</span>
+                    )}
+                    <span className="text-white/10 group-hover:text-white/40 transition-colors text-xs">→</span>
+                  </Link>
+                ))}
               </div>
             </div>
           </section>

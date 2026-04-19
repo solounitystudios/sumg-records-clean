@@ -7,6 +7,7 @@ const adminNav = [
   { label: "Dashboard", href: "/admin", icon: "◈" },
   { label: "Artists", href: "/admin/artists", icon: "◎" },
   { label: "Producers", href: "/admin/producers", icon: "◉" },
+  { label: "Songs", href: "/admin/songs", icon: "♫" },
   { label: "Brands", href: "/admin/brands", icon: "◐" },
   { label: "Releases", href: "/admin/releases", icon: "◑" },
   { label: "Media", href: "/admin/media", icon: "◒" },

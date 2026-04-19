@@ -28,11 +28,19 @@ export function TracklistEditor({
     if (!newTitle.trim()) return;
     const track: CMSSong = {
       id: generateTrackId(),
+      // slug is auto-derived from title for inline tracklist entries
+      slug: newTitle.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") + `-${Math.random().toString(36).slice(2, 6)}`,
       title: newTitle.trim(),
       releaseSlug,
+      releaseName: undefined,
       artistSlug,
+      artistName: artistSlug,
       trackNumber: tracks.length + 1,
       duration: newDuration.trim() || undefined,
+      status: "draft",
+      isVisible: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     onChange([...tracks, track]);
     setNewTitle("");

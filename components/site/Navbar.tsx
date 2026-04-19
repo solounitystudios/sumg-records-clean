@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 
 const navLinks = [
-  { label: "Artists", href: "#artists" },
-  { label: "Producers", href: "#producers" },
-  { label: "Brands", href: "#brands" },
-  { label: "Releases", href: "#releases" },
-  { label: "Vision", href: "#vision" },
+  { label: "Artists", href: "/artists" },
+  { label: "Releases", href: "/releases" },
+  { label: "Songs", href: "/songs" },
+  { label: "Producers", href: "/producers" },
+  { label: "Brands", href: "/brands" },
 ];
 
 export function Navbar() {
@@ -60,7 +60,7 @@ export function Navbar() {
 
         {/* Desktop CTA */}
         <a
-          href="#releases"
+          href="/releases"
           className="hidden md:inline-flex items-center gap-2 text-[10px] tracking-[0.25em] uppercase text-black bg-white hover:bg-white/90 px-5 py-2.5 transition-all duration-300"
         >
           Listen Now
@@ -99,7 +99,7 @@ export function Navbar() {
             </a>
           ))}
           <a
-            href="#releases"
+            href="/releases"
             onClick={closeMenu}
             className="mt-2 inline-flex items-center justify-center text-[10px] tracking-[0.25em] uppercase text-black bg-white hover:bg-white/90 px-5 py-3 transition-all duration-300"
           >

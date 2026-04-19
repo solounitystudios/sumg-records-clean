@@ -27,6 +27,7 @@ import { artists as seedArtists } from "@/data/artists";
 import { producers as seedProducers } from "@/data/producers";
 import { brands as seedBrands } from "@/data/brands";
 import { releases as seedReleases } from "@/data/releases";
+import { songs as seedSongs } from "@/data/songs";
 import {
   CMSArtist,
   CMSProducer,
@@ -200,6 +201,33 @@ function rowToHomepageConfig(r: any): CMSHomepageConfig {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToSong(r: any): CMSSong {
+  return {
+    id: r.id,
+    slug: r.slug,
+    title: r.title,
+    artistSlug: r.artist_slug,
+    artistName: r.artist_name,
+    releaseSlug: r.release_slug ?? undefined,
+    releaseName: r.release_name ?? undefined,
+    producerSlugs: r.producer_slugs ?? undefined,
+    genre: r.genre ?? undefined,
+    duration: r.duration ?? undefined,
+    audioUrl: r.audio_url ?? undefined,
+    lyrics: r.lyrics ?? undefined,
+    isExplicit: r.is_explicit ?? false,
+    trackNumber: r.track_number ?? undefined,
+    status: r.status ?? "draft",
+    isVisible: r.is_visible ?? false,
+    publishAt: r.publish_at ?? undefined,
+    featuredOnHomepage: r.featured_on_homepage ?? false,
+    mediaAssetId: r.media_asset_id ?? undefined,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
 // ─── Default homepage config (seed fallback) ─────────────────────────────────
 
 const defaultHomepageConfig: CMSHomepageConfig = {
@@ -242,6 +270,7 @@ interface CmsStoreState {
   producers: CMSProducer[];
   brands: CMSBrand[];
   releases: CMSRelease[];
+  songs: CMSSong[];
   assets: CMSAsset[];
   homepageConfig: CMSHomepageConfig;
   notifications: AdminNotification[];
@@ -281,9 +310,23 @@ interface CmsStoreActions {
   getPublicReleases: () => CMSRelease[];
   createRelease: (data: Omit<CMSRelease, "id" | "createdAt" | "updatedAt">) => CMSRelease;
   updateRelease: (id: string, data: Partial<CMSRelease>) => CMSRelease | undefined;
+  /**
+   * Publishes a release and automatically publishes all non-archived songs
+   * linked to that release.
+   */
   publishRelease: (id: string) => CMSRelease | undefined;
   deleteRelease: (id: string) => void;
   updateTracklist: (releaseId: string, tracklist: CMSSong[]) => void;
+
+  // Songs
+  getSongById: (id: string) => CMSSong | undefined;
+  getSongBySlug: (slug: string) => CMSSong | undefined;
+  getPublicSongs: () => CMSSong[];
+  getSongsForRelease: (releaseSlug: string) => CMSSong[];
+  getSongsForArtist: (artistSlug: string) => CMSSong[];
+  createSong: (data: Omit<CMSSong, "id" | "createdAt" | "updatedAt">) => CMSSong;
+  updateSong: (id: string, data: Partial<CMSSong>) => CMSSong | undefined;
+  deleteSong: (id: string) => void;
 
   // Assets
   getAssetById: (id: string) => CMSAsset | undefined;
@@ -337,6 +380,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   const [releases, setReleases] = useState<CMSRelease[]>(
     () => seedReleases as CMSRelease[]
   );
+  const [songs, setSongs] = useState<CMSSong[]>(
+    () => seedSongs as CMSSong[]
+  );
   const [assets, setAssets] = useState<CMSAsset[]>([]);
   const [homepageConfig, setHomepageConfig] = useState<CMSHomepageConfig>(
     defaultHomepageConfig
@@ -375,20 +421,23 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
       sb.from("producers").select("*").order("sort_order", { ascending: true }),
       sb.from("brands").select("*").order("sort_order", { ascending: true }),
       sb.from("releases").select("*").order("release_date", { ascending: false }),
+      sb.from("songs").select("*").order("created_at", { ascending: false }),
       sb.from("assets").select("*").order("created_at", { ascending: false }),
       sb.from("homepage_config").select("*").eq("id", "homepage").single(),
     ])
-      .then(([a, p, b, r, as, hp]) => {
+      .then(([a, p, b, r, so, as, hp]) => {
         if (a.data) setArtists(a.data.map(rowToArtist));
         if (p.data) setProducers(p.data.map(rowToProducer));
         if (b.data) setBrands(b.data.map(rowToBrand));
         if (r.data) setReleases(r.data.map(rowToRelease));
+        if (so.data) setSongs(so.data.map(rowToSong));
         if (as.data) setAssets(as.data.map(rowToAsset));
         if (hp.data) setHomepageConfig(rowToHomepageConfig(hp.data));
         if (a.error) console.error("[CMS] artists load:", a.error.message);
         if (p.error) console.error("[CMS] producers load:", p.error.message);
         if (b.error) console.error("[CMS] brands load:", b.error.message);
         if (r.error) console.error("[CMS] releases load:", r.error.message);
+        if (so.error) console.error("[CMS] songs load:", so.error.message);
         if (as.error) console.error("[CMS] assets load:", as.error.message);
         setDataSource("db");
       })
@@ -831,18 +880,50 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
 
   /**
    * publishRelease — transitions to "published" + isVisible = true.
-   * Writes atomically to Supabase so the change immediately affects all
-   * public pages that query releases with status = published.
+   *
+   * Automation: all songs linked to this release whose status is NOT
+   * "archived" are automatically published too, so they immediately appear
+   * on the public artist and release pages.
    */
   const publishRelease = useCallback(
     (id: string): CMSRelease | undefined => {
-      return updateRelease(id, {
+      const release = releases.find((r) => r.id === id);
+      const result = updateRelease(id, {
         status: "published",
         isVisible: true,
         publishAt: now(),
       });
+      // Auto-publish linked songs
+      if (release) {
+        const linkedSongs = songs.filter(
+          (s) => s.releaseSlug === release.slug && s.status !== "archived"
+        );
+        linkedSongs.forEach((s) => {
+          const t = now();
+          setSongs((prev) =>
+            prev.map((existing) =>
+              existing.id === s.id
+                ? { ...existing, status: "published", isVisible: true, updatedAt: t }
+                : existing
+            )
+          );
+          bgSync((sb) =>
+            sb.from("songs")
+              .update({ status: "published", is_visible: true, updated_at: t })
+              .eq("id", s.id)
+          );
+        });
+        if (linkedSongs.length > 0) {
+          notify(
+            "success",
+            `${linkedSongs.length} linked song${linkedSongs.length !== 1 ? "s" : ""} published automatically.`
+          );
+        }
+      }
+      return result;
     },
-    [updateRelease]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [releases, songs, updateRelease]
   );
 
   const deleteRelease = useCallback((id: string) => {
@@ -881,6 +962,136 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
+
+  // ── Songs ──────────────────────────────────────────────────────────────────
+
+  const getSongById = useCallback(
+    (id: string) => songs.find((s) => s.id === id),
+    [songs]
+  );
+
+  const getSongBySlug = useCallback(
+    (slug: string) => songs.find((s) => s.slug === slug),
+    [songs]
+  );
+
+  const getPublicSongs = useCallback(
+    () => songs.filter((s) => s.status === "published" && s.isVisible),
+    [songs]
+  );
+
+  const getSongsForRelease = useCallback(
+    (releaseSlug: string) =>
+      songs
+        .filter((s) => s.releaseSlug === releaseSlug && s.status === "published" && s.isVisible)
+        .sort((a, b) => (a.trackNumber ?? 999) - (b.trackNumber ?? 999)),
+    [songs]
+  );
+
+  const getSongsForArtist = useCallback(
+    (artistSlug: string) =>
+      songs.filter((s) => s.artistSlug === artistSlug && s.status === "published" && s.isVisible),
+    [songs]
+  );
+
+  const createSong = useCallback(
+    (data: Omit<CMSSong, "id" | "createdAt" | "updatedAt">): CMSSong => {
+      const song: CMSSong = {
+        ...data,
+        id: data.slug || generateId(),
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      setSongs((prev) => [...prev, song]);
+      bgSync(
+        (sb) =>
+          sb.from("songs").insert({
+            id: song.id,
+            slug: song.slug,
+            title: song.title,
+            artist_slug: song.artistSlug,
+            artist_name: song.artistName,
+            release_slug: song.releaseSlug ?? null,
+            release_name: song.releaseName ?? null,
+            producer_slugs: song.producerSlugs ?? null,
+            genre: song.genre ?? null,
+            duration: song.duration ?? null,
+            audio_url: song.audioUrl ?? null,
+            lyrics: song.lyrics ?? null,
+            is_explicit: song.isExplicit ?? false,
+            track_number: song.trackNumber ?? null,
+            status: song.status,
+            is_visible: song.isVisible,
+            publish_at: song.publishAt ?? null,
+            featured_on_homepage: song.featuredOnHomepage ?? false,
+            media_asset_id: song.mediaAssetId ?? null,
+          }),
+        () => setSongs((prev) => prev.filter((s) => s.id !== song.id))
+      );
+      return song;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const updateSong = useCallback(
+    (id: string, data: Partial<CMSSong>): CMSSong | undefined => {
+      let original: CMSSong | undefined;
+      let updated: CMSSong | undefined;
+      setSongs((prev) =>
+        prev.map((s) => {
+          if (s.id !== id) return s;
+          original = s;
+          updated = { ...s, ...data, updatedAt: now() };
+          return updated;
+        })
+      );
+      if (updated) {
+        const u = updated;
+        const orig = original;
+        bgSync(
+          (sb) =>
+            sb.from("songs").update({
+              title: u.title,
+              artist_slug: u.artistSlug,
+              artist_name: u.artistName,
+              release_slug: u.releaseSlug ?? null,
+              release_name: u.releaseName ?? null,
+              producer_slugs: u.producerSlugs ?? null,
+              genre: u.genre ?? null,
+              duration: u.duration ?? null,
+              audio_url: u.audioUrl ?? null,
+              lyrics: u.lyrics ?? null,
+              is_explicit: u.isExplicit ?? false,
+              track_number: u.trackNumber ?? null,
+              status: u.status,
+              is_visible: u.isVisible,
+              publish_at: u.publishAt ?? null,
+              featured_on_homepage: u.featuredOnHomepage ?? false,
+              media_asset_id: u.mediaAssetId ?? null,
+              updated_at: u.updatedAt,
+            }).eq("id", id),
+          orig ? () => setSongs((prev) => prev.map((s) => (s.id === id ? orig : s))) : undefined
+        );
+      }
+      return updated;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const deleteSong = useCallback((id: string) => {
+    let removed: CMSSong | undefined;
+    setSongs((prev) => {
+      removed = prev.find((s) => s.id === id);
+      return prev.filter((s) => s.id !== id);
+    });
+    bgSync(
+      (sb) => sb.from("songs").delete().eq("id", id),
+      removed ? () => setSongs((prev) => [...prev, removed!]) : undefined
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Assets ─────────────────────────────────────────────────────────────────
 
@@ -1080,6 +1291,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
     producers,
     brands,
     releases,
+    songs,
     assets,
     homepageConfig,
     notifications,
@@ -1109,6 +1321,14 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
     publishRelease,
     deleteRelease,
     updateTracklist,
+    getSongById,
+    getSongBySlug,
+    getPublicSongs,
+    getSongsForRelease,
+    getSongsForArtist,
+    createSong,
+    updateSong,
+    deleteSong,
     getAssetById,
     getAssetsForEntity,
     addAsset,
