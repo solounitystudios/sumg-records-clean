@@ -16,6 +16,7 @@ import { useCmsStore, isReleasePublic } from "@/lib/cms/store";
 import { CMSArtist, CMSProducer, CMSRelease, CMSSong, ReleaseStatus, CMSAsset, AssetAttachment } from "@/lib/types";
 import { getReleaseReadiness } from "@/lib/cms/readiness";
 import { useRole } from "@/lib/auth/use-role";
+import { EntityMediaPanel } from "@/components/admin/EntityMediaPanel";
 
 // ─── Artist multi-picker ─────────────────────────────────────────────────────
 
@@ -662,8 +663,44 @@ export default function EditReleasePage() {
 
         {/* Cover art */}
         <FormSection title="Cover Art">
-          <FormField type="url" label="Cover Art URL" value={form.coverArtUrl}
+          <EntityMediaPanel
+            entityType="release"
+            entityId={release.id}
+            role="cover"
+            title="Cover Art Image"
+            assetType="image"
+            allowMultiple={false}
+            canUpload={role.canUploadMedia}
+            onPrimaryUrlChange={(url) => set("coverArtUrl", url ?? "")}
+          />
+          <FormField type="url" label="Cover Art URL (manual override)" value={form.coverArtUrl}
             placeholder="https://…" mono onChange={(v) => set("coverArtUrl", v)} />
+        </FormSection>
+
+        {/* Gallery */}
+        <FormSection title="Image Gallery">
+          <EntityMediaPanel
+            entityType="release"
+            entityId={release.id}
+            role="gallery"
+            title="Gallery Images"
+            assetType="image"
+            allowMultiple={true}
+            canUpload={role.canUploadMedia}
+          />
+        </FormSection>
+
+        {/* Teaser video */}
+        <FormSection title="Teaser Video">
+          <EntityMediaPanel
+            entityType="release"
+            entityId={release.id}
+            role="video"
+            title="Teaser / Promo Video"
+            assetType="video"
+            allowMultiple={true}
+            canUpload={role.canUploadMedia}
+          />
         </FormSection>
 
         {/* Tracklist */}

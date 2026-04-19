@@ -324,6 +324,7 @@ export default function AdminDashboard() {
               { label: "Manage Brands", href: "/admin/brands" },
               { label: "Manage Producers", href: "/admin/producers" },
               { label: "Homepage Config", href: "/admin/homepage" },
+              { label: "System Integrity", href: "/admin/integrity" },
               { label: "View Public Site", href: "/" },
             ].map((action) => (
               <Link

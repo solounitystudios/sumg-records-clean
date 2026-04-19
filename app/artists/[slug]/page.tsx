@@ -30,14 +30,29 @@ export default async function ArtistPage({ params }: Props) {
     <>
       <Navbar />
       <main>
-        {/* Hero */}
+        {/* Hero — with optional hero image */}
         <section className="relative min-h-[60vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
-          <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
-            <span className="text-[30vw] font-black text-white/[0.025] tracking-tighter leading-none">{artist.name.charAt(0)}</span>
-          </div>
+          {/* Background: hero image or giant letter */}
+          {artist.heroImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={artist.heroImageUrl}
+              alt={artist.name}
+              className="absolute inset-0 w-full h-full object-cover opacity-30"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
+              <span className="text-[30vw] font-black text-white/[0.025] tracking-tighter leading-none">
+                {artist.name.charAt(0)}
+              </span>
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
           <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-20 pt-40">
             <p className="text-[10px] tracking-[0.35em] uppercase text-white/25 mb-3">{artist.genre}</p>
-            <h1 className="text-6xl md:text-8xl font-black tracking-tight text-white leading-none mb-6">{artist.name}</h1>
+            <h1 className="text-6xl md:text-8xl font-black tracking-tight text-white leading-none mb-6">
+              {artist.name}
+            </h1>
             <p className="text-base text-white/40 max-w-xl leading-relaxed">{artist.bio}</p>
           </div>
         </section>
@@ -103,7 +118,7 @@ export default async function ArtistPage({ params }: Props) {
 
         {/* Releases */}
         {releases.length > 0 && (
-          <section className="py-20">
+          <section className="py-20 border-b border-white/5">
             <div className="max-w-7xl mx-auto px-6 lg:px-10">
               <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-8">Discography</p>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">

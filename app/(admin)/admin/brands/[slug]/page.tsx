@@ -9,6 +9,7 @@ import {
   SaveButton,
   DangerButton,
 } from "@/components/admin/FormField";
+import { EntityMediaPanel } from "@/components/admin/EntityMediaPanel";
 import { useCmsStore } from "@/lib/cms/store";
 import { HeroStyle, CMSBrand } from "@/lib/types";
 import { useRole } from "@/lib/auth/use-role";
@@ -343,10 +344,47 @@ export default function EditBrandPage() {
 
         {/* Assets */}
         <FormSection title="Assets">
-          <FormField type="url" label="Hero Image URL" value={form.heroImageUrl}
+          {/* Hero Image — upload/replace + library attach */}
+          <EntityMediaPanel
+            entityType="brand"
+            entityId={brand.id}
+            role="hero"
+            title="Hero Image"
+            assetType="image"
+            allowMultiple={false}
+            canUpload={role.canUploadMedia}
+            onPrimaryUrlChange={(url) => set("heroImageUrl", url ?? "")}
+          />
+          <FormField type="url" label="Hero Image URL (manual override)" value={form.heroImageUrl}
             placeholder="https://…" mono onChange={(v) => set("heroImageUrl", v)} />
           <FormField type="url" label="Logo URL" value={form.logoUrl}
             placeholder="https://…" mono onChange={(v) => set("logoUrl", v)} />
+        </FormSection>
+
+        {/* Gallery */}
+        <FormSection title="Gallery">
+          <EntityMediaPanel
+            entityType="brand"
+            entityId={brand.id}
+            role="gallery"
+            title="Gallery Images"
+            assetType="image"
+            allowMultiple={true}
+            canUpload={role.canUploadMedia}
+          />
+        </FormSection>
+
+        {/* Campaign Media */}
+        <FormSection title="Campaign Video / Media">
+          <EntityMediaPanel
+            entityType="brand"
+            entityId={brand.id}
+            role="video"
+            title="Campaign Video"
+            assetType="video"
+            allowMultiple={true}
+            canUpload={role.canUploadMedia}
+          />
         </FormSection>
 
         {/* Featured Content */}

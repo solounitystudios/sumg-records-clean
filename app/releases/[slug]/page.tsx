@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
-import { getPublishedReleases, getReleaseBySlug, getSongsForRelease } from "@/lib/cms";
+import { getPublishedReleases, getReleaseBySlug, getSongsForRelease, getAllProducers } from "@/lib/cms";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
@@ -24,14 +24,47 @@ export default async function ReleasePage({ params }: Props) {
   // First-class songs linked to this release (from the songs table)
   const linkedSongs = getSongsForRelease(slug);
 
+  // Named producer credits
+  const allProducers = getAllProducers();
+  const producerCredits = (release.producerSlugs ?? []).map((pSlug) => ({
+    slug: pSlug,
+    name: allProducers.find((p) => p.slug === pSlug)?.name ?? pSlug,
+  }));
+
   return (
     <>
       <Navbar />
       <main>
+        {/* Hero — with cover art or giant letter */}
         <section className="relative min-h-[55vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
-          <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
-            <span className="text-[30vw] font-black text-white/[0.025] tracking-tighter leading-none">{release.title.charAt(0)}</span>
-          </div>
+          {release.coverArtUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={release.coverArtUrl}
+              alt={release.title}
+              className="absolute inset-0 w-full h-full object-cover opacity-25"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
+              <span className="text-[30vw] font-black text-white/[0.025] tracking-tighter leading-none">
+                {release.title.charAt(0)}
+              </span>
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent" />
+
+          {/* Cover art thumbnail in corner */}
+          {release.coverArtUrl && (
+            <div className="absolute right-8 bottom-8 w-32 h-32 md:w-48 md:h-48 border border-white/10 overflow-hidden hidden md:block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={release.coverArtUrl}
+                alt={`${release.title} cover art`}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
           <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-20 pt-40">
             <p className="text-[10px] tracking-[0.35em] uppercase text-white/25 mb-2">
               <Link href={`/artists/${release.artistSlug}`} className="hover:text-white/60 transition-colors">
@@ -39,10 +72,35 @@ export default async function ReleasePage({ params }: Props) {
               </Link>
               {" "}· {release.type} · {release.genre}
             </p>
-            <h1 className="text-6xl md:text-8xl font-black tracking-tight text-white leading-none mb-6">{release.title}</h1>
+            <h1 className="text-6xl md:text-8xl font-black tracking-tight text-white leading-none mb-6">
+              {release.title}
+            </h1>
             <p className="text-base text-white/40 max-w-xl">{release.description}</p>
+            {release.releaseDate && (
+              <p className="text-[10px] tracking-[0.2em] uppercase text-white/20 mt-4">
+                {new Date(release.releaseDate).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+            )}
           </div>
         </section>
+
+        {/* Cover art — full display on mobile (thumbnail is hidden md:block above) */}
+        {release.coverArtUrl && (
+          <section className="py-12 border-b border-white/5 md:hidden">
+            <div className="max-w-7xl mx-auto px-6">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={release.coverArtUrl}
+                alt={`${release.title} cover art`}
+                className="w-48 h-48 object-cover border border-white/10"
+              />
+            </div>
+          </section>
+        )}
 
         {/* First-class linked songs (from songs table — auto-published with release) */}
         {linkedSongs.length > 0 && (
@@ -56,7 +114,9 @@ export default async function ReleasePage({ params }: Props) {
                     href={`/songs/${song.slug}`}
                     className="flex items-center gap-5 py-4 border-b border-white/5 group hover:bg-white/[0.02] px-2 transition-colors"
                   >
-                    <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
+                      {String(song.trackNumber ?? i + 1).padStart(2, "0")}
+                    </span>
                     <span className="flex-1 text-sm text-white/70 group-hover:text-white transition-colors">
                       {song.title}
                       {song.isExplicit && (
@@ -82,7 +142,9 @@ export default async function ReleasePage({ params }: Props) {
               <div className="space-y-0 max-w-2xl">
                 {release.tracklist.map((track, i) => (
                   <div key={track.id} className="flex items-center gap-5 py-4 border-b border-white/5 group hover:bg-white/[0.02] px-2 transition-colors">
-                    <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
+                      {String(track.trackNumber ?? i + 1).padStart(2, "0")}
+                    </span>
                     <span className="text-sm text-white/70 group-hover:text-white transition-colors">{track.title}</span>
                     {track.duration && (
                       <span className="ml-auto text-[11px] font-mono text-white/20">{track.duration}</span>
@@ -94,19 +156,39 @@ export default async function ReleasePage({ params }: Props) {
           </section>
         )}
 
-        {/* Producer credits */}
-        {(release.producerSlugs ?? []).length > 0 && (
+        {/* Producer credits — with linked names */}
+        {producerCredits.length > 0 && (
           <section className="py-12 border-b border-white/5">
             <div className="max-w-7xl mx-auto px-6 lg:px-10">
               <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">Produced By</p>
               <div className="flex flex-wrap gap-3">
-                {(release.producerSlugs ?? []).map((pSlug) => (
+                {producerCredits.map(({ slug: pSlug, name }) => (
                   <Link
                     key={pSlug}
                     href={`/producers/${pSlug}`}
                     className="border border-white/10 px-4 py-2 text-[10px] tracking-[0.2em] uppercase text-white/35 hover:border-white/25 hover:text-white transition-colors"
                   >
-                    {pSlug}
+                    {name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Featured artists */}
+        {(release.featuredArtistSlugs ?? []).length > 0 && (
+          <section className="py-12 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">Featuring</p>
+              <div className="flex flex-wrap gap-3">
+                {(release.featuredArtistSlugs ?? []).map((aSlug) => (
+                  <Link
+                    key={aSlug}
+                    href={`/artists/${aSlug}`}
+                    className="border border-white/10 px-4 py-2 text-[10px] tracking-[0.2em] uppercase text-white/35 hover:border-white/25 hover:text-white transition-colors"
+                  >
+                    {aSlug}
                   </Link>
                 ))}
               </div>

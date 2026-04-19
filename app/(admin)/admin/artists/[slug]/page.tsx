@@ -10,8 +10,10 @@ import {
   DangerButton,
   StatusBadge,
 } from "@/components/admin/FormField";
+import { EntityMediaPanel } from "@/components/admin/EntityMediaPanel";
 import { useCmsStore } from "@/lib/cms/store";
 import { CMSArtist } from "@/lib/types";
+import { useRole } from "@/lib/auth/use-role";
 
 type FormState = {
   name: string;
@@ -31,11 +33,83 @@ type FormState = {
   "socialLinks.soundcloud": string;
 };
 
+// ─── Release picker ──────────────────────────────────────────────────────────
+
+function ReleasePicker({
+  artistSlug,
+  releases,
+}: {
+  artistSlug: string;
+  releases: { id: string; slug: string; title: string; artistSlug: string; status: string }[];
+}) {
+  const artistReleases = releases.filter((r) => r.artistSlug === artistSlug);
+  if (artistReleases.length === 0) {
+    return (
+      <p className="text-[10px] text-white/20 italic">No releases for this artist.</p>
+    );
+  }
+  return (
+    <div className="space-y-1">
+      {artistReleases.map((r) => (
+        <a
+          key={r.id}
+          href={`/admin/releases/${r.slug}`}
+          className="flex items-center justify-between px-3 py-2 border border-white/[0.06] hover:border-white/15 transition-colors group"
+        >
+          <span className="text-[11px] text-white/50 group-hover:text-white transition-colors truncate">
+            {r.title}
+          </span>
+          <span className="text-[10px] font-mono text-white/20 ml-3 flex-shrink-0">
+            {r.status}
+          </span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+// ─── Song picker ─────────────────────────────────────────────────────────────
+
+function SongPicker({
+  artistSlug,
+  songs,
+}: {
+  artistSlug: string;
+  songs: { id: string; slug: string; title: string; artistSlug: string; status: string }[];
+}) {
+  const artistSongs = songs.filter((s) => s.artistSlug === artistSlug);
+  if (artistSongs.length === 0) {
+    return <p className="text-[10px] text-white/20 italic">No songs for this artist.</p>;
+  }
+  return (
+    <div className="space-y-1">
+      {artistSongs.map((s) => (
+        <a
+          key={s.id}
+          href={`/admin/songs/${s.slug}`}
+          className="flex items-center justify-between px-3 py-2 border border-white/[0.06] hover:border-white/15 transition-colors group"
+        >
+          <span className="text-[11px] text-white/50 group-hover:text-white transition-colors truncate">
+            {s.title}
+          </span>
+          <span className="text-[10px] font-mono text-white/20 ml-3 flex-shrink-0">
+            {s.status}
+          </span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
 export default function EditArtistPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug as string;
-  const { getArtistBySlug, updateArtist, deleteArtist, notify } = useCmsStore();
+  const { getArtistBySlug, updateArtist, deleteArtist, notify, releases, songs } =
+    useCmsStore();
+  const role = useRole();
 
   const artist = getArtistBySlug(slug);
   const [form, setForm] = useState<FormState | null>(null);
@@ -95,26 +169,26 @@ export default function EditArtistPage() {
     setSaving(true);
 
     updateArtist(artist.id, {
-      name: form!.name,
-      slug: form!.slug,
-      genre: form!.genre,
-      role: form!.role,
-      bio: form!.bio,
-      longBio: form!.longBio || undefined,
-      featured: form!.featured,
-      featuredOnHomepage: form!.featuredOnHomepage,
-      tier: form!.tier,
-      status: form!.status,
-      heroImageUrl: form!.heroImageUrl || undefined,
-      profileImageUrl: form!.profileImageUrl || undefined,
+      name: form.name,
+      slug: form.slug,
+      genre: form.genre,
+      role: form.role,
+      bio: form.bio,
+      longBio: form.longBio || undefined,
+      featured: form.featured,
+      featuredOnHomepage: form.featuredOnHomepage,
+      tier: form.tier,
+      status: form.status,
+      heroImageUrl: form.heroImageUrl || undefined,
+      profileImageUrl: form.profileImageUrl || undefined,
       socialLinks: {
-        instagram: form!["socialLinks.instagram"] || undefined,
-        spotify: form!["socialLinks.spotify"] || undefined,
-        soundcloud: form!["socialLinks.soundcloud"] || undefined,
+        instagram: form["socialLinks.instagram"] || undefined,
+        spotify: form["socialLinks.spotify"] || undefined,
+        soundcloud: form["socialLinks.soundcloud"] || undefined,
       },
     });
 
-    notify("success", `Artist "${form!.name}" saved.`);
+    notify("success", `Artist "${form.name}" saved.`);
     setSaving(false);
   }
 
@@ -193,12 +267,49 @@ export default function EditArtistPage() {
             onChange={(v) => set("longBio", v)} />
         </FormSection>
 
-        {/* Images */}
-        <FormSection title="Images">
-          <FormField type="url" label="Hero Image URL" value={form.heroImageUrl}
+        {/* Hero Image */}
+        <FormSection title="Hero Image">
+          <EntityMediaPanel
+            entityType="artist"
+            entityId={artist.id}
+            role="hero"
+            title="Hero / Banner Image"
+            assetType="image"
+            allowMultiple={false}
+            canUpload={role.canUploadMedia}
+            onPrimaryUrlChange={(url) => set("heroImageUrl", url ?? "")}
+          />
+          <FormField type="url" label="Hero Image URL (manual override)" value={form.heroImageUrl}
             placeholder="https://…" mono onChange={(v) => set("heroImageUrl", v)} />
-          <FormField type="url" label="Profile Image URL" value={form.profileImageUrl}
+        </FormSection>
+
+        {/* Profile Image */}
+        <FormSection title="Profile Image">
+          <EntityMediaPanel
+            entityType="artist"
+            entityId={artist.id}
+            role="profile"
+            title="Profile / Avatar Image"
+            assetType="image"
+            allowMultiple={false}
+            canUpload={role.canUploadMedia}
+            onPrimaryUrlChange={(url) => set("profileImageUrl", url ?? "")}
+          />
+          <FormField type="url" label="Profile Image URL (manual override)" value={form.profileImageUrl}
             placeholder="https://…" mono onChange={(v) => set("profileImageUrl", v)} />
+        </FormSection>
+
+        {/* Visuals / Gallery */}
+        <FormSection title="Visuals & Gallery">
+          <EntityMediaPanel
+            entityType="artist"
+            entityId={artist.id}
+            role="gallery"
+            title="Gallery Visuals"
+            assetType="image"
+            allowMultiple={true}
+            canUpload={role.canUploadMedia}
+          />
         </FormSection>
 
         {/* Social */}
@@ -211,11 +322,26 @@ export default function EditArtistPage() {
             placeholder="https://soundcloud.com/…" mono onChange={(v) => set("socialLinks.soundcloud", v)} />
         </FormSection>
 
+        {/* Releases — linked read-only list */}
+        <FormSection title="Releases">
+          <ReleasePicker artistSlug={artist.slug} releases={releases} />
+        </FormSection>
+
+        {/* Songs — linked read-only list */}
+        <FormSection title="Songs">
+          <SongPicker artistSlug={artist.slug} songs={songs} />
+        </FormSection>
+
         {/* Actions */}
         <div className="pt-4 border-t border-white/5 flex items-center justify-between">
           <SaveButton onClick={handleSave} saving={saving} />
-          <DangerButton onClick={handleDelete} label="Delete Artist" />
+          <DangerButton onClick={handleDelete} label="Delete Artist" disabled={!role.canDelete} />
         </div>
+        {!role.canDelete && (
+          <p className="text-[10px] text-white/20">
+            ◌ Your role ({role.roleLabel}) does not have permission to delete entities.
+          </p>
+        )}
       </div>
     </AdminShell>
   );
