@@ -1,4 +1,5 @@
-export type ReleaseStatus = "draft" | "scheduled" | "published";
+export type ReleaseStatus = "draft" | "scheduled" | "published" | "archived";
+export type EntityStatus = "draft" | "active" | "archived";
 export type UserRole = "admin" | "editor";
 export type AssetType = "image" | "video" | "audio" | "document";
 export type HeroStyle = "editorial" | "minimal" | "mystic" | "industrial" | "coastal";
@@ -12,7 +13,10 @@ export interface CMSArtist {
   bio: string;
   longBio?: string;
   featured: boolean;
+  featuredOnHomepage?: boolean;
   tier: "primary" | "secondary";
+  status?: EntityStatus;
+  sortOrder?: number;
   heroImageUrl?: string;
   profileImageUrl?: string;
   socialLinks?: SocialLinks;
@@ -29,7 +33,11 @@ export interface CMSProducer {
   credits: string;
   signature: string;
   bio?: string;
+  status?: EntityStatus;
+  sortOrder?: number;
+  featuredOnHomepage?: boolean;
   profileImageUrl?: string;
+  heroImageUrl?: string;
   socialLinks?: SocialLinks;
   createdAt: string;
   updatedAt: string;
@@ -42,11 +50,16 @@ export interface CMSBrand {
   category: string;
   descriptor: string;
   tagline: string;
+  manifesto?: string;
+  heroCopy?: string;
   longDescription?: string;
   heroImageUrl?: string;
   logoUrl?: string;
   accentColor?: string;
+  heroStyle?: HeroStyle;
   isActive: boolean;
+  featuredOnHomepage?: boolean;
+  sortOrder?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,12 +70,15 @@ export interface CMSRelease {
   title: string;
   artistSlug: string;
   artistName: string;
+  featuredArtistSlugs?: string[];
+  producerSlugs?: string[];
   type: "Single" | "EP" | "Album" | "Mixtape";
   genre: string;
   releaseDate: string;
   publishAt?: string;
   status: ReleaseStatus;
   isVisible: boolean;
+  featuredOnHomepage?: boolean;
   description: string;
   coverArtUrl?: string;
   tracklist?: CMSSong[];
@@ -112,10 +128,14 @@ export interface CMSUser {
 export interface CMSHomepageConfig {
   id: string;
   featuredArtistSlugs: string[];
+  featuredBrandSlugs?: string[];
+  featuredReleaseSlugs?: string[];
   heroHeadline: string;
   heroSubtext: string;
   showLatestReleases: boolean;
   latestReleasesCount: number;
+  sectionOrder?: string[];
+  sectionVisibility?: Record<string, boolean>;
   updatedAt: string;
 }
 

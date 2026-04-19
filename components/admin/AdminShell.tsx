@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCmsStore } from "@/lib/cms/store";
 
 const adminNav = [
   { label: "Dashboard", href: "/admin", icon: "◈" },
@@ -9,6 +10,8 @@ const adminNav = [
   { label: "Brands", href: "/admin/brands", icon: "◐" },
   { label: "Releases", href: "/admin/releases", icon: "◑" },
   { label: "Media", href: "/admin/media", icon: "◒" },
+  { label: "Homepage", href: "/admin/homepage", icon: "◇" },
+  { label: "Settings", href: "/admin/settings", icon: "◌" },
 ];
 
 interface AdminShellProps {
@@ -18,6 +21,7 @@ interface AdminShellProps {
 
 export function AdminShell({ children, title }: AdminShellProps) {
   const pathname = usePathname();
+  const { notifications, dismissNotification } = useCmsStore();
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex">
@@ -74,6 +78,32 @@ export function AdminShell({ children, title }: AdminShellProps) {
           {children}
         </div>
       </main>
+
+      {/* Toast notifications */}
+      {notifications.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-50 space-y-2">
+          {notifications.map((n) => (
+            <div
+              key={n.id}
+              className={`flex items-center gap-3 px-4 py-3 text-xs border max-w-sm ${
+                n.type === "success"
+                  ? "bg-neutral-900 border-green-800/60 text-green-300"
+                  : n.type === "error"
+                  ? "bg-neutral-900 border-red-800/60 text-red-300"
+                  : "bg-neutral-900 border-white/10 text-white/60"
+              }`}
+            >
+              <span className="flex-1">{n.message}</span>
+              <button
+                onClick={() => dismissNotification(n.id)}
+                className="text-white/30 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

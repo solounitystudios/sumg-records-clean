@@ -1,3 +1,6 @@
+"use client";
+import { CmsStoreProvider } from "@/lib/cms/store";
+
 export default function AdminGroupLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return <CmsStoreProvider>{children}</CmsStoreProvider>;
 }
