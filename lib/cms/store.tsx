@@ -44,6 +44,9 @@ function now() {
 }
 
 function generateId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
   return Math.random().toString(36).slice(2, 10);
 }
 
@@ -370,10 +373,10 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
 
   // ── Supabase background sync helper ──────────────────────────────────────
 
-  function bgSync(fn: (sb: ReturnType<typeof createClient>) => PromiseLike<{ error: { message: string } | null }>) {
+  function bgSync(dbOperation: (sb: ReturnType<typeof createClient>) => PromiseLike<{ error: { message: string } | null }>) {
     if (!hasSupabase()) return;
     const sb = createClient();
-    Promise.resolve(fn(sb)).then(({ error }) => {
+    Promise.resolve(dbOperation(sb)).then(({ error }) => {
       if (error) {
         console.error("[CMS] sync error:", error.message);
         notify("error", `Sync error: ${error.message}`);
