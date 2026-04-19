@@ -14,6 +14,7 @@ import { TracklistEditor } from "@/components/admin/TracklistEditor";
 import { MediaLibraryGrid } from "@/components/admin/MediaLibraryGrid";
 import { useCmsStore, isReleasePublic } from "@/lib/cms/store";
 import { CMSArtist, CMSProducer, CMSRelease, CMSSong, ReleaseStatus, CMSAsset, AssetAttachment } from "@/lib/types";
+import { getReleaseReadiness } from "@/lib/cms/readiness";
 
 // ─── Artist multi-picker ─────────────────────────────────────────────────────
 
@@ -302,6 +303,56 @@ function MediaRelationPanel({
   );
 }
 
+// ─── Readiness checklist ─────────────────────────────────────────────────────
+
+function ReadinessChecklist({ release, allSongs }: { release: CMSRelease; allSongs: CMSSong[] }) {
+  const { score, items } = getReleaseReadiness(release, allSongs);
+  const barColor = score === 100 ? "bg-green-500/60" : score >= 66 ? "bg-yellow-500/50" : "bg-red-500/40";
+  return (
+    <div className="space-y-4">
+      {/* Score bar */}
+      <div className="flex items-center gap-4">
+        <div className="flex-1 h-1 bg-white/5 relative overflow-hidden">
+          <div
+            className={`absolute left-0 top-0 h-full transition-all duration-500 ${barColor}`}
+            style={{ width: `${score}%` }}
+          />
+        </div>
+        <span className={`text-[11px] font-mono font-semibold tabular-nums min-w-[3ch] text-right ${
+          score === 100 ? "text-green-400/70" : score >= 66 ? "text-yellow-400/70" : "text-red-400/60"
+        }`}>
+          {score}%
+        </span>
+      </div>
+
+      {/* Item list */}
+      <div className="space-y-2">
+        {items.map((item) => (
+          <div key={item.key} className="flex items-start gap-3">
+            <span className={`flex-shrink-0 text-xs mt-0.5 ${item.passed ? "text-green-400/60" : "text-red-400/50"}`}>
+              {item.passed ? "✓" : "✗"}
+            </span>
+            <div>
+              <p className={`text-[11px] tracking-wide ${item.passed ? "text-white/40" : "text-white/70"}`}>
+                {item.label}
+              </p>
+              {!item.passed && item.detail && (
+                <p className="text-[10px] text-white/25 mt-0.5">{item.detail}</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {score < 100 && (
+        <p className="text-[10px] text-white/15 border-t border-white/5 pt-3">
+          Complete all checks before publishing for the best experience.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function EditReleasePage() {
@@ -317,6 +368,7 @@ export default function EditReleasePage() {
     notify,
     artists,
     producers,
+    songs,
     getAssetsForEntity,
     attachAssetToEntity,
     detachAssetFromEntity,
@@ -597,6 +649,11 @@ export default function EditReleasePage() {
               </p>
             </div>
           )}
+        </FormSection>
+
+        {/* Readiness checklist */}
+        <FormSection title="Release Readiness">
+          <ReadinessChecklist release={{ ...release, producerSlugs, featuredArtistSlugs }} allSongs={songs} />
         </FormSection>
 
         {/* Cover art */}

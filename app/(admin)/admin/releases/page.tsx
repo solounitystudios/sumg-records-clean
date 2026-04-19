@@ -6,13 +6,30 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { EntityTable } from "@/components/admin/EntityTable";
 import { StatusBadge } from "@/components/admin/FormField";
 import { useCmsStore } from "@/lib/cms/store";
+import { getReadinessScore } from "@/lib/cms/readiness";
 
 const TABS = ["all", "draft", "scheduled", "published", "archived"] as const;
 type Tab = typeof TABS[number];
 
+// ─── Readiness badge ─────────────────────────────────────────────────────────
+
+function ReadinessBadge({ score }: { score: number }) {
+  const color =
+    score === 100
+      ? "border-green-800/50 text-green-400/70"
+      : score >= 66
+      ? "border-yellow-800/50 text-yellow-400/70"
+      : "border-red-900/40 text-red-400/60";
+  return (
+    <span className={`border text-[9px] tracking-[0.1em] px-1.5 py-0.5 font-mono ${color}`}>
+      {score}%
+    </span>
+  );
+}
+
 export default function AdminReleases() {
   const router = useRouter();
-  const { releases, deleteRelease, publishRelease, notify } = useCmsStore();
+  const { releases, songs, deleteRelease, publishRelease, notify } = useCmsStore();
   const [tab, setTab] = useState<Tab>("all");
 
   const filtered =
@@ -28,7 +45,6 @@ export default function AdminReleases() {
   function handlePublish(id: string, title: string) {
     if (confirm(`Publish "${title}" now? It will become visible on the public site.`)) {
       publishRelease(id);
-      notify("success", `"${title}" published and is now live.`);
     }
   }
 
@@ -90,6 +106,13 @@ export default function AdminReleases() {
               key: "status",
               label: "Status",
               render: (row) => <StatusBadge status={row.status} />,
+            },
+            {
+              key: "coverArtUrl",
+              label: "Ready",
+              render: (row) => (
+                <ReadinessBadge score={getReadinessScore(row, songs)} />
+              ),
             },
             {
               key: "isVisible",

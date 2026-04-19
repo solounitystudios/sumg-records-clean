@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import {
@@ -11,7 +11,12 @@ import {
   StatusBadge,
 } from "@/components/admin/FormField";
 import { useCmsStore } from "@/lib/cms/store";
-import { CMSSong, ReleaseStatus } from "@/lib/types";
+import { CMSSong, ReleaseStatus, CMSAsset } from "@/lib/types";
+import { uploadAsset } from "@/lib/media";
+import {
+  ACCEPTED_AUDIO_TYPES,
+  MAX_AUDIO_SIZE,
+} from "@/lib/media";
 
 // ─── Producer multi-picker ───────────────────────────────────────────────────
 
@@ -59,6 +64,192 @@ function ProducerPicker({
   );
 }
 
+// ─── Native audio upload panel ───────────────────────────────────────────────
+
+interface AudioUploadPanelProps {
+  songId: string;
+  songSlug: string;
+  currentUrl?: string;
+  currentAsset?: CMSAsset;
+  onUploaded: (url: string, assetId: string) => void;
+  onDelete: () => void;
+}
+
+function AudioUploadPanel({
+  songId,
+  currentUrl,
+  currentAsset,
+  onUploaded,
+  onDelete,
+}: AudioUploadPanelProps) {
+  const { addAsset, deleteAsset, detachAssetFromEntity, attachAssetToEntity, notify } =
+    useCmsStore();
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFile(file: File) {
+    setUploadError(null);
+    if (!ACCEPTED_AUDIO_TYPES.includes(file.type)) {
+      setUploadError("Unsupported file type. Use MP3, WAV, FLAC, AAC, or OGG.");
+      return;
+    }
+    if (file.size > MAX_AUDIO_SIZE) {
+      setUploadError(`File too large. Max ${Math.round(MAX_AUDIO_SIZE / 1024 / 1024)} MB.`);
+      return;
+    }
+    setUploading(true);
+    const result = await uploadAsset(file, "audio", "admin");
+    setUploading(false);
+    if (!result.success || !result.asset) {
+      // If Supabase is not configured, create a local-only asset with a blob URL
+      // so the workflow still functions in dev without storage credentials.
+      const localUrl = URL.createObjectURL(file);
+      const asset = addAsset({
+        type: "audio",
+        url: localUrl,
+        filename: file.name,
+        mimeType: file.type,
+        sizeBytes: file.size,
+        uploadedBy: "admin",
+        attachedTo: [{ entityType: "song", entityId: songId, role: "audio" }],
+      });
+      onUploaded(localUrl, asset.id);
+      notify("success", `"${file.name}" uploaded (local — Supabase storage not configured).`);
+      return;
+    }
+
+    const asset = addAsset({
+      ...result.asset,
+      attachedTo: [{ entityType: "song", entityId: songId, role: "audio" }],
+    });
+    attachAssetToEntity(asset.id, {
+      entityType: "song",
+      entityId: songId,
+      role: "audio",
+    });
+    onUploaded(asset.url, asset.id);
+    notify("success", `"${file.name}" uploaded and linked.`);
+  }
+
+  async function handleDelete() {
+    if (!confirm("Remove audio from this song?")) return;
+    setDeleting(true);
+    if (currentAsset) {
+      detachAssetFromEntity(currentAsset.id, "song", songId);
+    }
+    onDelete();
+    setDeleting(false);
+    notify("success", "Audio removed.");
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[10px] tracking-[0.2em] uppercase text-white/30">
+        Audio File
+      </p>
+
+      {/* Current audio preview */}
+      {currentUrl && (
+        <div className="border border-white/10 bg-white/[0.02] p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-white/30 text-base flex-shrink-0">♫</span>
+              <p className="text-xs text-white/50 font-mono truncate">
+                {currentAsset?.filename ?? currentUrl.split("/").pop() ?? "audio"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-[10px] tracking-[0.1em] uppercase text-red-900 hover:text-red-400 transition-colors flex-shrink-0 ml-3"
+            >
+              {deleting ? "Removing…" : "Remove"}
+            </button>
+          </div>
+          <audio
+            controls
+            src={currentUrl}
+            className="w-full"
+          />
+          {/* Replace zone */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="text-[10px] tracking-[0.15em] uppercase text-white/20 hover:text-white/50 transition-colors"
+            >
+              ↑ Replace audio
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Upload drop zone (shown when no audio yet) */}
+      {!currentUrl && (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+          onClick={() => !uploading && inputRef.current?.click()}
+          className={`border-2 border-dashed p-8 text-center cursor-pointer transition-all duration-200 ${
+            uploading
+              ? "border-white/20 opacity-60"
+              : dragOver
+              ? "border-white/40 bg-white/[0.04]"
+              : "border-white/10 hover:border-white/20 hover:bg-white/[0.02]"
+          }`}
+        >
+          {uploading ? (
+            <p className="text-[11px] tracking-[0.2em] uppercase text-white/40 animate-pulse">
+              Uploading…
+            </p>
+          ) : (
+            <>
+              <p className="text-[11px] tracking-[0.2em] uppercase text-white/30 mb-1">
+                Upload Audio
+              </p>
+              <p className="text-[10px] text-white/15">
+                MP3 · WAV · FLAC · AAC · OGG — max 100 MB
+              </p>
+              <p className="text-[10px] text-white/10 mt-1">
+                Drop file here or click to browse
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        accept={ACCEPTED_AUDIO_TYPES.join(",")}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+          // Reset value so re-uploading same file triggers change event
+          e.target.value = "";
+        }}
+      />
+
+      {uploadError && (
+        <p className="text-[10px] text-red-400">{uploadError}</p>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function EditSongPage() {
@@ -94,6 +285,7 @@ export default function EditSongPage() {
     isVisible: boolean;
     featuredOnHomepage: boolean;
     publishAt: string;
+    mediaAssetId: string;
   } | null>(null);
   const [producerSlugs, setProducerSlugs] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -115,6 +307,7 @@ export default function EditSongPage() {
       isVisible: song.isVisible,
       featuredOnHomepage: song.featuredOnHomepage ?? false,
       publishAt: song.publishAt ?? "",
+      mediaAssetId: song.mediaAssetId ?? "",
     });
     setProducerSlugs(song.producerSlugs ?? []);
   }, [song]);
@@ -135,9 +328,13 @@ export default function EditSongPage() {
     );
   }
 
-  const attachedAudio = getAssetsForEntity("song", song.id).filter(
+  // Find the linked audio asset (from the media library, attached to this song)
+  const attachedAudioAssets = getAssetsForEntity("song", song.id).filter(
     (a) => a.type === "audio"
   );
+  const primaryAudioAsset = form.mediaAssetId
+    ? attachedAudioAssets.find((a) => a.id === form.mediaAssetId) ?? attachedAudioAssets[0]
+    : attachedAudioAssets[0];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function set(key: string, value: any) {
@@ -167,6 +364,7 @@ export default function EditSongPage() {
       isVisible: form.isVisible,
       publishAt: form.publishAt || undefined,
       featuredOnHomepage: form.featuredOnHomepage,
+      mediaAssetId: form.mediaAssetId || undefined,
     });
     notify("success", `"${form.title}" saved.`);
     setSaving(false);
@@ -187,7 +385,21 @@ export default function EditSongPage() {
     );
   }
 
+  function handleAudioUploaded(url: string, assetId: string) {
+    set("audioUrl", url);
+    set("mediaAssetId", assetId);
+    // Auto-save audio URL to the song immediately
+    if (song) updateSong(song.id, { audioUrl: url, mediaAssetId: assetId });
+  }
+
+  function handleAudioDeleted() {
+    set("audioUrl", "");
+    set("mediaAssetId", "");
+    if (song) updateSong(song.id, { audioUrl: undefined, mediaAssetId: undefined });
+  }
+
   const isLive = song.status === "published" && song.isVisible;
+  const hasAudio = Boolean(form.audioUrl);
 
   return (
     <AdminShell title={`Edit — ${song.title}`}>
@@ -215,18 +427,47 @@ export default function EditSongPage() {
           </div>
         </div>
 
-        {/* Publish status bar */}
+        {/* Status bar */}
         <div
           className={`border px-5 py-3 text-[11px] ${
             isLive
               ? "border-green-800/40 bg-green-950/20 text-green-300/70"
-              : "border-white/5 text-white/20"
+              : hasAudio
+              ? "border-white/5 text-white/20"
+              : "border-yellow-900/30 bg-yellow-950/10 text-yellow-500/50"
           }`}
         >
           {isLive
             ? "✓ This song is live. It appears on the artist page and release tracklist."
-            : "◯ This song is not public. Set status to Published to make it visible."}
+            : hasAudio
+            ? "◯ This song is not public. Set status to Published to make it visible."
+            : "⚠ No audio file — upload audio before publishing."}
         </div>
+
+        {/* Audio Upload — native uploader, first section */}
+        <FormSection title="Audio">
+          <AudioUploadPanel
+            songId={song.id}
+            songSlug={song.slug}
+            currentUrl={form.audioUrl || undefined}
+            currentAsset={primaryAudioAsset}
+            onUploaded={handleAudioUploaded}
+            onDelete={handleAudioDeleted}
+          />
+
+          {/* Manual URL override */}
+          <div className="pt-2">
+            <FormField
+              type="url"
+              label="Audio URL (manual override)"
+              value={form.audioUrl}
+              placeholder="https://…"
+              mono
+              hint="Overrides the uploaded file above"
+              onChange={(v) => set("audioUrl", v)}
+            />
+          </div>
+        </FormSection>
 
         {/* Song info */}
         <FormSection title="Song Info">
@@ -305,29 +546,6 @@ export default function EditSongPage() {
               onChange={(v) => set("trackNumber", v)}
             />
           </div>
-
-          <FormField
-            type="url"
-            label="Audio URL"
-            value={form.audioUrl}
-            placeholder="https://…"
-            mono
-            onChange={(v) => set("audioUrl", v)}
-          />
-
-          {/* Linked media assets */}
-          {attachedAudio.length > 0 && (
-            <div className="border border-white/5 p-3 space-y-1">
-              <p className="text-[10px] tracking-[0.15em] uppercase text-white/20 mb-2">
-                Linked Audio Assets
-              </p>
-              {attachedAudio.map((a) => (
-                <p key={a.id} className="text-xs text-white/40 truncate font-mono">
-                  {a.filename}
-                </p>
-              ))}
-            </div>
-          )}
         </FormSection>
 
         {/* Relations */}
