@@ -1,7 +1,7 @@
-import { Artist } from "@/data/artists";
+import { CMSArtist } from "@/lib/types";
 
 interface ArtistCardProps {
-  artist: Artist;
+  artist: CMSArtist;
   size?: "large" | "small";
 }
 

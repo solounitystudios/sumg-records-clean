@@ -3,6 +3,7 @@
 import { AdminShell } from "@/components/admin/AdminShell";
 import { FormField, FormSection, SaveButton } from "@/components/admin/FormField";
 import { useState } from "react";
+import Link from "next/link";
 
 export default function AdminSettings() {
   const [form, setForm] = useState({
@@ -22,7 +23,7 @@ export default function AdminSettings() {
   }
 
   function handleSave() {
-    // Phase 5: persist to DB / env config
+    // TODO: persist site settings to the database (homepage_config or a dedicated table).
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   }
@@ -52,26 +53,30 @@ export default function AdminSettings() {
             value={form.googleAnalyticsId}
             placeholder="G-XXXXXXXXXX"
             mono
-            hint="Phase 5: connect to next.config.js or app layout."
+            hint="Add the ID to next.config.js or the root layout to activate tracking."
             onChange={(v) => set("googleAnalyticsId", v)}
           />
         </FormSection>
 
         <div className="border border-white/5 p-5 space-y-2">
-          <p className="text-[10px] tracking-[0.2em] uppercase text-white/25">Auth Configuration</p>
+          <p className="text-[10px] tracking-[0.2em] uppercase text-white/25">Auth</p>
           <p className="text-xs text-white/30">
-            Authentication is scaffolded in <code className="font-mono text-white/40">lib/auth/index.ts</code>.
-            Connect to Supabase Auth or NextAuth in Phase 4.
+            Authentication is handled by Supabase Auth — session management via SSR cookies,
+            PKCE for password reset, and role-based access in <code className="font-mono text-white/40">lib/auth/</code>.
+            Configure env vars in <code className="font-mono text-white/40">.env.local</code>.
           </p>
-          <p className="text-xs text-white/20 font-mono">NEXTAUTH_SECRET, SUPABASE_URL, SUPABASE_ANON_KEY</p>
+          <p className="text-xs text-white/20 font-mono">NEXT_PUBLIC_SUPABASE_URL · NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</p>
         </div>
 
         <div className="border border-white/5 p-5 space-y-2">
-          <p className="text-[10px] tracking-[0.2em] uppercase text-white/25">Database / Storage</p>
+          <p className="text-[10px] tracking-[0.2em] uppercase text-white/25">Business & Providers</p>
           <p className="text-xs text-white/30">
-            All data is in-memory for Phase 1–3. Connect Supabase or a Postgres database in Phase 5 to persist all CMS data.
+            Distributor, PRO, and provider reference lists are managed in the{" "}
+            <Link href="/admin/settings/business" className="text-white/50 hover:text-white underline underline-offset-2 transition-colors">
+              Business Settings
+            </Link>{" "}
+            panel.
           </p>
-          <p className="text-xs text-white/20 font-mono">DATABASE_URL, STORAGE_BUCKET</p>
         </div>
 
         <div className="pt-4 border-t border-white/5">

@@ -283,7 +283,6 @@ export interface CMSRelease {
   description: string;
   coverArtUrl?: string;
   tracklist?: CMSSong[];
-  streamingLinks?: StreamingLinks;
   dspLinks?: DSPLinks;
   providerConfig?: ProviderConfig;
   /** Publishing / rights metadata for this release. */
@@ -386,14 +385,6 @@ export interface SocialLinks {
   instagram?: string;
   twitter?: string;
   spotify?: string;
-  soundcloud?: string;
-  youtube?: string;
-}
-
-export interface StreamingLinks {
-  spotify?: string;
-  appleMusic?: string;
-  tidal?: string;
   soundcloud?: string;
   youtube?: string;
 }

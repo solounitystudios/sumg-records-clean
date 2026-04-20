@@ -40,6 +40,13 @@ import {
   ArtistTimelineItem,
 } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
+import {
+  rowToArtist,
+  rowToProducer,
+  rowToBrand,
+  rowToRelease,
+  rowToSong,
+} from "@/lib/cms/mappers";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -78,120 +85,15 @@ function hasSupabase(): boolean {
   return (
     typeof process.env.NEXT_PUBLIC_SUPABASE_URL === "string" &&
     process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith("https://") &&
-    typeof process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY === "string" &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length > 0
+    typeof process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY === "string" &&
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.length > 0
   );
 }
 
 // ─── DB row → CMS type mappers ────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToArtist(r: any): CMSArtist {
-  return {
-    id: r.id,
-    slug: r.slug,
-    name: r.name,
-    role: r.role ?? "",
-    genre: r.genre ?? "",
-    bio: r.bio ?? "",
-    longBio: r.long_bio ?? undefined,
-    featured: r.featured ?? false,
-    featuredOnHomepage: r.featured_on_homepage ?? false,
-    tier: r.tier ?? "secondary",
-    status: r.status ?? "active",
-    sortOrder: r.sort_order ?? 0,
-    heroImageUrl: r.hero_image_url ?? undefined,
-    profileImageUrl: r.profile_image_url ?? undefined,
-    socialLinks: r.social_links ?? undefined,
-    associatedBrands: r.associated_brands ?? undefined,
-    providerConfig: r.provider_config ?? undefined,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
-  };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToProducer(r: any): CMSProducer {
-  return {
-    id: r.id,
-    slug: r.slug,
-    name: r.name,
-    specialty: r.specialty ?? "",
-    credits: r.credits ?? "",
-    signature: r.signature ?? "",
-    bio: r.bio ?? undefined,
-    status: r.status ?? "active",
-    sortOrder: r.sort_order ?? 0,
-    featuredOnHomepage: r.featured_on_homepage ?? false,
-    profileImageUrl: r.profile_image_url ?? undefined,
-    heroImageUrl: r.hero_image_url ?? undefined,
-    socialLinks: r.social_links ?? undefined,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
-  };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToBrand(r: any): CMSBrand {
-  return {
-    id: r.id,
-    slug: r.slug,
-    name: r.name,
-    category: r.category ?? "",
-    descriptor: r.descriptor ?? "",
-    tagline: r.tagline ?? "",
-    manifesto: r.manifesto ?? undefined,
-    heroCopy: r.hero_copy ?? undefined,
-    heroHeadline: r.hero_headline ?? undefined,
-    heroSubcopy: r.hero_subcopy ?? undefined,
-    longDescription: r.long_description ?? undefined,
-    heroImageUrl: r.hero_image_url ?? undefined,
-    logoUrl: r.logo_url ?? undefined,
-    accentColor: r.accent_color ?? undefined,
-    heroStyle: r.hero_style ?? undefined,
-    campaignStatus: r.campaign_status ?? undefined,
-    collectionName: r.collection_name ?? undefined,
-    featuredReleaseSlugs: r.featured_release_slugs ?? undefined,
-
-    featuredAssetIds: r.featured_asset_ids ?? undefined,
-    isActive: r.is_active ?? true,
-    featuredOnHomepage: r.featured_on_homepage ?? false,
-    sortOrder: r.sort_order ?? 0,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
-  };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToRelease(r: any): CMSRelease {
-  return {
-    id: r.id,
-    slug: r.slug,
-    title: r.title,
-    artistSlug: r.artist_slug,
-    artistName: r.artist_name,
-    featuredArtistSlugs: r.featured_artist_slugs ?? undefined,
-    producerSlugs: r.producer_slugs ?? undefined,
-    type: r.type ?? "Single",
-    genre: r.genre ?? "",
-    releaseDate: r.release_date,
-    publishAt: r.publish_at ?? undefined,
-    status: r.status ?? "draft",
-    isVisible: r.is_visible ?? false,
-    featuredOnHomepage: r.featured_on_homepage ?? false,
-    description: r.description ?? "",
-    coverArtUrl: r.cover_art_url ?? undefined,
-    tracklist: r.tracklist ?? undefined,
-    streamingLinks: r.streaming_links ?? undefined,
-    dspLinks: r.dsp_links ?? undefined,
-    providerConfig: r.provider_config ?? undefined,
-    rightsMetadata: r.rights_metadata ?? undefined,
-    distributionRecord: r.distribution_record ?? undefined,
-    dataSource: r.data_source ?? undefined,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
-  };
-}
+// Core entity mappers (artist, producer, brand, release, song) are imported
+// from lib/cms/mappers.ts — the single source of truth.
+// The three helpers below are unique to the store.
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToAsset(r: any): CMSAsset {
@@ -222,37 +124,6 @@ function rowToHomepageConfig(r: any): CMSHomepageConfig {
     latestReleasesCount: r.latest_releases_count ?? 4,
     sectionOrder: r.section_order ?? undefined,
     sectionVisibility: r.section_visibility ?? undefined,
-    updatedAt: r.updated_at,
-  };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToSong(r: any): CMSSong {
-  return {
-    id: r.id,
-    slug: r.slug,
-    title: r.title,
-    artistSlug: r.artist_slug,
-    artistName: r.artist_name,
-    releaseSlug: r.release_slug ?? undefined,
-    releaseName: r.release_name ?? undefined,
-    producerSlugs: r.producer_slugs ?? undefined,
-    genre: r.genre ?? undefined,
-    duration: r.duration ?? undefined,
-    audioUrl: r.audio_url ?? undefined,
-    lyrics: r.lyrics ?? undefined,
-    isExplicit: r.is_explicit ?? false,
-    trackNumber: r.track_number ?? undefined,
-    status: r.status ?? "draft",
-    isVisible: r.is_visible ?? false,
-    publishAt: r.publish_at ?? undefined,
-    featuredOnHomepage: r.featured_on_homepage ?? false,
-    mediaAssetId: r.media_asset_id ?? undefined,
-    dspLinks: r.dsp_links ?? undefined,
-    isrc: r.isrc ?? undefined,
-    rightsMetadata: r.rights_metadata ?? undefined,
-    dataSource: r.data_source ?? undefined,
-    createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
 }
@@ -907,7 +778,6 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             description: release.description,
             cover_art_url: release.coverArtUrl ?? null,
             tracklist: release.tracklist ?? null,
-            streaming_links: release.streamingLinks ?? null,
             dsp_links: release.dspLinks ?? null,
             provider_config: release.providerConfig ?? null,
             rights_metadata: release.rightsMetadata ?? null,
@@ -955,7 +825,6 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               description: u.description,
               cover_art_url: u.coverArtUrl ?? null,
               tracklist: u.tracklist ?? null,
-              streaming_links: u.streamingLinks ?? null,
               dsp_links: u.dspLinks ?? null,
               provider_config: u.providerConfig ?? null,
               rights_metadata: u.rightsMetadata ?? null,

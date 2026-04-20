@@ -200,25 +200,6 @@ export default async function ReleasePage({ params }: Props) {
           </section>
         )}
 
-        {/* Streaming links */}
-        {release.streamingLinks && (
-          <section className="py-12 border-b border-white/5">
-            <div className="max-w-7xl mx-auto px-6 lg:px-10">
-              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">Stream (Legacy)</p>
-              <div className="flex flex-wrap gap-4">
-                {Object.entries(release.streamingLinks).map(([platform, url]) => (
-                  url && (
-                    <a key={platform} href={url} target="_blank" rel="noopener noreferrer"
-                      className="border border-white/10 px-6 py-3 text-[10px] tracking-[0.25em] uppercase text-white/50 hover:border-white/30 hover:text-white transition-all duration-300">
-                      {platform}
-                    </a>
-                  )
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-
         {/* DSP links */}
         {release.dspLinks && Object.values(release.dspLinks).some(Boolean) && (
           <section className="py-12 border-b border-white/5">
