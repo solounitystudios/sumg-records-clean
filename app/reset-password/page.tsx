@@ -15,28 +15,46 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [sessionReady, setSessionReady] = useState<boolean | null>(null); // null = checking
 
-  // Supabase fires an AUTH_TOKEN_REFRESHED / PASSWORD_RECOVERY event once the
-  // hash fragment has been parsed. We wait for that before allowing the form to
-  // submit so updateUser() has a valid session.
+  // Wait for a valid recovery session before allowing the form to submit.
+  // In the PKCE/SSR flow the session is set in cookies by /auth/callback, so:
+  //  - getSession() may return it immediately, OR
+  //  - onAuthStateChange fires INITIAL_SESSION / PASSWORD_RECOVERY / SIGNED_IN.
+  // If neither happens within 5 s the link is expired/invalid.
   useEffect(() => {
     const sb = createClient();
+    let resolved = false;
 
-    // Check whether we already have a valid session (e.g. user navigated back)
-    sb.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSessionReady(true);
+    function resolve(ready: boolean) {
+      if (!resolved) {
+        resolved = true;
+        setSessionReady(ready);
       }
+    }
+
+    // Immediate check — covers PKCE flow where session is already in cookies
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (session) resolve(true);
     });
 
     const {
       data: { subscription },
-    } = sb.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
-        setSessionReady(true);
+    } = sb.auth.onAuthStateChange((event, session) => {
+      if (
+        event === "INITIAL_SESSION" ||
+        event === "PASSWORD_RECOVERY" ||
+        event === "SIGNED_IN"
+      ) {
+        if (session) resolve(true);
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Fallback: show "link expired" if no valid session arrives within 5 s
+    const timeout = setTimeout(() => resolve(false), 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
