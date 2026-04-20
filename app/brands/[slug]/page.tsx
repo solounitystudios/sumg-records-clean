@@ -2,8 +2,7 @@ import { notFound } from "next/navigation";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { BrandHero } from "@/components/brand-themes/BrandHero";
-import { ReleaseCard } from "@/components/cards/ReleaseCard";
-import { getAllBrands, getBrandBySlug, getPublishedReleases, getPublicSongs } from "@/lib/cms";
+import { getAllBrands, getBrandBySlug } from "@/lib/cms";
 import { getBrandTheme } from "@/lib/brands";
 import Link from "next/link";
 
@@ -21,34 +20,13 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function BrandPage({ params }: Props) {
   const { slug } = await params;
-  const [brand, allBrands, allReleases, allSongs] = await Promise.all([
+  const [brand, allBrands] = await Promise.all([
     getBrandBySlug(slug),
     getAllBrands(),
-    getPublishedReleases(),
-    getPublicSongs(),
   ]);
   if (!brand || !brand.isActive) notFound();
 
   const theme = getBrandTheme(slug);
-
-  // Featured releases: prefer explicit list, fall back to published releases
-  // allReleases already contains only published+visible releases from getPublishedReleases()
-  const featuredReleaseSlugs: string[] = brand.featuredReleaseSlugs ?? [];
-  const featuredReleases =
-    featuredReleaseSlugs.length > 0
-      ? featuredReleaseSlugs
-          .map((s) => allReleases.find((r) => r.slug === s))
-          .filter(Boolean) as typeof allReleases
-      : allReleases.slice(0, 4);
-
-  // Featured songs: allSongs already contains only published+visible songs from getPublicSongs()
-  const featuredSongSlugs: string[] = brand.featuredSongSlugs ?? [];
-  const featuredSongs =
-    featuredSongSlugs.length > 0
-      ? featuredSongSlugs
-          .map((s) => allSongs.find((song) => song.slug === s))
-          .filter(Boolean) as typeof allSongs
-      : allSongs.slice(0, 5);
 
   return (
     <div className={theme.backgroundStyle} style={{ minHeight: "100vh" }}>
@@ -124,91 +102,6 @@ export default async function BrandPage({ params }: Props) {
           </div>
         </div>
       </section>
-
-      {/* Featured Releases */}
-      {featuredReleases.length > 0 && (
-        <section className={`py-20 border-t ${theme.borderStyle}`}>
-          <div className="max-w-7xl mx-auto px-6 lg:px-10">
-            <div className="flex items-center justify-between mb-10">
-              <p className="text-[9px] tracking-[0.4em] uppercase"
-                style={{ color: theme.accentColorHex, opacity: 0.5 }}>
-                Releases
-              </p>
-              <Link
-                href="/releases"
-                className="text-[9px] tracking-[0.25em] uppercase transition-colors hover:opacity-80"
-                style={{ color: theme.accentColorHex, opacity: 0.35 }}
-              >
-                All Releases →
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              {featuredReleases.map((r) => (
-                <a key={r.id} href={`/releases/${r.slug}`}>
-                  <ReleaseCard release={r} />
-                </a>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Featured Songs */}
-      {featuredSongs.length > 0 && (
-        <section className={`py-20 border-t ${theme.borderStyle}`}>
-          <div className="max-w-7xl mx-auto px-6 lg:px-10">
-            <div className="flex items-center justify-between mb-8">
-              <p className="text-[9px] tracking-[0.4em] uppercase"
-                style={{ color: theme.accentColorHex, opacity: 0.5 }}>
-                Songs
-              </p>
-              <Link
-                href="/songs"
-                className="text-[9px] tracking-[0.25em] uppercase hover:opacity-80 transition-opacity"
-                style={{ color: theme.accentColorHex, opacity: 0.35 }}
-              >
-                All Songs →
-              </Link>
-            </div>
-            <div className="space-y-0 max-w-2xl">
-              {featuredSongs.map((song, i) => (
-                <Link
-                  key={song.id}
-                  href={`/songs/${song.slug}`}
-                  className={`flex items-center gap-5 py-4 border-b group px-2 transition-all duration-150 ${theme.borderStyle}`}
-                >
-                  <span className="text-[11px] font-mono min-w-[2rem]"
-                    style={{ color: theme.accentColorHex, opacity: 0.35 }}>
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <span className={`text-sm group-hover:opacity-90 transition-opacity ${theme.bodyClassName}`}>
-                      {song.title}
-                      {song.isExplicit && (
-                        <span className="ml-2 text-[9px] border border-white/15 text-white/20 px-1.5 py-0.5">E</span>
-                      )}
-                    </span>
-                    {song.releaseName && (
-                      <p className="text-[10px] mt-0.5" style={{ color: theme.accentColorHex, opacity: 0.3 }}>
-                        {song.releaseName}
-                      </p>
-                    )}
-                  </div>
-                  {song.duration && (
-                    <span className="text-[11px] font-mono"
-                      style={{ color: theme.accentColorHex, opacity: 0.3 }}>
-                      {song.duration}
-                    </span>
-                  )}
-                  <span className="text-xs transition-colors" style={{ color: theme.accentColorHex, opacity: 0.25 }}>
-                    →
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* Brand navigation to other brands */}
       <section className={`py-12 border-t ${theme.borderStyle}`}>

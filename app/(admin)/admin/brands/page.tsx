@@ -20,9 +20,14 @@ export default function AdminBrands() {
     <AdminShell title="Brands">
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <p className="text-[10px] tracking-[0.3em] uppercase text-white/25">
-            {brands.length} Brand World{brands.length !== 1 ? "s" : ""}
-          </p>
+          <div>
+            <p className="text-[10px] tracking-[0.3em] uppercase text-white/25">
+              {brands.length} Brand World{brands.length !== 1 ? "s" : ""}
+            </p>
+            <p className="text-[10px] text-white/20 mt-1">
+              Brands are commerce and editorial identities. Music content (songs, releases) is managed separately in the music catalog.
+            </p>
+          </div>
           <Link
             href="/admin/brands/new"
             className="border border-white/10 px-5 py-2.5 text-[10px] tracking-[0.2em] uppercase text-white/50 hover:border-white/25 hover:text-white transition-all duration-200"

@@ -147,7 +147,6 @@ export default function EditBrandPage() {
     featuredOnHomepage: boolean;
   } | null>(null);
   const [featuredReleaseSlugs, setFeaturedReleaseSlugs] = useState<string[]>([]);
-  const [featuredSongSlugs, setFeaturedSongSlugs] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -173,7 +172,6 @@ export default function EditBrandPage() {
       featuredOnHomepage: brand.featuredOnHomepage ?? false,
     });
     setFeaturedReleaseSlugs(brand.featuredReleaseSlugs ?? []);
-    setFeaturedSongSlugs(brand.featuredSongSlugs ?? []);
   }, [brand]);
 
   if (!brand || !form) {
@@ -213,7 +211,6 @@ export default function EditBrandPage() {
       campaignStatus: form.campaignStatus,
       collectionName: form.collectionName || undefined,
       featuredReleaseSlugs: featuredReleaseSlugs.length ? featuredReleaseSlugs : undefined,
-      featuredSongSlugs: featuredSongSlugs.length ? featuredSongSlugs : undefined,
       isActive: form.isActive,
       featuredOnHomepage: form.featuredOnHomepage,
     });
@@ -236,10 +233,8 @@ export default function EditBrandPage() {
     );
   }
 
-  function toggleFeaturedSong(s: string) {
-    setFeaturedSongSlugs((prev) =>
-      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
-    );
+  function toggleFeaturedSong(_s: string) {
+    // Featured songs removed — songs are decoupled from brand pages.
   }
 
   return (
@@ -395,11 +390,9 @@ export default function EditBrandPage() {
             onToggle={toggleFeaturedRelease}
           />
           <div className="border-t border-white/5 pt-5">
-            <FeaturedSongsPicker
-              attached={featuredSongSlugs}
-              songs={songs}
-              onToggle={toggleFeaturedSong}
-            />
+            <p className="text-[10px] tracking-[0.15em] uppercase text-white/15 mb-2">
+              Featured Songs — removed. Music content is managed in the music catalog.
+            </p>
           </div>
         </FormSection>
 

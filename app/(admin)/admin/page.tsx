@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { useCmsStore } from "@/lib/cms/store";
+import { useShopifyStore } from "@/lib/shopify/store";
 import { getReadinessScore } from "@/lib/cms/readiness";
 import Link from "next/link";
 
@@ -119,6 +120,7 @@ function Section({
 
 export default function AdminDashboard() {
   const { artists, producers, brands, releases, songs } = useCmsStore();
+  const { products, orders, campaigns } = useShopifyStore();
 
   // ── Release health ─────────────────────────────────────────────────────────
   const publishedReleases = useMemo(
@@ -332,6 +334,38 @@ export default function AdminDashboard() {
               value={publishedSongs.length}
               href="/admin/songs"
               accent="green"
+            />
+          </div>
+        </div>
+
+        {/* ── Commerce KPIs ────────────────────────────────────────────────── */}
+        <div>
+          <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-4">
+            Commerce
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatTile
+              label="Products Live"
+              value={products.filter((p) => p.status === "active").length}
+              href="/admin/products"
+              accent="green"
+            />
+            <StatTile
+              label="Low Inventory"
+              value={products.filter((p) => p.inventory < 5 && p.status === "active").length}
+              href="/admin/inventory"
+              accent={products.filter((p) => p.inventory < 5 && p.status === "active").length > 0 ? "yellow" : undefined}
+            />
+            <StatTile
+              label="Orders Awaiting"
+              value={orders.filter((o) => o.fulfillmentStatus === "unfulfilled").length}
+              href="/admin/orders"
+              accent={orders.filter((o) => o.fulfillmentStatus === "unfulfilled").length > 0 ? "yellow" : undefined}
+            />
+            <StatTile
+              label="Draft Campaigns"
+              value={campaigns.filter((c) => c.status === "draft").length}
+              href="/admin/products"
             />
           </div>
         </div>

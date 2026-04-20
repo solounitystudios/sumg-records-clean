@@ -67,7 +67,6 @@ export function rowToBrand(r: any): CMSBrand {
     campaignStatus: r.campaign_status ?? undefined,
     collectionName: r.collection_name ?? undefined,
     featuredReleaseSlugs: r.featured_release_slugs ?? undefined,
-    featuredSongSlugs: r.featured_song_slugs ?? undefined,
     featuredAssetIds: r.featured_asset_ids ?? undefined,
     isActive: r.is_active ?? true,
     featuredOnHomepage: r.featured_on_homepage ?? false,
