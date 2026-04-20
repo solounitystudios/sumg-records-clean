@@ -5,8 +5,15 @@ import { ProducerNetwork } from "@/components/home/ProducerNetwork";
 import { BrandWorlds } from "@/components/home/BrandWorlds";
 import { LatestReleases } from "@/components/home/LatestReleases";
 import { VisionSection } from "@/components/home/VisionSection";
+import { getAllArtists, getPublishedReleases, getAllProducers, getAllBrands } from "@/lib/cms";
 
-export default function Home() {
+export default async function Home() {
+  const [artists, releases, producers, brands] = await Promise.all([
+    getAllArtists(),
+    getPublishedReleases(),
+    getAllProducers(),
+    getAllBrands(),
+  ]);
   return (
     <>
       <Navbar />
@@ -119,10 +126,10 @@ export default function Home() {
       </section>
 
       {/* ─── Sections ─── */}
-      <FeaturedArtists />
-      <ProducerNetwork />
-      <BrandWorlds />
-      <LatestReleases />
+      <FeaturedArtists artists={artists} />
+      <ProducerNetwork producers={producers} />
+      <BrandWorlds brands={brands} />
+      <LatestReleases releases={releases} />
       <VisionSection />
       <Footer />
     </>

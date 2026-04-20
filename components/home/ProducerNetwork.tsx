@@ -1,7 +1,11 @@
-import { producers } from "@/data/producers";
+import { CMSProducer } from "@/lib/types";
 import { ProducerCard } from "@/components/cards/ProducerCard";
 
-export function ProducerNetwork() {
+interface Props {
+  producers: CMSProducer[];
+}
+
+export function ProducerNetwork({ producers }: Props) {
   return (
     <section
       id="producers"

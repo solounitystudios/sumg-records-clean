@@ -3,28 +3,30 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { BrandHero } from "@/components/brand-themes/BrandHero";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
-import { getAllBrands } from "@/lib/cms";
-import { releases as allReleases } from "@/data/releases";
-import { songs as allSongs } from "@/data/songs";
+import { getAllBrands, getBrandBySlug, getPublishedReleases, getPublicSongs } from "@/lib/cms";
 import { getBrandTheme } from "@/lib/brands";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
 
 export async function generateStaticParams() {
-  return getAllBrands().map((b) => ({ slug: b.slug }));
+  return (await getAllBrands()).map((b) => ({ slug: b.slug }));
 }
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const brand = getAllBrands().find((b) => b.slug === slug);
+  const brand = await getBrandBySlug(slug);
   return { title: brand ? `${brand.name} — SUMG Records` : "Brand Not Found" };
 }
 
 export default async function BrandPage({ params }: Props) {
   const { slug } = await params;
-  const allBrands = getAllBrands();
-  const brand = allBrands.find((b) => b.slug === slug);
+  const [brand, allBrands, allReleases, allSongs] = await Promise.all([
+    getBrandBySlug(slug),
+    getAllBrands(),
+    getPublishedReleases(),
+    getPublicSongs(),
+  ]);
   if (!brand || !brand.isActive) notFound();
 
   const theme = getBrandTheme(slug);
@@ -34,22 +36,18 @@ export default async function BrandPage({ params }: Props) {
   const featuredReleases =
     featuredReleaseSlugs.length > 0
       ? featuredReleaseSlugs
-          .map((s) => allReleases.find((r) => r.slug === s && r.status === "published" && r.isVisible))
+          .map((s) => allReleases.find((r) => r.slug === s))
           .filter(Boolean) as typeof allReleases
-      : allReleases
-          .filter((r) => r.status === "published" && r.isVisible)
-          .slice(0, 4);
+      : allReleases.slice(0, 4);
 
   // Featured songs
   const featuredSongSlugs: string[] = brand.featuredSongSlugs ?? [];
   const featuredSongs =
     featuredSongSlugs.length > 0
       ? featuredSongSlugs
-          .map((s) => allSongs.find((song) => song.slug === s && song.status === "published" && song.isVisible))
+          .map((s) => allSongs.find((song) => song.slug === s))
           .filter(Boolean) as typeof allSongs
-      : allSongs
-          .filter((s) => s.status === "published" && s.isVisible)
-          .slice(0, 5);
+      : allSongs.slice(0, 5);
 
   return (
     <div className={theme.backgroundStyle} style={{ minHeight: "100vh" }}>

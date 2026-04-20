@@ -2,29 +2,28 @@ import { notFound } from "next/navigation";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
-import { artists } from "@/data/artists";
-import { getPublishedReleases, getSongsForArtist } from "@/lib/cms";
+import { getAllArtists, getArtistBySlug, getArtistReleases, getSongsForArtist } from "@/lib/cms";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
 
 export async function generateStaticParams() {
-  return artists.map((a) => ({ slug: a.slug }));
+  return (await getAllArtists()).map((a) => ({ slug: a.slug }));
 }
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const artist = artists.find((a) => a.slug === slug);
+  const artist = await getArtistBySlug(slug);
   return { title: artist ? `${artist.name} — SUMG Records` : "Artist Not Found" };
 }
 
 export default async function ArtistPage({ params }: Props) {
   const { slug } = await params;
-  const artist = artists.find((a) => a.slug === slug);
+  const artist = await getArtistBySlug(slug);
   if (!artist) notFound();
 
-  const releases = getPublishedReleases().filter((r) => r.artistSlug === artist.slug);
-  const songs = getSongsForArtist(artist.slug);
+  const releases = await getArtistReleases(artist.slug);
+  const songs = await getSongsForArtist(artist.slug);
 
   return (
     <>

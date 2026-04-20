@@ -1,7 +1,13 @@
-import { featuredArtists, secondaryArtists } from "@/data/artists";
+import { CMSArtist } from "@/lib/types";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 
-export function FeaturedArtists() {
+interface Props {
+  artists: CMSArtist[];
+}
+
+export function FeaturedArtists({ artists }: Props) {
+  const featuredArtists = artists.filter((a) => a.featured ?? a.tier === "primary");
+  const secondaryArtists = artists.filter((a) => !(a.featured ?? a.tier === "primary"));
   return (
     <section id="artists" className="py-28 px-6 lg:px-10 max-w-7xl mx-auto">
       {/* Section header */}

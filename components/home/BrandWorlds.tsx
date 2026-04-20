@@ -1,7 +1,11 @@
-import { brands } from "@/data/brands";
+import { CMSBrand } from "@/lib/types";
 import { BrandCard } from "@/components/cards/BrandCard";
 
-export function BrandWorlds() {
+interface Props {
+  brands: CMSBrand[];
+}
+
+export function BrandWorlds({ brands }: Props) {
   return (
     <section id="brands" className="py-28 border-t border-white/5 bg-black">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
