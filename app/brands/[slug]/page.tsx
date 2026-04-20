@@ -32,6 +32,7 @@ export default async function BrandPage({ params }: Props) {
   const theme = getBrandTheme(slug);
 
   // Featured releases: prefer explicit list, fall back to published releases
+  // allReleases already contains only published+visible releases from getPublishedReleases()
   const featuredReleaseSlugs: string[] = brand.featuredReleaseSlugs ?? [];
   const featuredReleases =
     featuredReleaseSlugs.length > 0
@@ -40,7 +41,7 @@ export default async function BrandPage({ params }: Props) {
           .filter(Boolean) as typeof allReleases
       : allReleases.slice(0, 4);
 
-  // Featured songs
+  // Featured songs: allSongs already contains only published+visible songs from getPublicSongs()
   const featuredSongSlugs: string[] = brand.featuredSongSlugs ?? [];
   const featuredSongs =
     featuredSongSlugs.length > 0
