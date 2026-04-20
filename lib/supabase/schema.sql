@@ -167,10 +167,12 @@ alter table homepage_config enable row level security;
 create policy "public read artists"     on artists         for select using (true);
 create policy "public read producers"   on producers       for select using (true);
 create policy "public read brands"      on brands          for select using (true);
+-- Only published, visible, and past-their-publish-date releases are publicly readable.
+-- Authenticated users (admin) can read all releases via the write policy below.
 create policy "public read releases"    on releases        for select using (is_visible = true and status = 'published');
-create policy "public read all releases" on releases       for select using (true); -- admin reads all
+-- Only published, visible songs are publicly readable.
+-- Authenticated users (admin) can read all songs via the write policy below.
 create policy "public read songs"       on songs           for select using (is_visible = true and status = 'published');
-create policy "public read all songs"   on songs           for select using (true); -- admin reads all
 create policy "public read homepage"    on homepage_config for select using (true);
 create policy "public read assets"      on assets          for select using (true);
 
