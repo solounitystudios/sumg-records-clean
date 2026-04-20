@@ -431,21 +431,22 @@ export function useCmsStore(): CmsStore {
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function CmsStoreProvider({ children }: { children: ReactNode }) {
-  // ── Initial state: seed data (replaced on mount if Supabase is configured) ──
+  // ── Initial state: empty when Supabase is configured (data loaded on mount),
+  //    seed data only in local dev when Supabase is not configured ──
   const [artists, setArtists] = useState<CMSArtist[]>(
-    () => seedArtists as CMSArtist[]
+    () => hasSupabase() ? [] : (seedArtists as CMSArtist[])
   );
   const [producers, setProducers] = useState<CMSProducer[]>(
-    () => seedProducers as CMSProducer[]
+    () => hasSupabase() ? [] : (seedProducers as CMSProducer[])
   );
   const [brands, setBrands] = useState<CMSBrand[]>(
-    () => seedBrands as CMSBrand[]
+    () => hasSupabase() ? [] : (seedBrands as CMSBrand[])
   );
   const [releases, setReleases] = useState<CMSRelease[]>(
-    () => seedReleases as CMSRelease[]
+    () => hasSupabase() ? [] : (seedReleases as CMSRelease[])
   );
   const [songs, setSongs] = useState<CMSSong[]>(
-    () => seedSongs as CMSSong[]
+    () => hasSupabase() ? [] : (seedSongs as CMSSong[])
   );
   const [assets, setAssets] = useState<CMSAsset[]>([]);
   const [timelineItems, setTimelineItems] = useState<ArtistTimelineItem[]>([]);
@@ -453,9 +454,11 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
     defaultHomepageConfig
   );
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(() => hasSupabase());
   const [syncState, setSyncState] = useState<SyncState>("idle");
-  const [dataSource, setDataSource] = useState<DataSource>("seed");
+  const [dataSource, setDataSource] = useState<DataSource>(
+    () => hasSupabase() ? "db" : "seed"
+  );
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 

@@ -19,6 +19,7 @@ const adminNav: Array<NavItem | NavDivider> = [
   { label: "Publishing",   href: "/admin/publishing",   icon: "◙" },
   { label: "Rights",       href: "/admin/rights",       icon: "⊛" },
   { label: "Distribution", href: "/admin/distribution", icon: "▤" },
+  { label: "Royalties",    href: "/admin/royalties",    icon: "◎" },
   { divider: true },
   { label: "Media",        href: "/admin/media",        icon: "◒" },
   { label: "Calendar",     href: "/admin/calendar",     icon: "◫" },

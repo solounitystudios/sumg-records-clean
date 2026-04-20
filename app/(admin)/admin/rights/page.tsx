@@ -19,6 +19,7 @@ import { useState, useMemo } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { useCmsStore } from "@/lib/cms/store";
 import { RightsStatus } from "@/lib/types";
+import { exportRightsToCSV } from "@/lib/utils/export";
 import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -158,8 +159,9 @@ export default function RightsPage() {
           </p>
         </div>
 
-        {/* ── Tabs ───────────────────────────────────────────────────────── */}
-        <div className="flex gap-0 border-b border-white/5">
+        {/* ── Tabs + Export ──────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between border-b border-white/5">
+          <div className="flex gap-0">
           {(["songs", "releases"] as TabType[]).map((t) => (
             <button
               key={t}
@@ -173,6 +175,13 @@ export default function RightsPage() {
               {t}
             </button>
           ))}
+          </div>
+          <button
+            onClick={() => exportRightsToCSV(songs)}
+            className="mb-px px-3 py-1.5 text-[10px] tracking-[0.15em] uppercase border border-white/10 text-white/40 hover:text-white/70 hover:border-white/20 transition-colors"
+          >
+            Export CSV
+          </button>
         </div>
 
         {/* ── Filters ────────────────────────────────────────────────────── */}
