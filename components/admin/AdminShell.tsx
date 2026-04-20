@@ -4,19 +4,27 @@ import { usePathname } from "next/navigation";
 import { useCmsStore } from "@/lib/cms/store";
 import { useRole } from "@/lib/auth/use-role";
 
-const adminNav = [
-  { label: "Dashboard",   href: "/admin",              icon: "⊞" },
-  { label: "Artists",     href: "/admin/artists",      icon: "◎" },
-  { label: "Producers",   href: "/admin/producers",    icon: "◉" },
-  { label: "Songs",       href: "/admin/songs",        icon: "♫" },
-  { label: "Brands",      href: "/admin/brands",       icon: "◐" },
-  { label: "Releases",    href: "/admin/releases",     icon: "◑" },
-  { label: "Publishing",  href: "/admin/publishing",   icon: "◙" },
-  { label: "Media",       href: "/admin/media",        icon: "◒" },
-  { label: "Calendar",    href: "/admin/calendar",     icon: "◫" },
-  { label: "Integrity",   href: "/admin/integrity",    icon: "◈" },
-  { label: "Homepage",    href: "/admin/homepage",     icon: "◇" },
-  { label: "Settings",    href: "/admin/settings",     icon: "◌" },
+type NavItem = { label: string; href: string; icon: string };
+type NavDivider = { divider: true };
+
+const adminNav: Array<NavItem | NavDivider> = [
+  { label: "Dashboard",    href: "/admin",              icon: "⊞" },
+  { label: "Artists",      href: "/admin/artists",      icon: "◎" },
+  { label: "Producers",    href: "/admin/producers",    icon: "◉" },
+  { label: "Songs",        href: "/admin/songs",        icon: "♫" },
+  { label: "Brands",       href: "/admin/brands",       icon: "◐" },
+  { label: "Releases",     href: "/admin/releases",     icon: "◑" },
+  { divider: true },
+  { label: "Catalog",      href: "/admin/catalog",      icon: "▦" },
+  { label: "Publishing",   href: "/admin/publishing",   icon: "◙" },
+  { label: "Rights",       href: "/admin/rights",       icon: "⊛" },
+  { label: "Distribution", href: "/admin/distribution", icon: "▤" },
+  { divider: true },
+  { label: "Media",        href: "/admin/media",        icon: "◒" },
+  { label: "Calendar",     href: "/admin/calendar",     icon: "◫" },
+  { label: "Integrity",    href: "/admin/integrity",    icon: "◈" },
+  { label: "Homepage",     href: "/admin/homepage",     icon: "◇" },
+  { label: "Settings",     href: "/admin/settings",     icon: "◌" },
 ];
 
 interface AdminShellProps {
@@ -65,7 +73,12 @@ export function AdminShell({ children, title }: AdminShellProps) {
 
         {/* Nav */}
         <nav className="flex-1 py-4 overflow-y-auto">
-          {adminNav.map((item) => {
+          {adminNav.map((item, idx) => {
+            if ("divider" in item) {
+              return (
+                <div key={`div-${idx}`} className="mx-5 my-2 border-t border-white/[0.04]" />
+              );
+            }
             const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
             return (
               <Link

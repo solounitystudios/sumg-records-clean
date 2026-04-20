@@ -185,6 +185,9 @@ function rowToRelease(r: any): CMSRelease {
     streamingLinks: r.streaming_links ?? undefined,
     dspLinks: r.dsp_links ?? undefined,
     providerConfig: r.provider_config ?? undefined,
+    rightsMetadata: r.rights_metadata ?? undefined,
+    distributionRecord: r.distribution_record ?? undefined,
+    dataSource: r.data_source ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -246,6 +249,9 @@ function rowToSong(r: any): CMSSong {
     featuredOnHomepage: r.featured_on_homepage ?? false,
     mediaAssetId: r.media_asset_id ?? undefined,
     dspLinks: r.dsp_links ?? undefined,
+    isrc: r.isrc ?? undefined,
+    rightsMetadata: r.rights_metadata ?? undefined,
+    dataSource: r.data_source ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -903,6 +909,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             streaming_links: release.streamingLinks ?? null,
             dsp_links: release.dspLinks ?? null,
             provider_config: release.providerConfig ?? null,
+            rights_metadata: release.rightsMetadata ?? null,
+            distribution_record: release.distributionRecord ?? null,
+            data_source: release.dataSource ?? null,
           }),
         () => setReleases((prev) => prev.filter((r) => r.id !== release.id))
       );
@@ -948,6 +957,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               streaming_links: u.streamingLinks ?? null,
               dsp_links: u.dspLinks ?? null,
               provider_config: u.providerConfig ?? null,
+              rights_metadata: u.rightsMetadata ?? null,
+              distribution_record: u.distributionRecord ?? null,
+              data_source: u.dataSource ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
           orig ? () => setReleases((prev) => prev.map((r) => (r.id === id ? orig : r))) : undefined
@@ -1107,6 +1119,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             featured_on_homepage: song.featuredOnHomepage ?? false,
             media_asset_id: song.mediaAssetId ?? null,
             dsp_links: song.dspLinks ?? null,
+            isrc: song.isrc ?? null,
+            rights_metadata: song.rightsMetadata ?? null,
+            data_source: song.dataSource ?? null,
           }),
         () => setSongs((prev) => prev.filter((s) => s.id !== song.id))
       );
@@ -1152,6 +1167,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               featured_on_homepage: u.featuredOnHomepage ?? false,
               media_asset_id: u.mediaAssetId ?? null,
               dsp_links: u.dspLinks ?? null,
+              isrc: u.isrc ?? null,
+              rights_metadata: u.rightsMetadata ?? null,
+              data_source: u.dataSource ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
           orig ? () => setSongs((prev) => prev.map((s) => (s.id === id ? orig : s))) : undefined

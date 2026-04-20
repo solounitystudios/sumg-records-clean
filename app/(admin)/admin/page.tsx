@@ -1,13 +1,21 @@
+"use client";
+
+import { useMemo } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
-import { artists } from "@/data/artists";
-import { producers } from "@/data/producers";
-import { brands } from "@/data/brands";
-import { releases as rawReleases } from "@/data/releases";
-import { songs as rawSongs } from "@/data/songs";
+import { useCmsStore } from "@/lib/cms/store";
 import { getReadinessScore } from "@/lib/cms/readiness";
 import Link from "next/link";
 
-export const metadata = { title: "Dashboard — SUMG Admin" };
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function isInNextDays(dateStr: string | undefined, days: number): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const now = new Date();
+  const future = new Date();
+  future.setDate(future.getDate() + days);
+  return d >= now && d <= future;
+}
 
 // ─── Stat tile ───────────────────────────────────────────────────────────────
 
@@ -108,31 +116,134 @@ function Section({
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
-  // Compute stats from seed data (will be replaced by store in client components)
-  const publishedReleases = rawReleases.filter(
-    (r) => r.status === "published" && r.isVisible
+  const { artists, producers, brands, releases, songs } = useCmsStore();
+
+  // ── Release health ─────────────────────────────────────────────────────────
+  const publishedReleases = useMemo(
+    () => releases.filter((r) => r.status === "published" && r.isVisible),
+    [releases]
   );
-  const draftReleases = rawReleases.filter((r) => r.status === "draft");
-  const scheduledReleases = rawReleases.filter((r) => r.status === "scheduled");
-  const archivedReleases = rawReleases.filter((r) => r.status === "archived");
-
-  const songsWithoutAudio = rawSongs.filter((s) => !s.audioUrl);
-  const publishedSongs = rawSongs.filter(
-    (s) => s.status === "published" && s.isVisible
+  const draftReleases = useMemo(
+    () => releases.filter((r) => r.status === "draft"),
+    [releases]
+  );
+  const scheduledReleases = useMemo(
+    () => releases.filter((r) => r.status === "scheduled"),
+    [releases]
+  );
+  const archivedReleases = useMemo(
+    () => releases.filter((r) => r.status === "archived"),
+    [releases]
   );
 
-  // Releases not at 100% readiness
-  const unreadyReleases = rawReleases
-    .filter((r) => r.status !== "archived")
-    .map((r) => ({ release: r, score: getReadinessScore(r, rawSongs) }))
-    .filter(({ score }) => score < 100)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
+  // ── Song health ────────────────────────────────────────────────────────────
+  const songsWithoutAudio = useMemo(
+    () =>
+      songs.filter(
+        (s) => s.status !== "archived" && !s.audioUrl && !s.mediaAssetId
+      ),
+    [songs]
+  );
+  const publishedSongs = useMemo(
+    () => songs.filter((s) => s.status === "published" && s.isVisible),
+    [songs]
+  );
 
-  // Latest edited releases (by updatedAt desc)
-  const latestEdited = [...rawReleases]
-    .sort((a, b) => (b.updatedAt > a.updatedAt ? 1 : -1))
-    .slice(0, 5);
+  // ── Catalog health KPIs ────────────────────────────────────────────────────
+  const songsWithoutISRC = useMemo(
+    () => songs.filter((s) => s.status !== "archived" && !s.isrc),
+    [songs]
+  );
+  const releasesWithoutUPC = useMemo(
+    () =>
+      releases.filter(
+        (r) =>
+          r.status !== "archived" &&
+          !r.providerConfig?.upc &&
+          !r.distributionRecord?.upc
+      ),
+    [releases]
+  );
+  const releasesWithoutCover = useMemo(
+    () => releases.filter((r) => r.status !== "archived" && !r.coverArtUrl),
+    [releases]
+  );
+  const releasesWithoutDistributor = useMemo(
+    () =>
+      releases.filter(
+        (r) =>
+          r.status !== "archived" &&
+          !r.providerConfig?.distributor &&
+          !r.distributionRecord?.distributor
+      ),
+    [releases]
+  );
+
+  // ── Rights health ──────────────────────────────────────────────────────────
+  const songsRightsPending = useMemo(
+    () =>
+      songs.filter(
+        (s) =>
+          s.status !== "archived" &&
+          (!s.rightsMetadata?.pro ||
+            !s.rightsMetadata?.compositionStatus ||
+            s.rightsMetadata?.compositionStatus === "draft")
+      ),
+    [songs]
+  );
+
+  // ── Upcoming releases ──────────────────────────────────────────────────────
+  const upcoming7 = useMemo(
+    () =>
+      releases.filter(
+        (r) =>
+          r.status !== "archived" &&
+          r.status !== "published" &&
+          isInNextDays(r.publishAt || r.releaseDate, 7)
+      ),
+    [releases]
+  );
+  const upcoming14 = useMemo(
+    () =>
+      releases.filter(
+        (r) =>
+          r.status !== "archived" &&
+          r.status !== "published" &&
+          isInNextDays(r.publishAt || r.releaseDate, 14)
+      ),
+    [releases]
+  );
+  const upcoming30 = useMemo(
+    () =>
+      releases.filter(
+        (r) =>
+          r.status !== "archived" &&
+          r.status !== "published" &&
+          isInNextDays(r.publishAt || r.releaseDate, 30)
+      ),
+    [releases]
+  );
+
+  // ── Readiness warnings ─────────────────────────────────────────────────────
+  const unreadyReleases = useMemo(
+    () =>
+      releases
+        .filter((r) => r.status !== "archived")
+        .map((r) => ({ release: r, score: getReadinessScore(r, songs) }))
+        .filter(({ score }) => score < 100)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5),
+    [releases, songs]
+  );
+
+  // ── Latest edited ──────────────────────────────────────────────────────────
+  const latestEdited = useMemo(
+    () =>
+      [...releases]
+        .sort((a, b) => (b.updatedAt > a.updatedAt ? 1 : -1))
+        .slice(0, 5),
+    [releases]
+  );
 
   return (
     <AdminShell title="Dashboard">
@@ -143,26 +254,10 @@ export default function AdminDashboard() {
             Overview
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatTile
-              label="Artists"
-              value={artists.length}
-              href="/admin/artists"
-            />
-            <StatTile
-              label="Producers"
-              value={producers.length}
-              href="/admin/producers"
-            />
-            <StatTile
-              label="Brands"
-              value={brands.length}
-              href="/admin/brands"
-            />
-            <StatTile
-              label="Songs"
-              value={rawSongs.length}
-              href="/admin/songs"
-            />
+            <StatTile label="Artists"   value={artists.length}   href="/admin/artists"   />
+            <StatTile label="Producers" value={producers.length} href="/admin/producers" />
+            <StatTile label="Brands"    value={brands.length}    href="/admin/brands"    />
+            <StatTile label="Songs"     value={songs.length}     href="/admin/songs"     />
           </div>
         </div>
 
@@ -172,27 +267,96 @@ export default function AdminDashboard() {
             Releases
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatTile label="Published" value={publishedReleases.length} href="/admin/releases?tab=published" accent="green"  />
+            <StatTile label="Scheduled" value={scheduledReleases.length} href="/admin/releases?tab=scheduled" accent="yellow" />
+            <StatTile label="Draft"     value={draftReleases.length}     href="/admin/releases?tab=draft"     />
+            <StatTile label="Archived"  value={archivedReleases.length}  href="/admin/releases?tab=archived"  />
+          </div>
+        </div>
+
+        {/* ── Catalog health KPIs ─────────────────────────────────────────── */}
+        <div>
+          <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-4">
+            Catalog Health
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatTile
-              label="Published"
-              value={publishedReleases.length}
-              href="/admin/releases?tab=published"
+              label="Songs Missing ISRC"
+              value={songsWithoutISRC.length}
+              href="/admin/catalog"
+              accent={songsWithoutISRC.length > 0 ? "yellow" : undefined}
+            />
+            <StatTile
+              label="Releases Missing UPC"
+              value={releasesWithoutUPC.length}
+              href="/admin/catalog"
+              accent={releasesWithoutUPC.length > 0 ? "yellow" : undefined}
+            />
+            <StatTile
+              label="Missing Cover Art"
+              value={releasesWithoutCover.length}
+              href="/admin/releases"
+              accent={releasesWithoutCover.length > 0 ? "red" : undefined}
+            />
+            <StatTile
+              label="No Distributor Set"
+              value={releasesWithoutDistributor.length}
+              href="/admin/distribution"
+              accent={releasesWithoutDistributor.length > 0 ? "yellow" : undefined}
+            />
+          </div>
+        </div>
+
+        {/* ── Operations health ────────────────────────────────────────────── */}
+        <div>
+          <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-4">
+            Operations Health
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <StatTile
+              label="Songs Missing Audio"
+              value={songsWithoutAudio.length}
+              href="/admin/songs"
+              accent={songsWithoutAudio.length > 0 ? "red" : undefined}
+            />
+            <StatTile
+              label="Rights Incomplete"
+              value={songsRightsPending.length}
+              href="/admin/rights"
+              accent={songsRightsPending.length > 0 ? "yellow" : undefined}
+            />
+            <StatTile
+              label="Published Songs"
+              value={publishedSongs.length}
+              href="/admin/songs"
               accent="green"
             />
+          </div>
+        </div>
+
+        {/* ── Upcoming release windows ─────────────────────────────────────── */}
+        <div>
+          <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-4">
+            Upcoming Releases
+          </p>
+          <div className="grid grid-cols-3 gap-3">
             <StatTile
-              label="Scheduled"
-              value={scheduledReleases.length}
-              href="/admin/releases?tab=scheduled"
-              accent="yellow"
+              label="Next 7 Days"
+              value={upcoming7.length}
+              href="/admin/publishing"
+              accent={upcoming7.length > 0 ? "yellow" : undefined}
             />
             <StatTile
-              label="Draft"
-              value={draftReleases.length}
-              href="/admin/releases?tab=draft"
+              label="Next 14 Days"
+              value={upcoming14.length}
+              href="/admin/publishing"
+              accent={upcoming14.length > 0 ? "yellow" : undefined}
             />
             <StatTile
-              label="Archived"
-              value={archivedReleases.length}
-              href="/admin/releases?tab=archived"
+              label="Next 30 Days"
+              value={upcoming30.length}
+              href="/admin/publishing"
+              accent={upcoming30.length > 0 ? "yellow" : undefined}
             />
           </div>
         </div>
@@ -250,22 +414,28 @@ export default function AdminDashboard() {
 
           {/* Latest edited */}
           <Section title="Recently Edited Releases" href="/admin/releases">
-            {latestEdited.map((r) => (
-              <ListRow
-                key={r.id}
-                label={r.title}
-                meta={r.updatedAt.slice(0, 10)}
-                href={`/admin/releases/${r.slug}`}
-                badge={r.status}
-                badgeColor={
-                  r.status === "published"
-                    ? "text-green-400/60"
-                    : r.status === "scheduled"
-                    ? "text-yellow-400/60"
-                    : "text-white/20"
-                }
-              />
-            ))}
+            {latestEdited.length === 0 ? (
+              <p className="text-[11px] text-white/20 italic py-2">
+                No releases yet.
+              </p>
+            ) : (
+              latestEdited.map((r) => (
+                <ListRow
+                  key={r.id}
+                  label={r.title}
+                  meta={r.updatedAt.slice(0, 10)}
+                  href={`/admin/releases/${r.slug}`}
+                  badge={r.status}
+                  badgeColor={
+                    r.status === "published"
+                      ? "text-green-400/60"
+                      : r.status === "scheduled"
+                      ? "text-yellow-400/60"
+                      : "text-white/20"
+                  }
+                />
+              ))
+            )}
           </Section>
 
           {/* Scheduled releases */}
@@ -289,27 +459,6 @@ export default function AdminDashboard() {
           </Section>
         </div>
 
-        {/* ── Songs at-a-glance ────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <StatTile
-            label="Published Songs"
-            value={publishedSongs.length}
-            href="/admin/songs"
-            accent="green"
-          />
-          <StatTile
-            label="Songs Missing Audio"
-            value={songsWithoutAudio.length}
-            href="/admin/songs"
-            accent={songsWithoutAudio.length > 0 ? "red" : undefined}
-          />
-          <StatTile
-            label="Upload Media"
-            value="→"
-            href="/admin/media"
-          />
-        </div>
-
         {/* ── Quick actions ────────────────────────────────────────────────── */}
         <div className="border-t border-white/5 pt-8">
           <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">
@@ -317,13 +466,13 @@ export default function AdminDashboard() {
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: "New Release", href: "/admin/releases/new" },
-              { label: "New Song", href: "/admin/songs/new" },
-              { label: "New Artist", href: "/admin/artists/new" },
-              { label: "Upload Media", href: "/admin/media" },
-              { label: "Manage Brands", href: "/admin/brands" },
-              { label: "Manage Producers", href: "/admin/producers" },
-              { label: "Homepage Config", href: "/admin/homepage" },
+              { label: "New Release",      href: "/admin/releases/new" },
+              { label: "New Song",         href: "/admin/songs/new" },
+              { label: "New Artist",       href: "/admin/artists/new" },
+              { label: "Upload Media",     href: "/admin/media" },
+              { label: "Catalog",          href: "/admin/catalog" },
+              { label: "Rights",           href: "/admin/rights" },
+              { label: "Distribution",     href: "/admin/distribution" },
               { label: "System Integrity", href: "/admin/integrity" },
               { label: "View Public Site", href: "/" },
             ].map((action) => (

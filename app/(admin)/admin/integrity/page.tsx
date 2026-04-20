@@ -160,6 +160,37 @@ export default function IntegrityPage() {
     }
   }
 
+  // ── Songs: missing ISRC ──────────────────────────────────────────────────────
+  for (const song of songs) {
+    if (song.status === "archived") continue;
+    if (!song.isrc) {
+      issues.push({
+        id: `song-no-isrc-${song.id}`,
+        severity: song.status === "published" ? "warning" : "info",
+        category: "Songs",
+        entity: `${song.title} — ${song.artistName}`,
+        entityHref: `/admin/songs/${song.slug}`,
+        description: `Song "${song.title}" has no ISRC assigned.`,
+      });
+    }
+  }
+
+  // ── Songs: rights metadata incomplete (published) ────────────────────────────
+  for (const song of songs) {
+    if (song.status !== "published") continue;
+    const hasRights = song.rightsMetadata?.pro || song.rightsMetadata?.publisher;
+    if (!hasRights) {
+      issues.push({
+        id: `song-no-rights-${song.id}`,
+        severity: "warning",
+        category: "Rights",
+        entity: `${song.title} — ${song.artistName}`,
+        entityHref: `/admin/songs/${song.slug}`,
+        description: `Published song "${song.title}" has no rights metadata (PRO / publisher).`,
+      });
+    }
+  }
+
   // ── Songs: without release link ──────────────────────────────────────────────
   for (const song of songs) {
     if (song.status === "archived") continue;
@@ -185,6 +216,40 @@ export default function IntegrityPage() {
         entity: asset.filename,
         entityHref: `/admin/media`,
         description: `Asset "${asset.filename}" is not attached to any entity (orphaned).`,
+      });
+    }
+  }
+
+  // ── Releases: missing UPC ────────────────────────────────────────────────────
+  for (const release of releases) {
+    if (release.status === "archived") continue;
+    const hasUPC = release.providerConfig?.upc || release.distributionRecord?.upc;
+    if (!hasUPC) {
+      issues.push({
+        id: `release-no-upc-${release.id}`,
+        severity: release.status === "published" ? "warning" : "info",
+        category: "Distribution",
+        entity: `${release.title} — ${release.artistName}`,
+        entityHref: `/admin/releases/${release.slug}`,
+        description: `Release "${release.title}" has no UPC assigned.`,
+      });
+    }
+  }
+
+  // ── Releases: missing distributor ────────────────────────────────────────────
+  for (const release of releases) {
+    if (release.status === "archived") continue;
+    const hasDistributor =
+      release.providerConfig?.distributor ||
+      release.distributionRecord?.distributor;
+    if (!hasDistributor) {
+      issues.push({
+        id: `release-no-distributor-${release.id}`,
+        severity: release.status === "published" ? "warning" : "info",
+        category: "Distribution",
+        entity: `${release.title} — ${release.artistName}`,
+        entityHref: `/admin/releases/${release.slug}`,
+        description: `Release "${release.title}" has no distributor configured.`,
       });
     }
   }

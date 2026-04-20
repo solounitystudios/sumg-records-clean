@@ -237,3 +237,30 @@ alter table artist_timeline_items enable row level security;
 create policy "public read timeline"  on artist_timeline_items for select using (true);
 create policy "auth write timeline"   on artist_timeline_items for all    using (auth.role() = 'authenticated');
 
+-- ─── Phase A+C migration — Music Operations Layer + Data Integrity ─────────────
+-- Additive only — all statements are safe to run multiple times (IF NOT EXISTS).
+--
+-- New fields enable:
+--   • Source-of-truth labeling (data_source) on songs and releases
+--   • ISRC at the song level (standard music publishing identifier)
+--   • Rights metadata per song and release (PRO, IPI, songwriter credits,
+--     composition/registration status, reference URLs)
+--   • Distribution tracking per release (distributor, submission/delivery/live
+--     status, UPC, distro reference IDs — manual entry, no fake live sync)
+--
+-- Run after Phase 7 migration.
+
+-- Source-of-truth tracking
+alter table songs     add column if not exists data_source         text;
+alter table releases  add column if not exists data_source         text;
+
+-- ISRC at song level
+alter table songs     add column if not exists isrc                text;
+
+-- Rights metadata (PRO, IPI/CAE, songwriter credits, registration status)
+alter table songs     add column if not exists rights_metadata     jsonb;
+alter table releases  add column if not exists rights_metadata     jsonb;
+
+-- Distribution record (distributor, statuses, UPC, reference IDs)
+alter table releases  add column if not exists distribution_record jsonb;
+
