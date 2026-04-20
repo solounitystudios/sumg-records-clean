@@ -10,11 +10,13 @@ import Link from "next/link";
 
 function isInNextDays(dateStr: string | undefined, days: number): boolean {
   if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
+  // Compare date-only strings to avoid same-day time-of-day edge cases
+  const d = dateStr.slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
   const future = new Date();
   future.setDate(future.getDate() + days);
-  return d >= now && d <= future;
+  const futureStr = future.toISOString().slice(0, 10);
+  return d >= today && d <= futureStr;
 }
 
 // ─── Stat tile ───────────────────────────────────────────────────────────────
@@ -180,7 +182,7 @@ export default function AdminDashboard() {
   );
 
   // ── Rights health ──────────────────────────────────────────────────────────
-  const songsRightsPending = useMemo(
+  const songsRightsIncomplete = useMemo(
     () =>
       songs.filter(
         (s) =>
@@ -321,9 +323,9 @@ export default function AdminDashboard() {
             />
             <StatTile
               label="Rights Incomplete"
-              value={songsRightsPending.length}
+              value={songsRightsIncomplete.length}
               href="/admin/rights"
-              accent={songsRightsPending.length > 0 ? "yellow" : undefined}
+              accent={songsRightsIncomplete.length > 0 ? "yellow" : undefined}
             />
             <StatTile
               label="Published Songs"
