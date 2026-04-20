@@ -5,8 +5,8 @@ import { getPublishedReleases } from "@/lib/cms";
 
 export const metadata = { title: "Releases — SUMG Records" };
 
-export default function ReleasesPage() {
-  const releases = getPublishedReleases();
+export default async function ReleasesPage() {
+  const releases = await getPublishedReleases();
   return (
     <>
       <Navbar />

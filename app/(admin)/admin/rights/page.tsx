@@ -19,6 +19,8 @@ import { useState, useMemo } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { useCmsStore } from "@/lib/cms/store";
 import { RightsStatus } from "@/lib/types";
+import { exportRightsToCSV, exportRightsToJSON } from "@/lib/utils/export";
+import { validateForRegistration } from "@/lib/cms/validation";
 import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -52,6 +54,7 @@ export default function RightsPage() {
   const [tab, setTab] = useState<TabType>("songs");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterPRO, setFilterPRO] = useState<string>("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // ── Stats (songs-only for the summary tiles) ──────────────────────────────
   const activeSongs = songs.filter((s) => s.status !== "archived");
@@ -106,6 +109,15 @@ export default function RightsPage() {
     return rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }, [releases, filterStatus, filterPRO]);
 
+  // ── Precomputed validation results ───────────────────────────────────────
+  const validationMap = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof validateForRegistration>>();
+    for (const song of songs) {
+      map.set(song.id, validateForRegistration(song));
+    }
+    return map;
+  }, [songs]);
+
   return (
     <AdminShell title="Rights">
       <div className="space-y-8">
@@ -158,8 +170,9 @@ export default function RightsPage() {
           </p>
         </div>
 
-        {/* ── Tabs ───────────────────────────────────────────────────────── */}
-        <div className="flex gap-0 border-b border-white/5">
+        {/* ── Tabs + Export ──────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between border-b border-white/5">
+          <div className="flex gap-0">
           {(["songs", "releases"] as TabType[]).map((t) => (
             <button
               key={t}
@@ -173,6 +186,19 @@ export default function RightsPage() {
               {t}
             </button>
           ))}
+          </div>
+          <button
+            onClick={() => exportRightsToCSV(songs)}
+            className="mb-px px-3 py-1.5 text-[10px] tracking-[0.15em] uppercase border border-white/10 text-white/40 hover:text-white/70 hover:border-white/20 transition-colors"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={() => exportRightsToJSON(songs)}
+            className="mb-px px-3 py-1.5 text-[10px] tracking-[0.15em] uppercase border border-white/10 text-white/40 hover:text-white/70 hover:border-white/20 transition-colors"
+          >
+            Export JSON
+          </button>
         </div>
 
         {/* ── Filters ────────────────────────────────────────────────────── */}
@@ -217,118 +243,163 @@ export default function RightsPage() {
             ) : (
               <div className="border border-white/5 overflow-x-auto">
                 <div className="min-w-[900px] grid grid-cols-12 gap-2 px-4 py-2 text-[9px] tracking-[0.2em] uppercase text-white/20 border-b border-white/5 bg-white/[0.01]">
-                  <span className="col-span-3">Song</span>
+                  <span className="col-span-2">Song</span>
                   <span className="col-span-2">Artist</span>
                   <span className="col-span-1">PRO</span>
                   <span className="col-span-2">Publisher</span>
                   <span className="col-span-1">IPI / CAE</span>
                   <span className="col-span-1">Comp.</span>
                   <span className="col-span-1">Reg.</span>
-                  <span className="col-span-1" />
+                  <span className="col-span-2">Validation</span>
                 </div>
                 <div className="min-w-[900px] divide-y divide-white/[0.03]">
                   {filteredSongs.map((song) => {
                     const rm = song.rightsMetadata;
+                    const issues = validationMap.get(song.id) ?? [];
+                    const criticals = issues.filter(i => i.severity === "critical").length;
+                    const warnings = issues.filter(i => i.severity === "warning").length;
+                    const isExpanded = expandedId === song.id;
                     return (
-                      <div
-                        key={song.id}
-                        className="grid grid-cols-12 gap-2 px-4 py-3 hover:bg-white/[0.02] transition-colors items-start"
-                      >
-                        {/* Song title + ISRC */}
-                        <div className="col-span-3 min-w-0">
-                          <p className="text-[11px] text-white/70 truncate">
-                            {song.title}
+                      <div key={song.id}>
+                        <div className="grid grid-cols-12 gap-2 px-4 py-3 hover:bg-white/[0.02] transition-colors items-start">
+                          {/* Song title + ISRC */}
+                          <div className="col-span-2 min-w-0">
+                            <p className="text-[11px] text-white/70 truncate">
+                              {song.title}
+                            </p>
+                            {song.isrc ? (
+                              <p className="text-[9px] font-mono text-white/25 mt-0.5">
+                                {song.isrc}
+                              </p>
+                            ) : (
+                              <p className="text-[9px] font-mono text-red-400/40 mt-0.5">
+                                No ISRC
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Artist */}
+                          <p className="col-span-2 text-[11px] text-white/40 truncate">
+                            {song.artistName}
                           </p>
-                          {song.isrc ? (
-                            <p className="text-[9px] font-mono text-white/25 mt-0.5">
-                              {song.isrc}
-                            </p>
-                          ) : (
-                            <p className="text-[9px] font-mono text-red-400/40 mt-0.5">
-                              No ISRC
-                            </p>
-                          )}
-                        </div>
 
-                        {/* Artist */}
-                        <p className="col-span-2 text-[11px] text-white/40 truncate">
-                          {song.artistName}
-                        </p>
-
-                        {/* PRO */}
-                        <p
-                          className={`col-span-1 text-[10px] font-mono ${
-                            rm?.pro ? "text-white/50" : "text-white/20"
-                          }`}
-                        >
-                          {rm?.pro ?? "—"}
-                        </p>
-
-                        {/* Publisher */}
-                        <p
-                          className={`col-span-2 text-[10px] truncate ${
-                            rm?.publisher ? "text-white/40" : "text-white/20"
-                          }`}
-                        >
-                          {rm?.publisher ?? "—"}
-                        </p>
-
-                        {/* IPI / CAE */}
-                        <p
-                          className={`col-span-1 text-[10px] font-mono truncate ${
-                            rm?.ipiCae ? "text-white/40" : "text-white/20"
-                          }`}
-                        >
-                          {rm?.ipiCae ?? "—"}
-                        </p>
-
-                        {/* Composition status */}
-                        <div className="col-span-1">
-                          <span
-                            className={`text-[9px] tracking-[0.1em] uppercase border px-1.5 py-0.5 ${rightsStatusColor(rm?.compositionStatus)}`}
+                          {/* PRO */}
+                          <p
+                            className={`col-span-1 text-[10px] font-mono ${
+                              rm?.pro ? "text-white/50" : "text-white/20"
+                            }`}
                           >
-                            {rightsStatusLabel(rm?.compositionStatus)}
-                          </span>
-                        </div>
+                            {rm?.pro ?? "—"}
+                          </p>
 
-                        {/* Registration status */}
-                        <div className="col-span-1">
-                          <span
-                            className={`text-[9px] tracking-[0.1em] uppercase border px-1.5 py-0.5 ${rightsStatusColor(rm?.registrationStatus)}`}
+                          {/* Publisher */}
+                          <p
+                            className={`col-span-2 text-[10px] truncate ${
+                              rm?.publisher ? "text-white/40" : "text-white/20"
+                            }`}
                           >
-                            {rightsStatusLabel(rm?.registrationStatus)}
-                          </span>
-                        </div>
+                            {rm?.publisher ?? "—"}
+                          </p>
 
-                        {/* Action links */}
-                        <div className="col-span-1 flex items-center justify-end gap-2">
-                          {rm?.bmiWorkUrl && (
-                            <a
-                              href={rm.bmiWorkUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[9px] tracking-[0.1em] uppercase text-white/20 hover:text-white transition-colors"
+                          {/* IPI / CAE */}
+                          <p
+                            className={`col-span-1 text-[10px] font-mono truncate ${
+                              rm?.ipiCae ? "text-white/40" : "text-white/20"
+                            }`}
+                          >
+                            {rm?.ipiCae ?? "—"}
+                          </p>
+
+                          {/* Composition status */}
+                          <div className="col-span-1">
+                            <span
+                              className={`text-[9px] tracking-[0.1em] uppercase border px-1.5 py-0.5 ${rightsStatusColor(rm?.compositionStatus)}`}
                             >
-                              BMI↗
-                            </a>
-                          )}
-                          {rm?.ascapWorkUrl && (
-                            <a
-                              href={rm.ascapWorkUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[9px] tracking-[0.1em] uppercase text-white/20 hover:text-white transition-colors"
+                              {rightsStatusLabel(rm?.compositionStatus)}
+                            </span>
+                          </div>
+
+                          {/* Registration status */}
+                          <div className="col-span-1">
+                            <span
+                              className={`text-[9px] tracking-[0.1em] uppercase border px-1.5 py-0.5 ${rightsStatusColor(rm?.registrationStatus)}`}
                             >
-                              ASCAP↗
-                            </a>
-                          )}
-                          <Link
-                            href={`/admin/songs/${song.slug}`}
-                            className="text-[10px] tracking-[0.15em] uppercase text-white/20 hover:text-white transition-colors"
-                          >
-                            Edit →
-                          </Link>
+                              {rightsStatusLabel(rm?.registrationStatus)}
+                            </span>
+                          </div>
+
+                          {/* Validation + actions */}
+                          <div className="col-span-2 flex flex-col items-end gap-1.5">
+                            {issues.length === 0 ? (
+                              <span className="text-[9px] tracking-[0.1em] text-green-400/60">
+                                ✓ Ready
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => setExpandedId(isExpanded ? null : song.id)}
+                                className={`text-[9px] tracking-[0.05em] text-left transition-colors ${
+                                  criticals > 0 ? "text-red-400/70 hover:text-red-400" : "text-yellow-400/70 hover:text-yellow-400"
+                                }`}
+                              >
+                                ⚠ {criticals > 0 && `${criticals} critical`}
+                                {criticals > 0 && warnings > 0 && ", "}
+                                {warnings > 0 && `${warnings} warning${warnings > 1 ? "s" : ""}`}
+                              </button>
+                            )}
+                            <div className="flex items-center gap-2">
+                              {rm?.bmiWorkUrl && (
+                                <a
+                                  href={rm.bmiWorkUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[9px] tracking-[0.1em] uppercase text-white/20 hover:text-white transition-colors"
+                                >
+                                  BMI↗
+                                </a>
+                              )}
+                              {rm?.ascapWorkUrl && (
+                                <a
+                                  href={rm.ascapWorkUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[9px] tracking-[0.1em] uppercase text-white/20 hover:text-white transition-colors"
+                                >
+                                  ASCAP↗
+                                </a>
+                              )}
+                              <Link
+                                href={`/admin/songs/${song.slug}`}
+                                className="text-[10px] tracking-[0.15em] uppercase text-white/20 hover:text-white transition-colors"
+                              >
+                                Edit →
+                              </Link>
+                            </div>
+                          </div>
                         </div>
+
+                        {/* Inline validation issues */}
+                        {isExpanded && issues.length > 0 && (
+                          <div className="px-4 pb-3 bg-white/[0.01]">
+                            <ul className="space-y-1 border-l border-white/[0.06] pl-3">
+                              {issues.map((issue, idx) => (
+                                <li key={idx} className="text-[9px] text-white/35 leading-relaxed">
+                                  <span
+                                    className={
+                                      issue.severity === "critical"
+                                        ? "text-red-400/70"
+                                        : issue.severity === "warning"
+                                        ? "text-yellow-400/60"
+                                        : "text-white/30"
+                                    }
+                                  >
+                                    • [{issue.severity}]
+                                  </span>{" "}
+                                  {issue.message}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

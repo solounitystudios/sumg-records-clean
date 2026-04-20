@@ -7,8 +7,8 @@ export const metadata = {
   title: "Songs — SUMG Records",
 };
 
-export default function SongsPage() {
-  const songs = getPublicSongs().sort((a, b) => {
+export default async function SongsPage() {
+  const songs = (await getPublicSongs()).sort((a, b) => {
     // Sort by release date (newest first), then alphabetically
     if (a.releaseSlug && b.releaseSlug) {
       return a.title.localeCompare(b.title);

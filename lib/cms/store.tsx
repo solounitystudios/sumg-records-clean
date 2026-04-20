@@ -152,7 +152,7 @@ function rowToBrand(r: any): CMSBrand {
     campaignStatus: r.campaign_status ?? undefined,
     collectionName: r.collection_name ?? undefined,
     featuredReleaseSlugs: r.featured_release_slugs ?? undefined,
-    featuredSongSlugs: r.featured_song_slugs ?? undefined,
+
     featuredAssetIds: r.featured_asset_ids ?? undefined,
     isActive: r.is_active ?? true,
     featuredOnHomepage: r.featured_on_homepage ?? false,
@@ -431,21 +431,22 @@ export function useCmsStore(): CmsStore {
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export function CmsStoreProvider({ children }: { children: ReactNode }) {
-  // ── Initial state: seed data (replaced on mount if Supabase is configured) ──
+  // ── Initial state: empty when Supabase is configured (data loaded on mount),
+  //    seed data only in local dev when Supabase is not configured ──
   const [artists, setArtists] = useState<CMSArtist[]>(
-    () => seedArtists as CMSArtist[]
+    () => hasSupabase() ? [] : (seedArtists as CMSArtist[])
   );
   const [producers, setProducers] = useState<CMSProducer[]>(
-    () => seedProducers as CMSProducer[]
+    () => hasSupabase() ? [] : (seedProducers as CMSProducer[])
   );
   const [brands, setBrands] = useState<CMSBrand[]>(
-    () => seedBrands as CMSBrand[]
+    () => hasSupabase() ? [] : (seedBrands as CMSBrand[])
   );
   const [releases, setReleases] = useState<CMSRelease[]>(
-    () => seedReleases as CMSRelease[]
+    () => hasSupabase() ? [] : (seedReleases as CMSRelease[])
   );
   const [songs, setSongs] = useState<CMSSong[]>(
-    () => seedSongs as CMSSong[]
+    () => hasSupabase() ? [] : (seedSongs as CMSSong[])
   );
   const [assets, setAssets] = useState<CMSAsset[]>([]);
   const [timelineItems, setTimelineItems] = useState<ArtistTimelineItem[]>([]);
@@ -453,9 +454,11 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
     defaultHomepageConfig
   );
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(() => hasSupabase());
   const [syncState, setSyncState] = useState<SyncState>("idle");
-  const [dataSource, setDataSource] = useState<DataSource>("seed");
+  const [dataSource, setDataSource] = useState<DataSource>(
+    () => hasSupabase() ? "db" : "seed"
+  );
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -783,7 +786,6 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             campaign_status: sanitizeCampaignStatus(brand.campaignStatus),
             collection_name: brand.collectionName ?? null,
             featured_release_slugs: brand.featuredReleaseSlugs ?? null,
-            featured_song_slugs: brand.featuredSongSlugs ?? null,
             featured_asset_ids: brand.featuredAssetIds ?? null,
             is_active: brand.isActive,
             featured_on_homepage: brand.featuredOnHomepage ?? false,
@@ -831,7 +833,6 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               campaign_status: sanitizeCampaignStatus(u.campaignStatus),
               collection_name: u.collectionName ?? null,
               featured_release_slugs: u.featuredReleaseSlugs ?? null,
-              featured_song_slugs: u.featuredSongSlugs ?? null,
               featured_asset_ids: u.featuredAssetIds ?? null,
               is_active: u.isActive,
               featured_on_homepage: u.featuredOnHomepage ?? false,

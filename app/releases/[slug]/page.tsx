@@ -8,32 +8,32 @@ import Link from "next/link";
 interface Props { params: Promise<{ slug: string }> }
 
 export async function generateStaticParams() {
-  return getPublishedReleases().map((r) => ({ slug: r.slug }));
+  return (await getPublishedReleases()).map((r) => ({ slug: r.slug }));
 }
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const release = getReleaseBySlug(slug);
+  const release = await getReleaseBySlug(slug);
   return { title: release ? `${release.title} — SUMG Records` : "Release Not Found" };
 }
 
 export default async function ReleasePage({ params }: Props) {
   const { slug } = await params;
-  const release = getReleaseBySlug(slug);
+  const release = await getReleaseBySlug(slug);
   if (!release) notFound();
 
   // First-class songs linked to this release (from the songs table)
-  const linkedSongs = getSongsForRelease(slug);
+  const linkedSongs = await getSongsForRelease(slug);
 
   // Named producer credits
-  const allProducers = getAllProducers();
+  const allProducers = await getAllProducers();
   const producerCredits = (release.producerSlugs ?? []).map((pSlug) => ({
     slug: pSlug,
     name: allProducers.find((p) => p.slug === pSlug)?.name ?? pSlug,
   }));
 
   // Artist info for credits
-  const artist = getArtistBySlug(release.artistSlug);
+  const artist = await getArtistBySlug(release.artistSlug);
 
   return (
     <>

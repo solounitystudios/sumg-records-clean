@@ -1,11 +1,12 @@
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { BrandCard } from "@/components/cards/BrandCard";
-import { brands } from "@/data/brands";
+import { getAllBrands } from "@/lib/cms";
 
 export const metadata = { title: "Brand Worlds — SUMG Records" };
 
-export default function BrandsPage() {
+export default async function BrandsPage() {
+  const brands = await getAllBrands();
   return (
     <>
       <Navbar />
@@ -17,6 +18,9 @@ export default function BrandsPage() {
           </div>
         </section>
         <section className="py-20 max-w-7xl mx-auto px-6 lg:px-10">
+          {brands.length === 0 && (
+            <p className="text-white/20 italic text-sm">No brands yet.</p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-white/5">
             {brands.map((brand) => (
               <a key={brand.id} href={`/brands/${brand.slug}`} className="block bg-black">

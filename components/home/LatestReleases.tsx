@@ -1,8 +1,11 @@
-import { getPublishedReleases } from "@/lib/cms";
+import { CMSRelease } from "@/lib/types";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
 
-export function LatestReleases() {
-  const releases = getPublishedReleases();
+interface Props {
+  releases: CMSRelease[];
+}
+
+export function LatestReleases({ releases }: Props) {
   return (
     <section
       id="releases"

@@ -1,11 +1,12 @@
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { ArtistCard } from "@/components/cards/ArtistCard";
-import { artists } from "@/data/artists";
+import { getAllArtists } from "@/lib/cms";
 
 export const metadata = { title: "Artists — SUMG Records" };
 
-export default function ArtistsPage() {
+export default async function ArtistsPage() {
+  const artists = await getAllArtists();
   return (
     <>
       <Navbar />
@@ -17,6 +18,9 @@ export default function ArtistsPage() {
           </div>
         </section>
         <section className="py-20 max-w-7xl mx-auto px-6 lg:px-10">
+          {artists.length === 0 && (
+            <p className="text-white/20 italic text-sm">No artists yet.</p>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {artists.map((artist) => (
               <a key={artist.id} href={`/artists/${artist.slug}`}>

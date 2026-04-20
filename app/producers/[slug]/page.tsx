@@ -1,23 +1,23 @@
 import { notFound } from "next/navigation";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
-import { producers } from "@/data/producers";
+import { getAllProducers, getProducerBySlug } from "@/lib/cms";
 
 interface Props { params: Promise<{ slug: string }> }
 
 export async function generateStaticParams() {
-  return producers.map((p) => ({ slug: p.slug }));
+  return (await getAllProducers()).map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const producer = producers.find((p) => p.slug === slug);
+  const producer = await getProducerBySlug(slug);
   return { title: producer ? `${producer.name} — SUMG Records` : "Producer Not Found" };
 }
 
 export default async function ProducerPage({ params }: Props) {
   const { slug } = await params;
-  const producer = producers.find((p) => p.slug === slug);
+  const producer = await getProducerBySlug(slug);
   if (!producer) notFound();
 
   return (

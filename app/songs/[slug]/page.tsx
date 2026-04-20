@@ -17,12 +17,12 @@ interface Props {
 }
 
 export async function generateStaticParams() {
-  return getAllPublicSongSlugs().map((slug) => ({ slug }));
+  return (await getAllPublicSongSlugs()).map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const song = getSongBySlug(slug);
+  const song = await getSongBySlug(slug);
   return {
     title: song
       ? `${song.title} — ${song.artistName} — SUMG Records`
@@ -32,23 +32,23 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function SongPage({ params }: Props) {
   const { slug } = await params;
-  const song = getSongBySlug(slug);
+  const song = await getSongBySlug(slug);
   if (!song) notFound();
 
-  const release = song.releaseSlug ? getReleaseBySlug(song.releaseSlug) : undefined;
+  const release = song.releaseSlug ? await getReleaseBySlug(song.releaseSlug) : undefined;
   const releaseTracks = song.releaseSlug
-    ? getSongsForRelease(song.releaseSlug)
+    ? await getSongsForRelease(song.releaseSlug)
     : [];
 
   // Resolve producer names from the producers table
-  const allProducers = getAllProducers();
+  const allProducers = await getAllProducers();
   const producerCredits = (song.producerSlugs ?? []).map((pSlug) => ({
     slug: pSlug,
     name: allProducers.find((p) => p.slug === pSlug)?.name ?? pSlug,
   }));
 
   // Related songs — other songs by this artist (excluding current)
-  const relatedSongs = getSongsForArtist(song.artistSlug)
+  const relatedSongs = (await getSongsForArtist(song.artistSlug))
     .filter((s) => s.slug !== song.slug)
     .slice(0, 5);
 

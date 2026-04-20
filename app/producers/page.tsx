@@ -1,11 +1,12 @@
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { ProducerCard } from "@/components/cards/ProducerCard";
-import { producers } from "@/data/producers";
+import { getAllProducers } from "@/lib/cms";
 
 export const metadata = { title: "Producers — SUMG Records" };
 
-export default function ProducersPage() {
+export default async function ProducersPage() {
+  const producers = await getAllProducers();
   return (
     <>
       <Navbar />
@@ -17,6 +18,9 @@ export default function ProducersPage() {
           </div>
         </section>
         <section className="py-20 max-w-7xl mx-auto px-6 lg:px-10">
+          {producers.length === 0 && (
+            <p className="text-white/20 italic text-sm">No producers yet.</p>
+          )}
           <div className="border-t border-white/5">
             {producers.map((producer, i) => (
               <a key={producer.id} href={`/producers/${producer.slug}`} className="block">

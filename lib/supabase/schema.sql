@@ -264,3 +264,100 @@ alter table releases  add column if not exists rights_metadata     jsonb;
 -- Distribution record (distributor, statuses, UPC, reference IDs)
 alter table releases  add column if not exists distribution_record jsonb;
 
+
+-- ============================================================
+-- Phase 6 — Shopify Commerce Layer (additive migration)
+-- Run once in production Supabase SQL editor.
+-- ============================================================
+
+-- Shopify products reference table
+CREATE TABLE IF NOT EXISTS shopify_products (
+  id TEXT PRIMARY KEY,
+  handle TEXT NOT NULL,
+  title TEXT NOT NULL,
+  vendor TEXT NOT NULL DEFAULT '',
+  product_type TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'draft',
+  description TEXT,
+  tags JSONB DEFAULT '[]',
+  price NUMERIC(10,2) NOT NULL DEFAULT 0,
+  compare_at_price NUMERIC(10,2),
+  currency TEXT NOT NULL DEFAULT 'USD',
+  image_url TEXT,
+  inventory INTEGER NOT NULL DEFAULT 0,
+  variants_count INTEGER NOT NULL DEFAULT 1,
+  brand_slug TEXT NOT NULL DEFAULT '',
+  collection_handle TEXT,
+  shopify_gid TEXT,
+  last_synced TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Shopify collections reference table
+CREATE TABLE IF NOT EXISTS shopify_collections (
+  id TEXT PRIMARY KEY,
+  handle TEXT NOT NULL,
+  title TEXT NOT NULL,
+  brand_slug TEXT NOT NULL DEFAULT '',
+  description TEXT,
+  image_url TEXT,
+  products_count INTEGER NOT NULL DEFAULT 0,
+  published BOOLEAN NOT NULL DEFAULT false,
+  shopify_gid TEXT,
+  last_synced TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Shopify orders reference table
+CREATE TABLE IF NOT EXISTS shopify_orders (
+  id TEXT PRIMARY KEY,
+  order_number INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  financial_status TEXT NOT NULL DEFAULT 'pending',
+  fulfillment_status TEXT NOT NULL DEFAULT 'unfulfilled',
+  total_price NUMERIC(10,2) NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  customer_name TEXT,
+  customer_email TEXT,
+  line_items JSONB DEFAULT '[]',
+  brand_slug TEXT,
+  shopify_gid TEXT,
+  last_synced TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Shopify inventory items
+CREATE TABLE IF NOT EXISTS shopify_inventory_items (
+  id TEXT PRIMARY KEY,
+  product_id TEXT NOT NULL,
+  product_title TEXT NOT NULL,
+  variant_title TEXT,
+  sku TEXT,
+  available INTEGER NOT NULL DEFAULT 0,
+  committed INTEGER NOT NULL DEFAULT 0,
+  incoming INTEGER NOT NULL DEFAULT 0,
+  brand_slug TEXT NOT NULL DEFAULT '',
+  shopify_gid TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Campaigns (SUMG-managed, cross-references Shopify products)
+CREATE TABLE IF NOT EXISTS shopify_campaigns (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  brand_slug TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft',
+  start_date DATE,
+  end_date DATE,
+  description TEXT,
+  featured_product_ids JSONB DEFAULT '[]',
+  goal TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Remove deprecated song coupling from brands (safe — columns may not exist)
+ALTER TABLE brands DROP COLUMN IF EXISTS featured_song_slugs;

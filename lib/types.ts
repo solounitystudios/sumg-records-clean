@@ -250,9 +250,12 @@ export interface CMSBrand {
   /** Current collection or capsule name (e.g. "Spring 2025 — Void Series") */
   collectionName?: string;
   /** Slugs of releases featured on the brand page */
+  /**
+   * @deprecated Music releases should not be coupled to brand pages.
+   * Use Shopify collections for brand commerce content.
+   * Preserved for data migration compatibility.
+   */
   featuredReleaseSlugs?: string[];
-  /** Slugs of songs featured on the brand page */
-  featuredSongSlugs?: string[];
   /** IDs of media assets featured on the brand page */
   featuredAssetIds?: string[];
   isActive: boolean;
