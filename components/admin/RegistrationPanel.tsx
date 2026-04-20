@@ -90,6 +90,49 @@ function safeUrl(url: string): string {
   return "#";
 }
 
+// ─── Checklists ───────────────────────────────────────────────────────────────
+
+const CHECKLISTS: Record<RegistrationPanelProps["service"], string[]> = {
+  distrokid: [
+    "Song title and artist name exactly match the recording",
+    "ISRC assigned (DistroKid can generate if not set)",
+    "Cover art: minimum 3000×3000px, JPG or PNG, no text borders",
+    "Audio: WAV 16-bit or 24-bit, 44.1kHz or higher",
+    "Release date set (minimum 7 days lead time recommended)",
+    "UPC assigned (DistroKid generates automatically)",
+    "Explicit tag set correctly",
+    "All featured artists listed",
+    "Publishing/label name set",
+  ],
+  bmi: [
+    "Writer registration: all songwriters registered with BMI",
+    "IPI/CAE numbers on file for each writer",
+    "Publisher registered and active with BMI",
+    "Song title matches the recorded version",
+    "Writer splits total 100%",
+    "Song added to BMI repertoire via Songview portal",
+    "Reference BMI work ID stored in SUMG admin",
+  ],
+  songtrust: [
+    "Songtrust account active (publisher admin setup)",
+    "Song title matches registration exactly",
+    "All co-writers have IPI/CAE on file",
+    "Writer splits total 100%",
+    "Publishing admin agreement in place with Songtrust",
+    "ISRC assigned",
+    "Registration confirmation email saved as reference",
+  ],
+  soundexchange: [
+    "Artist registered with SoundExchange as featured artist",
+    "Copyright owner/label registered separately",
+    "ISRC assigned and confirmed on recording",
+    "Sound recording copyright year set",
+    "Direct payment account set up (featured artist split)",
+    "Label/rights holder account configured (non-featured split)",
+    "SoundExchange registration ID stored in SUMG admin",
+  ],
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function RegistrationPanel({
@@ -110,6 +153,7 @@ export function RegistrationPanel({
   const [refId, setRefId] = useState(initialRefId ?? "");
   const [refUrl, setRefUrl] = useState(initialRefUrl ?? "");
   const [notes, setNotes] = useState(initialNotes ?? "");
+  const [checklistOpen, setChecklistOpen] = useState(false);
 
   const serviceLabel = SERVICE_LABELS[service];
   const note = SERVICE_NOTE[service];
@@ -272,6 +316,26 @@ export function RegistrationPanel({
             rows={3}
             className="w-full bg-transparent border border-white/[0.08] px-3 py-2 text-[11px] text-white/60 placeholder:text-white/15 focus:border-white/20 focus:outline-none resize-none"
           />
+        )}
+      </div>
+
+      {/* ── Submission Checklist ────────────────────────────────────────── */}
+      <div className="border-t border-white/[0.06] pt-4 mt-4">
+        <button
+          onClick={() => setChecklistOpen((v) => !v)}
+          className="text-[9px] tracking-[0.2em] uppercase text-white/25 hover:text-white/50 transition-colors"
+        >
+          {checklistOpen ? "▾" : "▸"} Submission Checklist
+        </button>
+        {checklistOpen && (
+          <ul className="mt-3 space-y-1.5">
+            {CHECKLISTS[service].map((item, i) => (
+              <li key={i} className="flex items-start gap-2 text-[10px] text-white/40">
+                <span className="text-white/20 mt-0.5">□</span>
+                {item}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 

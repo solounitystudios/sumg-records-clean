@@ -18,7 +18,7 @@
 import { useState, useMemo } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { useCmsStore } from "@/lib/cms/store";
-import { exportCatalogToCSV } from "@/lib/utils/export";
+import { exportCatalogToCSV, exportCatalogToJSON } from "@/lib/utils/export";
 import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -193,12 +193,20 @@ export default function CatalogPage() {
               )}
             </div>
           </div>
+          <div className="flex items-center gap-2">
           <button
             onClick={() => exportCatalogToCSV(songs, releases)}
             className="px-3 py-1.5 text-[10px] tracking-[0.15em] uppercase border border-white/10 text-white/40 hover:text-white/70 hover:border-white/20 transition-colors"
           >
             Export CSV
           </button>
+          <button
+            onClick={() => exportCatalogToJSON(songs, releases)}
+            className="px-3 py-1.5 text-[10px] tracking-[0.15em] uppercase border border-white/10 text-white/40 hover:text-white/70 hover:border-white/20 transition-colors"
+          >
+            Export JSON
+          </button>
+          </div>
         </div>
 
         {/* ── Tabs ───────────────────────────────────────────────────────── */}

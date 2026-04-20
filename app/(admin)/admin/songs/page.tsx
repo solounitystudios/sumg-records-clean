@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useCmsStore } from "@/lib/cms/store";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { getCopyReadyMetadata } from "@/lib/utils/export";
 import Link from "next/link";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -12,7 +14,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function AdminSongsPage() {
-  const { songs } = useCmsStore();
+  const { songs, notify } = useCmsStore();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const sorted = [...songs].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -20,6 +23,16 @@ export default function AdminSongsPage() {
 
   const published = songs.filter((s) => s.status === "published").length;
   const draft = songs.filter((s) => s.status === "draft").length;
+
+  async function handleCopy(songId: string) {
+    const song = songs.find((s) => s.id === songId);
+    if (!song) return;
+    const text = getCopyReadyMetadata(song);
+    await navigator.clipboard.writeText(text);
+    notify("success", "Metadata copied to clipboard");
+    setCopiedId(songId);
+    setTimeout(() => setCopiedId((prev) => (prev === songId ? null : prev)), 2000);
+  }
 
   return (
     <AdminShell title="Songs">
@@ -101,7 +114,14 @@ export default function AdminSongsPage() {
                     {song.status}
                   </span>
                 </div>
-                <div className="col-span-1 flex justify-end">
+                <div className="col-span-1 flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => handleCopy(song.id)}
+                    className="text-[10px] tracking-[0.1em] uppercase text-white/20 hover:text-white/60 transition-colors"
+                    title="Copy metadata to clipboard"
+                  >
+                    {copiedId === song.id ? "✓" : "Copy ↗"}
+                  </button>
                   <Link
                     href={`/admin/songs/${song.slug}`}
                     className="text-[10px] tracking-[0.15em] uppercase text-white/25 hover:text-white transition-colors"
