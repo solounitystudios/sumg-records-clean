@@ -1,6 +1,90 @@
 export type ReleaseStatus = "draft" | "scheduled" | "published" | "archived";
 export type EntityStatus = "draft" | "active" | "archived";
 
+// ─── Music Operations Layer ───────────────────────────────────────────────────
+
+/** Where a record's data originated — used for source-of-truth labeling. */
+export type DataOriginSource =
+  | "manual"
+  | "supabase"
+  | "imported"
+  | "distro"
+  | "bmi"
+  | "ascap"
+  | "shopify";
+
+/** Rights / publishing registration status for a composition or recording. */
+export type RightsStatus = "draft" | "pending" | "registered" | "issue";
+
+/** Distribution pipeline status for a release. */
+export type DistributionStatus =
+  | "draft"
+  | "queued"
+  | "submitted"
+  | "delivered"
+  | "live"
+  | "issue";
+
+/** A single songwriter / composer credit with optional split percentage. */
+export interface SongwriterCredit {
+  name: string;
+  role: "Songwriter" | "Composer" | "Co-Writer" | "Producer" | "Other";
+  splitPct?: number;
+  /** IPI / CAE number for this contributor. */
+  ipi?: string;
+  pro?: PROName;
+}
+
+/**
+ * Rights metadata for a song or release.
+ * Populated manually or imported — BMI/ASCAP have no real-time public API.
+ * Reference URLs and registration status must be confirmed by the rights team.
+ */
+export interface RightsMetadata {
+  /** Performing Rights Organization for the primary rights holder. */
+  pro?: PROName;
+  /** IPI / CAE number of the primary rights holder. */
+  ipiCae?: string;
+  publisher?: string;
+  publishingAdmin?: string;
+  songwriterCredits?: SongwriterCredit[];
+  /** Registration status of the musical composition with the PRO. */
+  compositionStatus?: RightsStatus;
+  /** Whether the master recording is registered / tracked. */
+  registrationStatus?: RightsStatus;
+  /** Songview or other PRO work reference URL. */
+  songviewUrl?: string;
+  bmiWorkUrl?: string;
+  ascapWorkUrl?: string;
+  rightsNotes?: string;
+  source?: DataOriginSource;
+  /** ISO date — last time rights data was verified by the team. */
+  lastVerified?: string;
+}
+
+/**
+ * Distribution tracking record — attached to a release.
+ * DistroKid and similar services do not provide a real-time public API.
+ * Store reference IDs and status manually; link back to distributor dashboard.
+ */
+export interface DistributionRecord {
+  distributor?: string;
+  submissionStatus?: DistributionStatus;
+  deliveryStatus?: DistributionStatus;
+  liveStatus?: DistributionStatus;
+  /** Planned release / delivery date for distribution. */
+  scheduledDate?: string;
+  /** DSP platform names where this release is confirmed live. */
+  dspCoverage?: string[];
+  upc?: string;
+  /** Distributor-assigned internal release reference ID (e.g. DistroKid ID). */
+  distroReferenceId?: string;
+  distroNotes?: string;
+  source?: DataOriginSource;
+  /** ISO date — last time distribution data was verified / synced manually. */
+  lastSynced?: string;
+}
+
 // ─── DSP / Streaming ─────────────────────────────────────────────────────────
 
 /** First-class DSP link set — used on both songs and releases. */
@@ -199,6 +283,12 @@ export interface CMSRelease {
   streamingLinks?: StreamingLinks;
   dspLinks?: DSPLinks;
   providerConfig?: ProviderConfig;
+  /** Publishing / rights metadata for this release. */
+  rightsMetadata?: RightsMetadata;
+  /** Distribution tracking record for this release. */
+  distributionRecord?: DistributionRecord;
+  /** Where this record's data originated (manual entry, import, etc.). */
+  dataSource?: DataOriginSource;
   createdAt: string;
   updatedAt: string;
 }
@@ -238,6 +328,12 @@ export interface CMSSong {
   /** ID of a linked CMSAsset (audio file in the media library) */
   mediaAssetId?: string;
   dspLinks?: DSPLinks;
+  /** International Standard Recording Code — song-level identifier. */
+  isrc?: string;
+  /** Publishing / rights metadata for this composition. */
+  rightsMetadata?: RightsMetadata;
+  /** Where this record's data originated (manual entry, import, etc.). */
+  dataSource?: DataOriginSource;
   createdAt: string;
   updatedAt: string;
 }
