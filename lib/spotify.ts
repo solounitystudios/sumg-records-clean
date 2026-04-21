@@ -140,7 +140,6 @@ async function spotifyFetch<T>(path: string): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
     // Next.js extended fetch: cache responses for 1 hour across requests
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     next: { revalidate: 3600 },
   } as RequestInit & { next?: { revalidate?: number } });
   if (!res.ok) {
