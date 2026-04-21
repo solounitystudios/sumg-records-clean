@@ -12,7 +12,20 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const producer = await getProducerBySlug(slug);
-  return { title: producer ? `${producer.name} — SUMG Records` : "Producer Not Found" };
+  if (!producer) return { title: "Producer Not Found" };
+  const bioDesc = producer.bio
+    ? producer.bio.length > 160
+      ? `${producer.bio.slice(0, 160)}…`
+      : producer.bio
+    : `${producer.name} — producer at SUMG Records. Specialty: ${producer.specialty}.`;
+  return {
+    title: producer.name,
+    description: bioDesc,
+    openGraph: {
+      title: `${producer.name} — SUMG Records`,
+      description: bioDesc,
+    },
+  };
 }
 
 export default async function ProducerPage({ params }: Props) {

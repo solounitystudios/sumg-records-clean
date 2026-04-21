@@ -4,7 +4,14 @@ import { getPublicSongs } from "@/lib/cms";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Songs — SUMG Records",
+  title: "Songs",
+  description:
+    "Stream and explore every song in the SUMG Records catalogue — singles, album tracks, and exclusive releases from our independent artist roster.",
+  openGraph: {
+    title: "Songs — SUMG Records",
+    description:
+      "Stream and explore every song in the SUMG Records catalogue — singles, album tracks, and exclusive releases from our independent artist roster.",
+  },
 };
 
 export default async function SongsPage() {

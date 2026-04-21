@@ -15,10 +15,19 @@ export const metadata: Metadata = {
     siteName: "SUMG Records",
     type: "website",
     locale: "en_US",
+    images: [
+      {
+        url: "/og-image.svg",
+        width: 1200,
+        height: 630,
+        alt: "SUMG Records — Sound. Vision. Culture.",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     site: "@sumgrecords",
+    images: ["/og-image.svg"],
   },
   robots: {
     index: true,

@@ -3,7 +3,16 @@ import { Footer } from "@/components/site/Footer";
 import { ProducerCard } from "@/components/cards/ProducerCard";
 import { getAllProducers } from "@/lib/cms";
 
-export const metadata = { title: "Producers — SUMG Records" };
+export const metadata = {
+  title: "Producers",
+  description:
+    "Meet the producer network behind SUMG Records — five architects of sound building environments for the artists they serve.",
+  openGraph: {
+    title: "Producers — SUMG Records",
+    description:
+      "Meet the producer network behind SUMG Records — five architects of sound building environments for the artists they serve.",
+  },
+};
 
 export default async function ProducersPage() {
   const producers = await getAllProducers();
