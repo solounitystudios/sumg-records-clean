@@ -24,12 +24,11 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const song = await getSongBySlug(slug);
-  const release = song?.releaseSlug ? await getReleaseBySlug(song.releaseSlug) : undefined;
+  if (!song) return { title: "Song Not Found" };
+  const release = song.releaseSlug ? await getReleaseBySlug(song.releaseSlug) : undefined;
   const imageUrl = release?.coverArtUrl;
   return {
-    title: song
-      ? `${song.title} — ${song.artistName} — SUMG Records`
-      : "Song Not Found",
+    title: `${song.title} — ${song.artistName} — SUMG Records`,
     ...(imageUrl && {
       openGraph: { images: [{ url: imageUrl }] },
       twitter: { card: "summary_large_image", images: [imageUrl] },

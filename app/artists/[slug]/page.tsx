@@ -15,9 +15,10 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const artist = await getArtistBySlug(slug);
-  const imageUrl = artist?.heroImageUrl ?? artist?.profileImageUrl;
+  if (!artist) return { title: "Artist Not Found" };
+  const imageUrl = artist.heroImageUrl ?? artist.profileImageUrl;
   return {
-    title: artist ? `${artist.name} — SUMG Records` : "Artist Not Found",
+    title: `${artist.name} — SUMG Records`,
     ...(imageUrl && {
       openGraph: { images: [{ url: imageUrl }] },
       twitter: { card: "summary_large_image", images: [imageUrl] },
