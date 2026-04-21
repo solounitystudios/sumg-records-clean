@@ -18,7 +18,7 @@ import {
   ACCEPTED_AUDIO_TYPES,
   MAX_AUDIO_SIZE,
 } from "@/lib/media";
-import { createClient } from "@/lib/supabase/client";
+import { getCurrentUploader } from "@/lib/auth";
 import { DSPLinksPanel } from "@/components/admin/DSPLinksPanel";
 
 // ─── Producer multi-picker ───────────────────────────────────────────────────
@@ -106,9 +106,7 @@ function AudioUploadPanel({
     setUploading(true);
 
     // Resolve the actual user identity for the audit trail.
-    const sb = createClient();
-    const { data: { user } } = await sb.auth.getUser();
-    const uploadedBy = user?.email ?? user?.id ?? "unknown";
+    const uploadedBy = await getCurrentUploader();
 
     const result = await uploadAsset(file, "audio", uploadedBy);
     setUploading(false);

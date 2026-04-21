@@ -388,49 +388,60 @@ drop policy if exists "auth write assets"    on assets;
 drop policy if exists "auth write homepage"  on homepage_config;
 drop policy if exists "auth write timeline"  on artist_timeline_items;
 
+-- ─── Helper: is the calling user an explicitly-provisioned CMS operator? ─────
+-- Centralises the role list so future role additions require one change here.
+-- Uses SECURITY DEFINER so the function runs with the permissions of its owner
+-- and can safely call auth.jwt() within RLS policies.
+create or replace function is_cms_role() returns boolean
+  language sql security definer stable
+  as $$
+    select (auth.jwt() -> 'app_metadata' ->> 'role')
+             in ('admin','editor','media_manager','release_manager')
+  $$;
+
 -- ─── Role-based write policies (INSERT / UPDATE / DELETE) ────────────────────
 -- Any user with a recognised CMS role in app_metadata may write.
 -- Users who are authenticated but have no app_metadata.role are rejected.
 
 create policy "role write artists"
   on artists for all
-  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
-  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+  using  (is_cms_role())
+  with check (is_cms_role());
 
 create policy "role write producers"
   on producers for all
-  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
-  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+  using  (is_cms_role())
+  with check (is_cms_role());
 
 create policy "role write brands"
   on brands for all
-  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
-  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+  using  (is_cms_role())
+  with check (is_cms_role());
 
 create policy "role write releases"
   on releases for all
-  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
-  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+  using  (is_cms_role())
+  with check (is_cms_role());
 
 create policy "role write songs"
   on songs for all
-  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
-  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+  using  (is_cms_role())
+  with check (is_cms_role());
 
 create policy "role write assets"
   on assets for all
-  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
-  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+  using  (is_cms_role())
+  with check (is_cms_role());
 
 create policy "role write homepage"
   on homepage_config for all
-  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
-  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+  using  (is_cms_role())
+  with check (is_cms_role());
 
 create policy "role write timeline"
   on artist_timeline_items for all
-  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
-  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+  using  (is_cms_role())
+  with check (is_cms_role());
 
 -- ─── Admin read policies — draft / non-visible content ───────────────────────
 -- The public read policies only expose published + visible rows.
@@ -439,11 +450,11 @@ create policy "role write timeline"
 
 create policy "role read all releases"
   on releases for select
-  using ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+  using (is_cms_role());
 
 create policy "role read all songs"
   on songs for select
-  using ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+  using (is_cms_role());
 
 -- ─── Storage object RLS policies — "media" bucket ────────────────────────────
 -- Supabase Storage uses RLS on the storage.objects system table.
@@ -471,22 +482,18 @@ create policy "allow public read media"
 create policy "role insert media"
   on storage.objects for insert
   to authenticated
-  with check (
-    bucket_id = 'media' and
-    (auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager')
-  );
+  with check (bucket_id = 'media' and is_cms_role());
 
 create policy "role update media"
   on storage.objects for update
   to authenticated
-  using (
-    bucket_id = 'media' and
-    (auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager')
-  )
-  with check (
-    bucket_id = 'media' and
-    (auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager')
-  );
+  using  (bucket_id = 'media' and is_cms_role())
+  with check (bucket_id = 'media' and is_cms_role());
+
+create policy "role delete media"
+  on storage.objects for delete
+  to authenticated
+  using (bucket_id = 'media' and is_cms_role());
 
 create policy "role delete media"
   on storage.objects for delete

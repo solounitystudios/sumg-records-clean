@@ -6,7 +6,7 @@ import { MediaUploader } from "@/components/admin/MediaUploader";
 import { MediaLibraryGrid } from "@/components/admin/MediaLibraryGrid";
 import { useCmsStore } from "@/lib/cms/store";
 import { uploadAsset } from "@/lib/media";
-import { createClient } from "@/lib/supabase/client";
+import { getCurrentUploader } from "@/lib/auth";
 import { AssetType } from "@/lib/types";
 
 export default function AdminMedia() {
@@ -18,9 +18,7 @@ export default function AdminMedia() {
     setUploading(true);
 
     // Resolve the actual user identity for the audit trail.
-    const sb = createClient();
-    const { data: { user } } = await sb.auth.getUser();
-    const uploadedBy = user?.email ?? user?.id ?? "unknown";
+    const uploadedBy = await getCurrentUploader();
 
     const result = await uploadAsset(file, type, uploadedBy);
     setUploading(false);

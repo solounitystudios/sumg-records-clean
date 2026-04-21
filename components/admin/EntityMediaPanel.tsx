@@ -18,7 +18,7 @@ import { useRef, useState } from "react";
 import { CMSAsset, AssetAttachment, AssetType } from "@/lib/types";
 import { useCmsStore } from "@/lib/cms/store";
 import { uploadAsset, ACCEPTED_IMAGE_TYPES, ACCEPTED_VIDEO_TYPES, MAX_IMAGE_SIZE, MAX_VIDEO_SIZE } from "@/lib/media";
-import { createClient } from "@/lib/supabase/client";
+import { getCurrentUploader } from "@/lib/auth";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -293,9 +293,7 @@ export function EntityMediaPanel({
     setUploading(true);
 
     // Resolve the actual user identity for the audit trail.
-    const sb = createClient();
-    const { data: { user } } = await sb.auth.getUser();
-    const uploadedBy = user?.email ?? user?.id ?? "unknown";
+    const uploadedBy = await getCurrentUploader();
 
     const result = await uploadAsset(file, assetType, uploadedBy);
     setUploading(false);
