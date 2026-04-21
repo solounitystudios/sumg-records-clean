@@ -46,30 +46,34 @@ export default function NewBrandPage() {
     return errs;
   }
 
-  function handleSave() {
+  async function handleSave() {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setSaving(true);
 
-    createBrand({
-      slug: form.slug,
-      name: form.name,
-      category: form.category,
-      tagline: form.tagline,
-      descriptor: form.descriptor,
-      longDescription: form.longDescription || undefined,
-      manifesto: form.manifesto || undefined,
-      heroCopy: form.heroCopy || undefined,
-      heroImageUrl: form.heroImageUrl || undefined,
-      logoUrl: form.logoUrl || undefined,
-      accentColor: form.accentColor || undefined,
-      heroStyle: form.heroStyle,
-      isActive: form.isActive,
-      featuredOnHomepage: form.featuredOnHomepage,
-    });
+    try {
+      await createBrand({
+        slug: form.slug,
+        name: form.name,
+        category: form.category,
+        tagline: form.tagline,
+        descriptor: form.descriptor,
+        longDescription: form.longDescription || undefined,
+        manifesto: form.manifesto || undefined,
+        heroCopy: form.heroCopy || undefined,
+        heroImageUrl: form.heroImageUrl || undefined,
+        logoUrl: form.logoUrl || undefined,
+        accentColor: form.accentColor || undefined,
+        heroStyle: form.heroStyle,
+        isActive: form.isActive,
+        featuredOnHomepage: form.featuredOnHomepage,
+      });
 
-    notify("success", `Brand "${form.name}" created.`);
-    router.push(`/admin/brands/${form.slug}`);
+      notify("success", `Brand "${form.name}" created.`);
+      router.push(`/admin/brands/${form.slug}`);
+    } catch {
+      setSaving(false);
+    }
   }
 
   return (

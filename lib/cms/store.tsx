@@ -210,21 +210,21 @@ interface CmsStoreActions {
   // Artists
   getArtistById: (id: string) => CMSArtist | undefined;
   getArtistBySlug: (slug: string) => CMSArtist | undefined;
-  createArtist: (data: Omit<CMSArtist, "id" | "createdAt" | "updatedAt">) => CMSArtist;
+  createArtist: (data: Omit<CMSArtist, "id" | "createdAt" | "updatedAt">) => Promise<CMSArtist>;
   updateArtist: (id: string, data: Partial<CMSArtist>) => CMSArtist | undefined;
   deleteArtist: (id: string) => void;
 
   // Producers
   getProducerById: (id: string) => CMSProducer | undefined;
   getProducerBySlug: (slug: string) => CMSProducer | undefined;
-  createProducer: (data: Omit<CMSProducer, "id" | "createdAt" | "updatedAt">) => CMSProducer;
+  createProducer: (data: Omit<CMSProducer, "id" | "createdAt" | "updatedAt">) => Promise<CMSProducer>;
   updateProducer: (id: string, data: Partial<CMSProducer>) => CMSProducer | undefined;
   deleteProducer: (id: string) => void;
 
   // Brands
   getBrandById: (id: string) => CMSBrand | undefined;
   getBrandBySlug: (slug: string) => CMSBrand | undefined;
-  createBrand: (data: Omit<CMSBrand, "id" | "createdAt" | "updatedAt">) => CMSBrand;
+  createBrand: (data: Omit<CMSBrand, "id" | "createdAt" | "updatedAt">) => Promise<CMSBrand>;
   updateBrand: (id: string, data: Partial<CMSBrand>) => CMSBrand | undefined;
   deleteBrand: (id: string) => void;
 
@@ -232,7 +232,7 @@ interface CmsStoreActions {
   getReleaseById: (id: string) => CMSRelease | undefined;
   getReleaseBySlug: (slug: string) => CMSRelease | undefined;
   getPublicReleases: () => CMSRelease[];
-  createRelease: (data: Omit<CMSRelease, "id" | "createdAt" | "updatedAt">) => CMSRelease;
+  createRelease: (data: Omit<CMSRelease, "id" | "createdAt" | "updatedAt">) => Promise<CMSRelease>;
   updateRelease: (id: string, data: Partial<CMSRelease>) => CMSRelease | undefined;
   /**
    * Publishes a release and automatically publishes all non-archived songs
@@ -248,7 +248,7 @@ interface CmsStoreActions {
   getPublicSongs: () => CMSSong[];
   getSongsForRelease: (releaseSlug: string) => CMSSong[];
   getSongsForArtist: (artistSlug: string) => CMSSong[];
-  createSong: (data: Omit<CMSSong, "id" | "createdAt" | "updatedAt">) => CMSSong;
+  createSong: (data: Omit<CMSSong, "id" | "createdAt" | "updatedAt">) => Promise<CMSSong>;
   updateSong: (id: string, data: Partial<CMSSong>) => CMSSong | undefined;
   deleteSong: (id: string) => void;
 
@@ -256,7 +256,7 @@ interface CmsStoreActions {
   getTimelineItemsForArtist: (artistSlug: string) => ArtistTimelineItem[];
   createTimelineItem: (
     data: Omit<ArtistTimelineItem, "id" | "createdAt" | "updatedAt">
-  ) => ArtistTimelineItem;
+  ) => Promise<ArtistTimelineItem>;
   updateTimelineItem: (
     id: string,
     data: Partial<ArtistTimelineItem>
@@ -387,15 +387,20 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   }, []); // run once on mount
 
   // ── Supabase background sync helper (with rollback) ───────────────────────
+  //
+  // Returns a Promise<boolean> so create-flows can await DB confirmation
+  // before showing success or redirecting.  Returns true on success, false on
+  // error.  When Supabase is not configured (seed mode) resolves immediately
+  // with true so offline dev flows work unchanged.
 
   function bgSync(
     dbOperation: (sb: ReturnType<typeof createClient>) => PromiseLike<{ error: { message: string } | null }>,
     rollback?: () => void
-  ) {
-    if (!hasSupabase()) return;
+  ): Promise<boolean> {
+    if (!hasSupabase()) return Promise.resolve(true);
     const sb = createClient();
     setSyncState("syncing");
-    Promise.resolve(dbOperation(sb)).then(({ error }) => {
+    return Promise.resolve(dbOperation(sb)).then(({ error }) => {
       if (error) {
         console.error("[CMS] sync error:", error.message);
         notify("error", `Sync failed: ${error.message}`);
@@ -403,8 +408,10 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         if (rollback) rollback();
         // Auto-clear error state after 4 s so the indicator resets
         setTimeout(() => setSyncState("idle"), 4000);
+        return false;
       } else {
         setSyncState("idle");
+        return true;
       }
     });
   }
@@ -422,7 +429,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const createArtist = useCallback(
-    (data: Omit<CMSArtist, "id" | "createdAt" | "updatedAt">): CMSArtist => {
+    async (data: Omit<CMSArtist, "id" | "createdAt" | "updatedAt">): Promise<CMSArtist> => {
       const artist: CMSArtist = {
         ...data,
         id: data.slug || generateId(),
@@ -430,7 +437,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         updatedAt: now(),
       };
       setArtists((prev) => [...prev, artist]);
-      bgSync(
+      const ok = await bgSync(
         (sb) =>
           sb.from("artists").insert({
             id: artist.id,
@@ -453,6 +460,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
           }),
         () => setArtists((prev) => prev.filter((a) => a.id !== artist.id))
       );
+      if (!ok) throw new Error("Failed to save artist to database.");
       return artist;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -529,7 +537,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const createProducer = useCallback(
-    (data: Omit<CMSProducer, "id" | "createdAt" | "updatedAt">): CMSProducer => {
+    async (data: Omit<CMSProducer, "id" | "createdAt" | "updatedAt">): Promise<CMSProducer> => {
       const producer: CMSProducer = {
         ...data,
         id: data.slug || generateId(),
@@ -537,7 +545,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         updatedAt: now(),
       };
       setProducers((prev) => [...prev, producer]);
-      bgSync(
+      const ok = await bgSync(
         (sb) =>
           sb.from("producers").insert({
             id: producer.id,
@@ -556,6 +564,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
           }),
         () => setProducers((prev) => prev.filter((p) => p.id !== producer.id))
       );
+      if (!ok) throw new Error("Failed to save producer to database.");
       return producer;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -628,7 +637,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const createBrand = useCallback(
-    (data: Omit<CMSBrand, "id" | "createdAt" | "updatedAt">): CMSBrand => {
+    async (data: Omit<CMSBrand, "id" | "createdAt" | "updatedAt">): Promise<CMSBrand> => {
       const brand: CMSBrand = {
         ...data,
         id: data.slug || generateId(),
@@ -636,7 +645,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         updatedAt: now(),
       };
       setBrands((prev) => [...prev, brand]);
-      bgSync(
+      const ok = await bgSync(
         (sb) =>
           sb.from("brands").insert({
             id: brand.id,
@@ -664,6 +673,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
           }),
         () => setBrands((prev) => prev.filter((b) => b.id !== brand.id))
       );
+      if (!ok) throw new Error("Failed to save brand to database.");
       return brand;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -750,7 +760,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const createRelease = useCallback(
-    (data: Omit<CMSRelease, "id" | "createdAt" | "updatedAt">): CMSRelease => {
+    async (data: Omit<CMSRelease, "id" | "createdAt" | "updatedAt">): Promise<CMSRelease> => {
       const release: CMSRelease = {
         ...data,
         id: data.slug || generateId(),
@@ -758,7 +768,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         updatedAt: now(),
       };
       setReleases((prev) => [...prev, release]);
-      bgSync(
+      const ok = await bgSync(
         (sb) =>
           sb.from("releases").insert({
             id: release.id,
@@ -786,6 +796,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
           }),
         () => setReleases((prev) => prev.filter((r) => r.id !== release.id))
       );
+      if (!ok) throw new Error("Failed to save release to database.");
       return release;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -958,7 +969,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const createSong = useCallback(
-    (data: Omit<CMSSong, "id" | "createdAt" | "updatedAt">): CMSSong => {
+    async (data: Omit<CMSSong, "id" | "createdAt" | "updatedAt">): Promise<CMSSong> => {
       const song: CMSSong = {
         ...data,
         id: data.slug || generateId(),
@@ -966,7 +977,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         updatedAt: now(),
       };
       setSongs((prev) => [...prev, song]);
-      bgSync(
+      const ok = await bgSync(
         (sb) =>
           sb.from("songs").insert({
             id: song.id,
@@ -995,6 +1006,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
           }),
         () => setSongs((prev) => prev.filter((s) => s.id !== song.id))
       );
+      if (!ok) throw new Error("Failed to save song to database.");
       return song;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1078,9 +1090,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const createTimelineItem = useCallback(
-    (
+    async (
       data: Omit<ArtistTimelineItem, "id" | "createdAt" | "updatedAt">
-    ): ArtistTimelineItem => {
+    ): Promise<ArtistTimelineItem> => {
       const item: ArtistTimelineItem = {
         ...data,
         id: generateId(),
@@ -1088,7 +1100,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         updatedAt: now(),
       };
       setTimelineItems((prev) => [...prev, item]);
-      bgSync(
+      const ok = await bgSync(
         (sb) =>
           sb.from("artist_timeline_items").insert({
             id: item.id,
@@ -1110,6 +1122,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         () =>
           setTimelineItems((prev) => prev.filter((t) => t.id !== item.id))
       );
+      if (!ok) throw new Error("Failed to save timeline item to database.");
       return item;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
