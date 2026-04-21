@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV === "development";
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
@@ -20,12 +22,15 @@ const nextConfig: NextConfig = {
           // Content Security Policy.
           // 'unsafe-inline' is required by Tailwind CSS v4 (injected styles) and
           // Next.js App Router (hydration inline scripts).
-          // 'unsafe-eval' is required by Next.js in development mode.
+          // 'unsafe-eval' is only included in development (Next.js HMR/Turbopack).
           {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              // 'unsafe-eval' is needed by Next.js dev server (HMR); omit in production
+              isDev
+                ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
+                : "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               // Supabase storage for uploaded media; i.scdn.co for Spotify album art
               "img-src 'self' data: blob: https://*.supabase.co https://i.scdn.co",
