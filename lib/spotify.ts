@@ -8,6 +8,7 @@
  * All public functions are safe to call from Server Components, Route Handlers,
  * and any other server-side context.
  */
+import "server-only";
 
 // ─── Token cache ──────────────────────────────────────────────────────────────
 
@@ -104,15 +105,67 @@ export interface SpotifyAlbum {
   external_urls: { spotify: string };
 }
 
+/** Full album object returned by /albums/:id — includes the tracks list. */
+export interface SpotifyAlbumDetail extends SpotifyAlbum {
+  label: string;
+  artists: { id: string; name: string; external_urls: { spotify: string } }[];
+  tracks: {
+    items: {
+      id: string;
+      name: string;
+      track_number: number;
+      duration_ms: number;
+      explicit: boolean;
+      external_urls: { spotify: string };
+      preview_url: string | null;
+    }[];
+    total: number;
+  };
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Spotify IDs are 22-character Base62 strings.
+ * Returns true only for strings that look like a valid Spotify resource ID.
+ */
+export function isValidSpotifyId(id: string): boolean {
+  return /^[A-Za-z0-9]{22}$/.test(id);
+}
 
 /**
  * Extract a Spotify artist ID from either a bare ID string or a full Spotify URL.
  * e.g. "https://open.spotify.com/artist/4dpARuHxo51G3z768sgnrY" → "4dpARuHxo51G3z768sgnrY"
+ *
+ * Returns null for empty strings, malformed URLs, or values with no recognisable ID.
+ * Callers should check isValidSpotifyId() on the result before making API calls.
  */
-export function extractSpotifyArtistId(idOrUrl: string): string {
-  const match = idOrUrl.match(/artist\/([A-Za-z0-9]+)/);
-  return match ? match[1] : idOrUrl;
+export function extractSpotifyArtistId(idOrUrl: string): string | null {
+  const s = idOrUrl.trim();
+  if (!s) return null;
+  // Full URL: extract the segment after "artist/"
+  const urlMatch = s.match(/artist\/([A-Za-z0-9]{22})/);
+  if (urlMatch) return urlMatch[1];
+  // Bare ID: accept only if it looks like a Spotify ID
+  if (isValidSpotifyId(s)) return s;
+  return null;
+}
+
+/**
+ * Extract a Spotify album or single ID from either a bare ID or a full Spotify URL.
+ * e.g. "https://open.spotify.com/album/4dpARuHxo51G3z768sgnrY" → "4dpARuHxo51G3z768sgnrY"
+ *
+ * Returns null for empty strings, malformed URLs, or values with no recognisable ID.
+ */
+export function extractSpotifyAlbumId(idOrUrl: string): string | null {
+  const s = idOrUrl.trim();
+  if (!s) return null;
+  // Full URL: extract the segment after "album/"
+  const urlMatch = s.match(/album\/([A-Za-z0-9]{22})/);
+  if (urlMatch) return urlMatch[1];
+  // Bare ID
+  if (isValidSpotifyId(s)) return s;
+  return null;
 }
 
 /**
@@ -221,5 +274,19 @@ export async function getSpotifyArtistAlbums(
     return data.items;
   } catch {
     return [];
+  }
+}
+
+/**
+ * Fetch the full album object (including tracklist) for a Spotify album ID.
+ * Used by SpotifyReleasePanel on release detail pages.
+ */
+export async function getSpotifyAlbum(
+  albumId: string
+): Promise<SpotifyAlbumDetail | null> {
+  try {
+    return await spotifyFetch<SpotifyAlbumDetail>(`/albums/${albumId}`);
+  } catch {
+    return null;
   }
 }

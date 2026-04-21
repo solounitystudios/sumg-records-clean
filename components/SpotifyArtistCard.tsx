@@ -43,6 +43,8 @@ export async function SpotifyArtistCard({ spotifyUrl }: Props) {
   }
 
   const artistId = extractSpotifyArtistId(spotifyUrl);
+  // Malformed or empty URL — skip silently rather than making a bad API call
+  if (!artistId) return null;
 
   const [artist, topTracks] = await Promise.all([
     getSpotifyArtist(artistId),

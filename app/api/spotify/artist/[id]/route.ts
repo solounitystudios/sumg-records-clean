@@ -16,6 +16,16 @@ interface RouteContext {
  *   { artist, topTracks, albums }
  *
  * Credentials stay on the server; only sanitised results reach the client.
+ *
+ * Route visibility: public utility — callable from any browser context.
+ *
+ * Production hardening checklist (not yet implemented):
+ *   - Rate limiting: add an edge middleware or Upstash/Redis limiter (e.g. 20 req/min
+ *     per IP) before deploying at scale to avoid upstream Spotify 429s.
+ *   - Caching: the underlying spotifyFetch() already sets next.revalidate = 3600.
+ *     For even higher throughput, add a route-level Cache-Control header.
+ *   - Auth gating: if this should be admin-only, verify the Supabase session cookie
+ *     before calling Spotify (see app/api/auth pattern for reference).
  */
 export async function GET(_request: NextRequest, context: RouteContext) {
   const { id } = await context.params;

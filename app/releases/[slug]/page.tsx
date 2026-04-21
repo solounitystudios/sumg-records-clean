@@ -3,6 +3,7 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { getPublishedReleases, getReleaseBySlug, getSongsForRelease, getAllProducers, getArtistBySlug } from "@/lib/cms";
 import { DSPButtonGroup } from "@/components/admin/DSPLinksPanel";
+import { SpotifyReleasePanel } from "@/components/SpotifyReleasePanel";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
@@ -223,6 +224,14 @@ export default async function ReleasePage({ params }: Props) {
               <DSPButtonGroup links={release.dspLinks} />
             </div>
           </section>
+        )}
+
+        {/* Spotify release enrichment — album art (when missing locally), tracklist, metadata */}
+        {release.dspLinks?.spotify && (
+          <SpotifyReleasePanel
+            spotifyUrl={release.dspLinks.spotify}
+            hasCoverArt={!!release.coverArtUrl}
+          />
         )}
 
         {/* Artist CTA */}
