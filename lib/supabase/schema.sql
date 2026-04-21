@@ -393,4 +393,7 @@ create policy if not exists "public read artist snapshots"
   on artist_spotify_snapshots for select using (true);
 create policy if not exists "auth write artist snapshots"
   on artist_spotify_snapshots for all using (auth.role() = 'authenticated');
+-- Additive: site-wide settings persisted via /admin/settings
+ALTER TABLE homepage_config
+  ADD COLUMN IF NOT EXISTS site_settings jsonb NOT NULL DEFAULT '{}'::jsonb;
 

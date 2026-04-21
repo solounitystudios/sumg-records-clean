@@ -203,6 +203,8 @@ export interface CMSArtist {
   heroImageUrl?: string;
   profileImageUrl?: string;
   socialLinks?: SocialLinks;
+  /** External shop / merch store URL for this artist (e.g. Shopify storefront). */
+  shopUrl?: string;
   associatedBrands?: string[];
   providerConfig?: ProviderConfig;
   /** Bare 22-char Spotify artist ID — derived from socialLinks.spotify or set explicitly via admin */
