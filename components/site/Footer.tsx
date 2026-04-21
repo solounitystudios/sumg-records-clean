@@ -43,12 +43,12 @@ export function Footer() {
               <p className="text-[9px] tracking-[0.3em] uppercase text-white/20 mb-5">
                 {category}
               </p>
-              <ul className="space-y-3">
+              <ul className="space-y-0">
                 {links.map((link) => (
                   <li key={link.label}>
                     <a
                       href={link.href}
-                      className="text-xs text-white/40 hover:text-white/80 transition-colors duration-300 tracking-wide"
+                      className="block py-1.5 text-xs text-white/40 hover:text-white/80 transition-colors duration-300 tracking-wide"
                     >
                       {link.label}
                     </a>
@@ -61,15 +61,15 @@ export function Footer() {
 
         {/* Bottom bar */}
         <div className="border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <p className="text-[10px] tracking-[0.15em] text-white/15 uppercase">
+          <p className="text-[10px] tracking-[0.15em] text-white/30 uppercase">
             &copy; {new Date().getFullYear()} SUMG Records. All rights reserved.
           </p>
-          <div className="flex gap-6">
+          <div className="flex gap-4">
             {["Privacy", "Terms", "Publishing"].map((item) => (
               <a
                 key={item}
                 href="#"
-                className="text-[10px] tracking-[0.15em] uppercase text-white/15 hover:text-white/40 transition-colors duration-300"
+                className="block py-2 text-[10px] tracking-[0.15em] uppercase text-white/30 hover:text-white/60 transition-colors duration-300"
               >
                 {item}
               </a>
