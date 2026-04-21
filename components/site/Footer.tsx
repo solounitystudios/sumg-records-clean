@@ -1,20 +1,24 @@
+import { EmailCapture } from "@/components/site/EmailCapture";
+
 const footerLinks = {
   Label: [
-    { label: "Artists", href: "#artists" },
-    { label: "Releases", href: "#releases" },
-    { label: "Producers", href: "#producers" },
+    { label: "Artists", href: "/artists" },
+    { label: "Releases", href: "/releases" },
+    { label: "Producers", href: "/producers" },
+    { label: "Shop", href: "/shop" },
   ],
   Worlds: [
-    { label: "Woronoff", href: "#brands" },
-    { label: "Unity Standard", href: "#brands" },
-    { label: "Moon Spell", href: "#brands" },
-    { label: "Concrete Borough", href: "#brands" },
-    { label: "Salt Current", href: "#brands" },
+    { label: "Woronoff", href: "/brands/woronoff" },
+    { label: "Unity Standard", href: "/brands/unity-standard" },
+    { label: "Moon Spell", href: "/brands/moon-spell" },
+    { label: "Concrete Borough", href: "/brands/concrete-borough" },
+    { label: "Salt Current", href: "/brands/salt-current" },
   ],
   Company: [
-    { label: "Vision", href: "#vision" },
-    { label: "Contact", href: "mailto:contact@sumgrecords.com" },
-    { label: "Press", href: "#" },
+    { label: "About", href: "/about" },
+    { label: "Membership", href: "/membership" },
+    { label: "Contact", href: "/contact" },
+    { label: "Press", href: "mailto:press@sumgrecords.com" },
   ],
 };
 
@@ -22,6 +26,23 @@ export function Footer() {
   return (
     <footer className="border-t border-white/5 bg-black mt-0">
       <div className="max-w-7xl mx-auto px-6 lg:px-10 pt-16 pb-10">
+        {/* Email capture banner */}
+        <div className="border border-white/[0.06] px-8 py-8 mb-14">
+          <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-12">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-1">
+                Stay Connected
+              </p>
+              <p className="text-sm text-white/50 leading-relaxed">
+                New drops, merch releases, and label dispatches. No spam.
+              </p>
+            </div>
+            <div className="w-full md:w-80 shrink-0">
+              <EmailCapture source="footer" variant="inline" />
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           {/* Brand column */}
           <div className="md:col-span-1">
@@ -65,15 +86,24 @@ export function Footer() {
             &copy; {new Date().getFullYear()} SUMG Records. All rights reserved.
           </p>
           <div className="flex gap-6">
-            {["Privacy", "Terms", "Publishing"].map((item) => (
-              <a
-                key={item}
-                href="#"
-                className="text-[10px] tracking-[0.15em] uppercase text-white/15 hover:text-white/40 transition-colors duration-300"
-              >
-                {item}
-              </a>
-            ))}
+            <a
+              href="/privacy"
+              className="text-[10px] tracking-[0.15em] uppercase text-white/15 hover:text-white/40 transition-colors duration-300"
+            >
+              Privacy
+            </a>
+            <a
+              href="/terms"
+              className="text-[10px] tracking-[0.15em] uppercase text-white/15 hover:text-white/40 transition-colors duration-300"
+            >
+              Terms
+            </a>
+            <a
+              href="/contact?subject=Publishing+Inquiry"
+              className="text-[10px] tracking-[0.15em] uppercase text-white/15 hover:text-white/40 transition-colors duration-300"
+            >
+              Publishing
+            </a>
           </div>
         </div>
       </div>

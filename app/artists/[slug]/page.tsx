@@ -7,6 +7,7 @@ import { getAllArtists, getArtistBySlug, getArtistReleases, getSongsForArtist } 
 import { SocialLinks } from "@/lib/types";
 import { AudioPlayButton } from "@/components/AudioPlayButton";
 import { EmailSignup } from "@/components/site/EmailSignup";
+import { EmailCapture } from "@/components/site/EmailCapture";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
