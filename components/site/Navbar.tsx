@@ -28,14 +28,15 @@ export function Navbar() {
     };
   }, [menuOpen]);
 
-  // Escape key closes the mobile menu
+  // Escape key closes the mobile menu — listener only active while menu is open
   useEffect(() => {
+    if (!menuOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMenuOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [menuOpen]);
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -103,7 +104,7 @@ export function Navbar() {
       {/* Mobile menu panel — CSS slide animation via max-h/opacity */}
       <nav
         className={`md:hidden bg-black/95 border-t border-white/5 px-6 flex flex-col gap-1 overflow-hidden transition-all duration-300 ease-in-out ${
-          menuOpen ? "max-h-screen py-6 opacity-100" : "max-h-0 py-0 opacity-0 pointer-events-none"
+          menuOpen ? "max-h-80 py-6 opacity-100" : "max-h-0 py-0 opacity-0 pointer-events-none"
         }`}
         aria-hidden={!menuOpen}
       >
