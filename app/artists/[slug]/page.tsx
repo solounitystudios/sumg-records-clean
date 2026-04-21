@@ -15,15 +15,17 @@ export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const artist = await getArtistBySlug(slug);
   if (!artist) return { title: "Artist Not Found" };
+  const bioDesc = artist.bio
+    ? artist.bio.length > 160
+      ? `${artist.bio.slice(0, 160)}…`
+      : artist.bio
+    : `${artist.name} — Artist on SUMG Records.`;
   return {
     title: artist.name,
-    description:
-      artist.bio
-        ? `${artist.bio.slice(0, 155)}${artist.bio.length > 155 ? "…" : ""}`
-        : `${artist.name} — Artist on SUMG Records.`,
+    description: bioDesc,
     openGraph: {
       title: `${artist.name} — SUMG Records`,
-      description: artist.bio ?? `${artist.name} — Artist on SUMG Records.`,
+      description: bioDesc,
     },
   };
 }

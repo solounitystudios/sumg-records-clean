@@ -15,9 +15,10 @@ export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const release = await getReleaseBySlug(slug);
   if (!release) return { title: "Release Not Found" };
-  const desc = release.description
-    ? `${release.description.slice(0, 155)}${release.description.length > 155 ? "…" : ""}`
+  const rawDesc = release.description
+    ? release.description
     : `${release.title} by ${release.artistName} — available on SUMG Records.`;
+  const desc = rawDesc.length > 160 ? `${rawDesc.slice(0, 160)}…` : rawDesc;
   return {
     title: release.title,
     description: desc,

@@ -16,10 +16,10 @@ export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const brand = await getBrandBySlug(slug);
   if (!brand) return { title: "Brand Not Found" };
-  const desc =
-    brand.descriptor || brand.tagline
-      ? `${brand.descriptor ?? brand.tagline}`.slice(0, 160)
-      : `${brand.name} — a SUMG Records brand world.`;
+  const rawDesc = brand.descriptor || brand.tagline
+    ? `${brand.descriptor ?? brand.tagline}`
+    : `${brand.name} — a SUMG Records brand world.`;
+  const desc = rawDesc.length > 160 ? `${rawDesc.slice(0, 160)}…` : rawDesc;
   return {
     title: brand.name,
     description: desc,
