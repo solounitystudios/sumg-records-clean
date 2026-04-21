@@ -48,6 +48,9 @@ export default function AdminSettings() {
             ...(data.site_settings as Partial<SiteSettings>),
           }));
         }
+      })
+      .catch(() => {
+        // Settings load failure is non-fatal; the form will use defaults.
       });
   }, []);
 
