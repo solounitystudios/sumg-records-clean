@@ -3,6 +3,7 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { getPublishedReleases, getReleaseBySlug, getSongsForRelease, getAllProducers, getArtistBySlug } from "@/lib/cms";
 import { DSPButtonGroup } from "@/components/admin/DSPLinksPanel";
+import { AudioPlayButton } from "@/components/AudioPlayButton";
 import { EmailCapture } from "@/components/site/EmailCapture";
 import Link from "next/link";
 
@@ -122,6 +123,7 @@ export default async function ReleasePage({ params }: Props) {
                     <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
                       {String(song.trackNumber ?? i + 1).padStart(2, "0")}
                     </span>
+                    <AudioPlayButton audioUrl={song.audioUrl} />
                     <span className="flex-1 text-sm text-white/70 group-hover:text-white transition-colors">
                       {song.title}
                       {song.isExplicit && (
@@ -150,6 +152,7 @@ export default async function ReleasePage({ params }: Props) {
                     <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
                       {String(track.trackNumber ?? i + 1).padStart(2, "0")}
                     </span>
+                    <AudioPlayButton audioUrl={track.audioUrl} />
                     <span className="text-sm text-white/70 group-hover:text-white transition-colors">{track.title}</span>
                     {track.duration && (
                       <span className="ml-auto text-[11px] font-mono text-white/20">{track.duration}</span>
