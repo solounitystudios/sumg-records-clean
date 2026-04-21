@@ -2,9 +2,11 @@ import { notFound } from "next/navigation";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
+import { ArtistCard } from "@/components/cards/ArtistCard";
 import { getAllArtists, getArtistBySlug, getArtistReleases, getSongsForArtist } from "@/lib/cms";
 import { SocialLinks } from "@/lib/types";
 import { AudioPlayButton } from "@/components/AudioPlayButton";
+import { EmailSignup } from "@/components/site/EmailSignup";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
@@ -35,6 +37,8 @@ export default async function ArtistPage({ params }: Props) {
 
   const releases = await getArtistReleases(artist.slug);
   const songs = await getSongsForArtist(artist.slug);
+  const allArtists = await getAllArtists();
+  const otherArtists = allArtists.filter((a) => a.slug !== artist.slug).slice(0, 3);
 
   return (
     <>
@@ -159,6 +163,63 @@ export default async function ArtistPage({ params }: Props) {
             </div>
           </section>
         )}
+
+        {/* Merch / Shop CTA */}
+        <section className="py-14 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-6 lg:px-10">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 border border-white/[0.06] px-6 py-6 hover:border-white/12 transition-colors">
+              <div>
+                <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-1.5">
+                  Merchandise
+                </p>
+                <p className="text-base font-semibold text-white/80">
+                  {artist.shopUrl ? `Shop ${artist.name}` : "Shop SUMG"}
+                </p>
+                <p className="text-xs text-white/35 mt-1">
+                  Apparel, accessories &amp; exclusive drops.
+                </p>
+              </div>
+              <a
+                href={artist.shopUrl ?? "/brands"}
+                target={artist.shopUrl ? "_blank" : undefined}
+                rel={artist.shopUrl ? "noopener noreferrer" : undefined}
+                className="flex-shrink-0 inline-flex items-center gap-3 text-[10px] tracking-[0.25em] uppercase text-black bg-white hover:bg-white/90 px-6 py-3 transition-all duration-300"
+              >
+                Shop Now
+                <span className="text-black/40">→</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        {/* More from SUMG */}
+        {otherArtists.length > 0 && (
+          <section className="py-20 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <div className="flex items-center justify-between mb-8">
+                <p className="text-[10px] tracking-[0.3em] uppercase text-white/25">
+                  More from SUMG
+                </p>
+                <Link
+                  href="/artists"
+                  className="text-[10px] tracking-[0.2em] uppercase text-white/20 hover:text-white transition-colors"
+                >
+                  All Artists →
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {otherArtists.map((a) => (
+                  <Link key={a.id} href={`/artists/${a.slug}`}>
+                    <ArtistCard artist={a} size="small" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Email signup */}
+        <EmailSignup />
       </main>
       <Footer />
     </>
