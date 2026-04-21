@@ -1,4 +1,4 @@
-import { CMSArtist, CMSProducer, CMSBrand, CMSRelease, CMSSong } from "@/lib/types";
+import { CMSArtist, CMSProducer, CMSBrand, CMSRelease, CMSSong, RoyaltyStatement, SpotifySnapshot } from "@/lib/types";
 
 export function rowToArtist(r: any): CMSArtist {
   return {
@@ -102,6 +102,42 @@ export function rowToRelease(r: any): CMSRelease {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function rowToRoyaltyStatement(r: any): RoyaltyStatement {
+  return {
+    id: r.id,
+    source: r.source ?? "manual",
+    periodStart: r.period_start,
+    periodEnd: r.period_end,
+    artistSlug: r.artist_slug ?? undefined,
+    releaseSlug: r.release_slug ?? undefined,
+    songIsrc: r.song_isrc ?? undefined,
+    songTitle: r.song_title ?? "",
+    streams: r.streams ?? undefined,
+    grossRevenue: parseFloat(r.gross_revenue ?? "0"),
+    netRevenue: parseFloat(r.net_revenue ?? "0"),
+    currency: r.currency ?? "USD",
+    territory: r.territory ?? undefined,
+    rawRow: r.raw_row ?? undefined,
+    uploadedBy: r.uploaded_by ?? undefined,
+    createdAt: r.created_at,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function rowToSpotifySnapshot(r: any): SpotifySnapshot {
+  return {
+    id: r.id,
+    artistSlug: r.artist_slug,
+    spotifyId: r.spotify_id,
+    followers: r.followers ?? 0,
+    popularity: r.popularity ?? 0,
+    snapshotDate: r.snapshot_date,
+    createdAt: r.created_at,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function rowToSong(r: any): CMSSong {
   return {
     id: r.id,

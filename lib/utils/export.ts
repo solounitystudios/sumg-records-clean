@@ -1,4 +1,4 @@
-import { CMSSong, CMSRelease } from "@/lib/types";
+import { CMSSong, CMSRelease, RoyaltyStatement } from "@/lib/types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -235,7 +235,47 @@ export function exportRightsToJSON(songs: CMSSong[]): void {
   URL.revokeObjectURL(url);
 }
 
-// ─── Copy-ready metadata ──────────────────────────────────────────────────────
+// ─── Royalties CSV ────────────────────────────────────────────────────────────
+
+/**
+ * Exports all royalty statement rows to CSV and triggers a browser download.
+ */
+export function exportRoyaltiesToCSV(statements: RoyaltyStatement[]): void {
+  const headers = [
+    "Source",
+    "Period Start",
+    "Period End",
+    "Song Title",
+    "Artist Slug",
+    "ISRC",
+    "Streams",
+    "Gross Revenue",
+    "Net Revenue",
+    "Currency",
+    "Territory",
+    "Imported At",
+  ];
+
+  const rows = statements.map((s) =>
+    row([
+      s.source,
+      s.periodStart,
+      s.periodEnd,
+      s.songTitle,
+      s.artistSlug ?? "",
+      s.songIsrc ?? "",
+      s.streams !== undefined ? s.streams : "",
+      s.grossRevenue,
+      s.netRevenue,
+      s.currency,
+      s.territory ?? "",
+      s.createdAt?.slice(0, 10) ?? "",
+    ])
+  );
+
+  const csv = [headers.join(","), ...rows].join("\n");
+  triggerDownload(csv, `sumg-royalties-${new Date().toISOString().slice(0, 10)}.csv`);
+}
 
 /**
  * Returns a formatted text block with all metadata for a single song,

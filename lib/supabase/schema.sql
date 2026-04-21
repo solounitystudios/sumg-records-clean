@@ -363,3 +363,54 @@ CREATE TABLE IF NOT EXISTS shopify_campaigns (
 
 -- Remove deprecated song coupling from brands (safe — columns may not exist)
 ALTER TABLE brands DROP COLUMN IF EXISTS featured_song_slugs;
+
+-- ============================================================
+-- Phase Revenue — Royalty Statements + Spotify Snapshots
+-- Run once in production Supabase SQL editor.
+-- Safe to run multiple times (CREATE TABLE IF NOT EXISTS).
+-- ============================================================
+
+-- Royalty statements — single source of truth for all revenue sources.
+-- Sources: distrokid | bmi | soundexchange | apple | manual
+CREATE TABLE IF NOT EXISTS royalty_statements (
+  id              TEXT PRIMARY KEY,
+  source          TEXT NOT NULL DEFAULT 'manual',
+  period_start    DATE NOT NULL,
+  period_end      DATE NOT NULL,
+  artist_slug     TEXT,
+  release_slug    TEXT,
+  song_isrc       TEXT,
+  song_title      TEXT NOT NULL DEFAULT '',
+  streams         BIGINT,
+  gross_revenue   NUMERIC(12,4) NOT NULL DEFAULT 0,
+  net_revenue     NUMERIC(12,4) NOT NULL DEFAULT 0,
+  currency        TEXT NOT NULL DEFAULT 'USD',
+  territory       TEXT,
+  raw_row         JSONB,
+  uploaded_by     TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE royalty_statements ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public read royalty_statements"
+  ON royalty_statements FOR SELECT USING (true);
+CREATE POLICY "auth write royalty_statements"
+  ON royalty_statements FOR ALL USING (auth.role() = 'authenticated');
+
+-- Spotify artist snapshots — periodic follower/popularity captures.
+-- Populated by /api/spotify/snapshot (Vercel cron or manual trigger).
+CREATE TABLE IF NOT EXISTS spotify_snapshots (
+  id              TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  artist_slug     TEXT NOT NULL,
+  spotify_id      TEXT NOT NULL,
+  followers       INTEGER NOT NULL DEFAULT 0,
+  popularity      INTEGER NOT NULL DEFAULT 0,
+  snapshot_date   DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE spotify_snapshots ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public read spotify_snapshots"
+  ON spotify_snapshots FOR SELECT USING (true);
+CREATE POLICY "auth write spotify_snapshots"
+  ON spotify_snapshots FOR ALL USING (auth.role() = 'authenticated');

@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import { CMSArtist, CMSBrand, CMSProducer, CMSRelease, CMSSong } from "@/lib/types";
-import { rowToArtist, rowToProducer, rowToBrand, rowToRelease, rowToSong } from "./mappers";
+import { CMSArtist, CMSBrand, CMSProducer, CMSRelease, CMSSong, RoyaltyStatement, SpotifySnapshot } from "@/lib/types";
+import { rowToArtist, rowToProducer, rowToBrand, rowToRelease, rowToSong, rowToRoyaltyStatement, rowToSpotifySnapshot } from "./mappers";
 import { artists as rawArtists } from "@/data/artists";
 import { brands as rawBrands } from "@/data/brands";
 import { producers as rawProducers } from "@/data/producers";
@@ -246,5 +246,107 @@ export async function getSongsForRelease(releaseSlug: string): Promise<CMSSong[]
 export async function getAllPublicSongSlugs(): Promise<string[]> {
   const songs = await getPublicSongs();
   return songs.map((s) => s.slug);
+}
+
+// ─── Royalty Statements ──────────────────────────────────────────────────────
+
+/**
+ * Returns all royalty statement rows, newest first.
+ * Falls back to an empty array when Supabase is not configured.
+ */
+export async function getRoyaltyStatements(): Promise<RoyaltyStatement[]> {
+  const sb = getSupabaseClient();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("royalty_statements")
+    .select("*")
+    .order("period_start", { ascending: false });
+  if (error) {
+    console.error("[cms] royalty_statements:", error.message);
+    return [];
+  }
+  return (data ?? []).map(rowToRoyaltyStatement);
+}
+
+/**
+ * Bulk-inserts an array of royalty statement rows.
+ * Returns the number of rows successfully inserted, or throws on error.
+ */
+export async function insertRoyaltyStatements(
+  rows: Omit<RoyaltyStatement, "id" | "createdAt">[]
+): Promise<number> {
+  const sb = getSupabaseClient();
+  if (!sb) throw new Error("Supabase is not configured.");
+
+  const dbRows = rows.map((r) => ({
+    id: crypto.randomUUID(),
+    source: r.source,
+    period_start: r.periodStart,
+    period_end: r.periodEnd,
+    artist_slug: r.artistSlug ?? null,
+    release_slug: r.releaseSlug ?? null,
+    song_isrc: r.songIsrc ?? null,
+    song_title: r.songTitle,
+    streams: r.streams ?? null,
+    gross_revenue: r.grossRevenue,
+    net_revenue: r.netRevenue,
+    currency: r.currency,
+    territory: r.territory ?? null,
+    raw_row: r.rawRow ?? null,
+    uploaded_by: r.uploadedBy ?? null,
+  }));
+
+  const { error, count } = await sb
+    .from("royalty_statements")
+    .insert(dbRows, { count: "exact" });
+
+  if (error) throw new Error(error.message);
+  return count ?? rows.length;
+}
+
+// ─── Spotify Snapshots ───────────────────────────────────────────────────────
+
+/**
+ * Returns Spotify snapshot rows for a given artist slug, oldest first.
+ * Used to render follower/popularity trend charts.
+ */
+export async function getSpotifySnapshots(artistSlug: string): Promise<SpotifySnapshot[]> {
+  const sb = getSupabaseClient();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("spotify_snapshots")
+    .select("*")
+    .eq("artist_slug", artistSlug)
+    .order("snapshot_date", { ascending: true });
+  if (error) {
+    console.error("[cms] spotify_snapshots:", error.message);
+    return [];
+  }
+  return (data ?? []).map(rowToSpotifySnapshot);
+}
+
+/**
+ * Upserts a Spotify snapshot (one per artist per day — duplicate dates are
+ * ignored via ON CONFLICT DO NOTHING at the DB level; the caller can simply
+ * insert and let the DB discard duplicates).
+ */
+export async function upsertSpotifySnapshot(
+  snapshot: Omit<SpotifySnapshot, "id" | "createdAt">
+): Promise<void> {
+  const sb = getSupabaseClient();
+  if (!sb) throw new Error("Supabase is not configured.");
+
+  const { error } = await sb.from("spotify_snapshots").insert({
+    artist_slug: snapshot.artistSlug,
+    spotify_id: snapshot.spotifyId,
+    followers: snapshot.followers,
+    popularity: snapshot.popularity,
+    snapshot_date: snapshot.snapshotDate,
+  });
+
+  // Silently ignore unique-constraint violations (already have today's snapshot)
+  if (error && !error.message.includes("duplicate")) {
+    throw new Error(error.message);
+  }
 }
 

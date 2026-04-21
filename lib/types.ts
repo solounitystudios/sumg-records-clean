@@ -406,6 +406,63 @@ export interface BrandTheme {
   backgroundStyle: string;
 }
 
+// ─── Revenue / Royalty Statements ────────────────────────────────────────────
+
+/**
+ * Source label for a royalty statement row.
+ * Corresponds to the exporting platform the CSV was downloaded from.
+ */
+export type RoyaltySource =
+  | "distrokid"
+  | "bmi"
+  | "soundexchange"
+  | "apple"
+  | "manual";
+
+/**
+ * A single row imported from a distributor or PRO earnings statement.
+ * Stored in the `royalty_statements` Supabase table.
+ */
+export interface RoyaltyStatement {
+  id: string;
+  source: RoyaltySource;
+  /** ISO date — first day of the royalty period (e.g. "2024-01-01") */
+  periodStart: string;
+  /** ISO date — last day of the royalty period (e.g. "2024-01-31") */
+  periodEnd: string;
+  artistSlug?: string;
+  releaseSlug?: string;
+  songIsrc?: string;
+  songTitle: string;
+  /** Stream/play count from DistroKid rows; undefined for PRO-only rows */
+  streams?: number;
+  grossRevenue: number;
+  netRevenue: number;
+  currency: string;
+  territory?: string;
+  /** Original CSV row preserved verbatim for audit trail */
+  rawRow?: Record<string, string>;
+  uploadedBy?: string;
+  createdAt: string;
+}
+
+// ─── Spotify Snapshots ───────────────────────────────────────────────────────
+
+/**
+ * A point-in-time capture of a Spotify artist's public metrics.
+ * Populated by /api/spotify/snapshot; used to show follower growth trends.
+ */
+export interface SpotifySnapshot {
+  id: string;
+  artistSlug: string;
+  spotifyId: string;
+  followers: number;
+  popularity: number;
+  /** ISO date — the day this snapshot was taken */
+  snapshotDate: string;
+  createdAt: string;
+}
+
 export interface AuthSession {
   user: CMSUser | null;
   isAuthenticated: boolean;
