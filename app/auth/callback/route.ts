@@ -11,12 +11,25 @@ import { cookies } from "next/headers";
  *  - Password recovery (type=recovery) → redirect to /reset-password
  *  - Generic PKCE code exchange → redirect to /admin or ?next param
  */
+
+/**
+ * Returns `value` unchanged when it is a safe same-origin path
+ * (starts with "/" but not "//"), otherwise returns `fallback`.
+ * Prevents open-redirect attacks via the ?next= query parameter.
+ */
+function safeInternalPath(value: string | null | undefined, fallback = "/admin"): string {
+  if (!value) return fallback;
+  if (!value.startsWith("/")) return fallback;
+  if (value.startsWith("//")) return fallback;
+  return value;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
 
   const code = searchParams.get("code");
   const type = searchParams.get("type"); // present for recovery links
-  const next = searchParams.get("next") ?? "/admin";
+  const next = safeInternalPath(searchParams.get("next"));
 
   // No code — nothing to exchange; send to login with an error hint
   if (!code) {
@@ -29,7 +42,7 @@ export async function GET(request: NextRequest) {
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {

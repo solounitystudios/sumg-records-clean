@@ -363,3 +363,77 @@ CREATE TABLE IF NOT EXISTS shopify_campaigns (
 
 -- Remove deprecated song coupling from brands (safe — columns may not exist)
 ALTER TABLE brands DROP COLUMN IF EXISTS featured_song_slugs;
+
+-- ─── Security hardening migration — tighten RLS write policies ───────────────
+-- Replaces the original auth.role() = 'authenticated' write policies with
+-- role-aware policies that inspect app_metadata.role from the JWT.
+--
+-- Why this matters:
+--   auth.role() = 'authenticated' is true for ANY logged-in Supabase user,
+--   including users who self-signed up via the Supabase Auth UI or API.
+--   app_metadata is controlled server-side only (service-role client) and
+--   cannot be set by end-users, so only explicitly provisioned SUMG operators
+--   will satisfy these policies.
+--
+-- Safe to run on an existing database — uses DROP POLICY IF EXISTS.
+
+-- Remove old permissive write policies
+drop policy if exists "auth write artists"     on artists;
+drop policy if exists "auth write producers"   on producers;
+drop policy if exists "auth write brands"      on brands;
+drop policy if exists "auth write releases"    on releases;
+drop policy if exists "auth write songs"       on songs;
+drop policy if exists "auth write assets"      on assets;
+drop policy if exists "auth write homepage"    on homepage_config;
+drop policy if exists "public read timeline"   on artist_timeline_items;
+drop policy if exists "auth write timeline"    on artist_timeline_items;
+
+-- Role-aware write policies (read-all + write for SUMG operators only)
+create policy "sumg write artists"
+  on artists for all
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin', 'editor', 'media_manager', 'release_manager'));
+
+create policy "sumg write producers"
+  on producers for all
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin', 'editor', 'media_manager', 'release_manager'));
+
+create policy "sumg write brands"
+  on brands for all
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin', 'editor', 'media_manager', 'release_manager'));
+
+create policy "sumg write releases"
+  on releases for all
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin', 'editor', 'media_manager', 'release_manager'));
+
+create policy "sumg write songs"
+  on songs for all
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin', 'editor', 'media_manager', 'release_manager'));
+
+create policy "sumg write assets"
+  on assets for all
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin', 'editor', 'media_manager', 'release_manager'));
+
+create policy "sumg write homepage"
+  on homepage_config for all
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin', 'editor', 'media_manager', 'release_manager'));
+
+-- Timeline public read: previously USING (true) exposed all rows (including
+-- visibility='private' and status='draft') to the anon/publishable key.
+-- Now restricted to rows explicitly marked public and published.
+create policy "public read timeline"
+  on artist_timeline_items for select
+  using (visibility = 'public' and status = 'published');
+
+create policy "sumg write timeline"
+  on artist_timeline_items for all
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin', 'editor', 'media_manager', 'release_manager'));
+
+-- ─── Provisioning note ───────────────────────────────────────────────────────
+-- To grant a Supabase user access to the admin, set their app_metadata in the
+-- Supabase dashboard (Authentication → Users → edit) or via the service-role
+-- client:
+--
+--   await supabase.auth.admin.updateUserById(userId, {
+--     app_metadata: { role: 'admin' }   -- or 'editor' | 'media_manager' | 'release_manager'
+--   });
+
