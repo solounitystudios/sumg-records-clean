@@ -6,6 +6,7 @@ import {
 } from "@/lib/spotify";
 
 interface RouteContext {
+interface Params {
   params: Promise<{ id: string }>;
 }
 
@@ -53,4 +54,41 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       { status: 500 }
     );
   }
+ * Returns combined Spotify data for a single artist:
+ *   { artist, topTracks, albums }
+ *
+ * [id] must be a valid 22-character Spotify artist ID.
+ * Calls Spotify server-side so credentials are never exposed to the browser.
+ */
+export async function GET(_req: NextRequest, { params }: Params) {
+  const { id } = await params;
+
+  if (!/^[A-Za-z0-9]{22}$/.test(id)) {
+    return NextResponse.json(
+      { error: "Invalid Spotify artist ID — must be 22 alphanumeric characters" },
+      { status: 400 }
+    );
+  }
+
+  const [artist, topTracks, albums] = await Promise.all([
+    getSpotifyArtist(id),
+    getSpotifyArtistTopTracks(id),
+    getSpotifyArtistAlbums(id),
+  ]);
+
+  if (!artist) {
+    return NextResponse.json(
+      { error: "Artist not found or Spotify API unavailable" },
+      { status: 404 }
+    );
+  }
+
+  return NextResponse.json(
+    { artist, topTracks, albums },
+    {
+      headers: {
+        "Cache-Control": "s-maxage=3600, stale-while-revalidate=7200",
+      },
+    }
+  );
 }

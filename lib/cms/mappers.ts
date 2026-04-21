@@ -17,8 +17,10 @@ export function rowToArtist(r: any): CMSArtist {
     heroImageUrl: r.hero_image_url ?? undefined,
     profileImageUrl: r.profile_image_url ?? undefined,
     socialLinks: r.social_links ?? undefined,
+    shopUrl: r.shop_url ?? undefined,
     associatedBrands: r.associated_brands ?? undefined,
     providerConfig: r.provider_config ?? undefined,
+    spotifyId: r.spotify_id ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -127,6 +129,8 @@ export function rowToSong(r: any): CMSSong {
     isrc: r.isrc ?? undefined,
     rightsMetadata: r.rights_metadata ?? undefined,
     dataSource: r.data_source ?? undefined,
+    spotifyTrackId: r.spotify_track_id ?? undefined,
+    spotifyAudioFeatures: r.spotify_audio_features ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

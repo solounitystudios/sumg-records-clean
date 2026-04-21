@@ -20,17 +20,35 @@ export default async function ProducersPage() {
     <>
       <Navbar />
       <main>
-        <section className="pt-32 pb-16 border-b border-white/5">
-          <div className="max-w-7xl mx-auto px-6 lg:px-10">
-            <p className="text-[10px] tracking-[0.35em] uppercase text-white/25 mb-3">Behind the Sound</p>
-            <h1 className="text-5xl md:text-7xl font-black tracking-tight text-white leading-none">Producers</h1>
+        {/* Page hero */}
+        <section className="relative pt-36 pb-20 border-b border-white/5 overflow-hidden">
+          <div className="absolute inset-0 flex items-center justify-end pr-10 select-none pointer-events-none overflow-hidden">
+            <span className="text-[15vw] font-black text-white/[0.018] tracking-tighter leading-none">
+              PRODUCERS
+            </span>
+          </div>
+          <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-[10px] tracking-[0.35em] uppercase text-white/25 mb-3">
+                  Behind the Sound
+                </p>
+                <h1 className="text-5xl md:text-7xl font-black tracking-tight text-white leading-none">
+                  Producers
+                </h1>
+              </div>
+              <p className="hidden md:block text-xs text-white/25 max-w-[200px] text-right leading-relaxed">
+                The architects of the SUMG sound.
+              </p>
+            </div>
           </div>
         </section>
+
         <section className="py-20 max-w-7xl mx-auto px-6 lg:px-10">
           {producers.length === 0 && (
             <p className="text-white/20 italic text-sm">No producers yet.</p>
           )}
-          <div className="border-t border-white/5">
+          <div className="border-t border-white/5 max-w-3xl">
             {producers.map((producer, i) => (
               <a key={producer.id} href={`/producers/${producer.slug}`} className="block">
                 <ProducerCard producer={producer} index={i} />

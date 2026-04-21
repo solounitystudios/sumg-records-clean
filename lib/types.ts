@@ -203,8 +203,12 @@ export interface CMSArtist {
   heroImageUrl?: string;
   profileImageUrl?: string;
   socialLinks?: SocialLinks;
+  /** External shop / merch store URL for this artist (e.g. Shopify storefront). */
+  shopUrl?: string;
   associatedBrands?: string[];
   providerConfig?: ProviderConfig;
+  /** Bare 22-char Spotify artist ID — derived from socialLinks.spotify or set explicitly via admin */
+  spotifyId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -336,6 +340,10 @@ export interface CMSSong {
   rightsMetadata?: RightsMetadata;
   /** Where this record's data originated (manual entry, import, etc.). */
   dataSource?: DataOriginSource;
+  /** Bare 22-char Spotify track ID — derived from dspLinks.spotify or set via admin enrichment */
+  spotifyTrackId?: string;
+  /** Audio-feature data fetched from the Spotify audio-features endpoint */
+  spotifyAudioFeatures?: SpotifyAudioFeatures;
   createdAt: string;
   updatedAt: string;
 }
@@ -387,6 +395,54 @@ export interface SocialLinks {
   spotify?: string;
   soundcloud?: string;
   youtube?: string;
+}
+
+// ─── Spotify enrichment ───────────────────────────────────────────────────────
+
+/**
+ * Audio-feature data returned by the Spotify audio-features endpoint.
+ * Stored as-is in songs.spotify_audio_features (jsonb).
+ */
+export interface SpotifyAudioFeatures {
+  id: string;
+  /** 0.0–1.0 — suitability for dancing */
+  danceability: number;
+  /** 0.0–1.0 — perceptual measure of intensity and activity */
+  energy: number;
+  /** Pitch class notation 0 (C) – 11 (B), -1 when undetectable */
+  key: number;
+  /** Overall loudness in dB, typically -60 to 0 */
+  loudness: number;
+  /** 0 = minor, 1 = major */
+  mode: 0 | 1;
+  /** 0.0–1.0 — presence of spoken words */
+  speechiness: number;
+  /** 0.0–1.0 — confidence the track is acoustic */
+  acousticness: number;
+  /** 0.0–1.0 — predicts whether a track has no vocals */
+  instrumentalness: number;
+  /** 0.0–1.0 — probability the track is live */
+  liveness: number;
+  /** 0.0–1.0 — musical positiveness conveyed */
+  valence: number;
+  /** Track tempo in BPM */
+  tempo: number;
+  duration_ms: number;
+  time_signature: number;
+}
+
+/**
+ * A point-in-time follower / popularity snapshot for a SUMG artist on Spotify.
+ * Stored in the artist_spotify_snapshots table.
+ */
+export interface ArtistSpotifySnapshot {
+  id: string;
+  artistSlug: string;
+  spotifyId: string;
+  followers: number;
+  popularity: number;
+  /** ISO-8601 timestamp when the snapshot was taken */
+  snapshotAt: string;
 }
 
 export interface BrandTheme {

@@ -76,7 +76,7 @@ export default async function Home() {
         <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-28 pt-40">
           <div className="max-w-3xl">
             {/* Label tag */}
-            <div className="flex items-center gap-3 mb-8">
+            <div className="flex items-center gap-3 mb-8 animate-fade-in">
               <div className="w-8 h-px bg-white/30" />
               <p className="text-[10px] tracking-[0.4em] uppercase text-white/40">
                 Premium Independent Label
@@ -88,30 +88,28 @@ export default async function Home() {
               className="font-black text-white leading-[0.92] tracking-tighter mb-8"
               style={{ fontSize: "clamp(3.5rem, 9vw, 8rem)" }}
             >
-              Sound.
-              <br />
-              <span className="text-white/35">Vision.</span>
-              <br />
-              Culture.
+              <span className="block animate-fade-in-up delay-100">Sound.</span>
+              <span className="block text-white/35 animate-fade-in-up delay-200">Vision.</span>
+              <span className="block animate-fade-in-up delay-300">Culture.</span>
             </h1>
 
             {/* Sub-copy */}
-            <p className="text-sm md:text-base text-white/35 max-w-lg leading-relaxed mb-12">
+            <p className="text-sm md:text-base text-white/35 max-w-lg leading-relaxed mb-12 animate-fade-in-up delay-400">
               SUMG Records is an independent label building artists and sound
               worlds with precision. Seven artists. Five producers. One
               ecosystem.
             </p>
 
             {/* CTAs */}
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4 animate-fade-in-up delay-500">
               <a
-                href="#artists"
+                href="/artists"
                 className="inline-flex items-center gap-3 bg-white text-black text-[11px] tracking-[0.25em] uppercase px-8 py-4 font-semibold hover:bg-white/90 transition-colors duration-300"
               >
                 Meet the Artists
               </a>
               <a
-                href="#releases"
+                href="/releases"
                 className="inline-flex items-center gap-3 border border-white/15 text-white text-[11px] tracking-[0.25em] uppercase px-8 py-4 hover:border-white/35 hover:bg-white/[0.03] transition-all duration-300"
               >
                 Latest Releases
@@ -120,7 +118,7 @@ export default async function Home() {
           </div>
 
           {/* Stats row */}
-          <div className="mt-20 pt-10 border-t border-white/5 grid grid-cols-3 gap-8 max-w-md">
+          <div className="mt-20 pt-10 border-t border-white/5 grid grid-cols-3 gap-8 max-w-md animate-fade-in-up delay-600">
             {[
               { value: "7", label: "Artists" },
               { value: "5", label: "Producers" },
@@ -135,6 +133,12 @@ export default async function Home() {
                 </p>
               </div>
             ))}
+          </div>
+
+          {/* Scroll cue */}
+          <div className="mt-16 hidden md:flex items-center gap-3 animate-fade-in delay-700">
+            <div className="w-px h-8 bg-white/15 animate-pulse-slow" />
+            <p className="text-[9px] tracking-[0.3em] uppercase text-white/20">Scroll</p>
           </div>
         </div>
 
