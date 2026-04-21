@@ -1,0 +1,226 @@
+/**
+ * lib/spotify.ts
+ *
+ * Server-side Spotify API client using the Client Credentials flow.
+ * Secrets (SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET) are never exposed to the browser.
+ * Tokens are cached in-process and refreshed automatically when they expire.
+ *
+ * All public functions are safe to call from Server Components, Route Handlers,
+ * and any other server-side context.
+ */
+
+// ─── Token cache ──────────────────────────────────────────────────────────────
+
+interface TokenEntry {
+  accessToken: string;
+  expiresAt: number; // Unix ms
+}
+
+let tokenCache: TokenEntry | null = null;
+
+async function getSpotifyToken(): Promise<string> {
+  const now = Date.now();
+
+  // Serve cached token if still valid (with 30 s buffer)
+  if (tokenCache && tokenCache.expiresAt - 30_000 > now) {
+    return tokenCache.accessToken;
+  }
+
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "Spotify credentials not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET."
+    );
+  }
+
+  const credentials = btoa(`${clientId}:${clientSecret}`);
+
+  const res = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(`Spotify token request failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  tokenCache = {
+    accessToken: data.access_token as string,
+    expiresAt: now + (data.expires_in as number) * 1000,
+  };
+
+  return tokenCache.accessToken;
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface SpotifyImage {
+  url: string;
+  height: number | null;
+  width: number | null;
+}
+
+export interface SpotifyArtist {
+  id: string;
+  name: string;
+  genres: string[];
+  popularity: number;
+  followers: { total: number };
+  images: SpotifyImage[];
+  external_urls: { spotify: string };
+}
+
+export interface SpotifyTrack {
+  id: string;
+  name: string;
+  popularity: number;
+  duration_ms: number;
+  explicit: boolean;
+  preview_url: string | null;
+  external_urls: { spotify: string };
+  album: {
+    id: string;
+    name: string;
+    release_date: string;
+    images: SpotifyImage[];
+  };
+}
+
+export interface SpotifyAlbum {
+  id: string;
+  name: string;
+  album_type: "album" | "single" | "compilation";
+  release_date: string;
+  total_tracks: number;
+  images: SpotifyImage[];
+  external_urls: { spotify: string };
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Extract a Spotify artist ID from either a bare ID string or a full Spotify URL.
+ * e.g. "https://open.spotify.com/artist/4dpARuHxo51G3z768sgnrY" → "4dpARuHxo51G3z768sgnrY"
+ */
+export function extractSpotifyArtistId(idOrUrl: string): string {
+  const match = idOrUrl.match(/artist\/([A-Za-z0-9]+)/);
+  return match ? match[1] : idOrUrl;
+}
+
+/**
+ * Return the best available image from a Spotify images array.
+ * Prefers the closest to `targetWidth` px, defaulting to the first image.
+ */
+export function pickSpotifyImage(
+  images: SpotifyImage[],
+  targetWidth = 640
+): SpotifyImage | undefined {
+  if (!images.length) return undefined;
+  return images.reduce((best, img) => {
+    const bestDiff = Math.abs((best.width ?? 640) - targetWidth);
+    const imgDiff = Math.abs((img.width ?? 640) - targetWidth);
+    return imgDiff < bestDiff ? img : best;
+  });
+}
+
+// ─── API functions ────────────────────────────────────────────────────────────
+
+const API = "https://api.spotify.com/v1";
+
+async function spotifyFetch<T>(path: string): Promise<T> {
+  const token = await getSpotifyToken();
+  const res = await fetch(`${API}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    // Next.js extended fetch: cache responses for 1 hour across requests
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    next: { revalidate: 3600 },
+  } as RequestInit & { next?: { revalidate?: number } });
+  if (!res.ok) {
+    throw new Error(`Spotify API error ${res.status} for ${path}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+/**
+ * Fetch a single Spotify artist by their Spotify ID.
+ */
+export async function getSpotifyArtist(
+  artistId: string
+): Promise<SpotifyArtist | null> {
+  try {
+    return await spotifyFetch<SpotifyArtist>(`/artists/${artistId}`);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Search Spotify for artists matching a query string.
+ * Returns up to `limit` results (default 5, max 50).
+ */
+export async function searchSpotifyArtists(
+  query: string,
+  limit = 5
+): Promise<SpotifyArtist[]> {
+  const params = new URLSearchParams({
+    q: query,
+    type: "artist",
+    limit: String(Math.min(limit, 50)),
+  });
+  try {
+    const data = await spotifyFetch<{ artists: { items: SpotifyArtist[] } }>(
+      `/search?${params}`
+    );
+    return data.artists.items;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetch the top tracks for a Spotify artist in the given market (default "US").
+ */
+export async function getSpotifyArtistTopTracks(
+  artistId: string,
+  market = "US"
+): Promise<SpotifyTrack[]> {
+  try {
+    const data = await spotifyFetch<{ tracks: SpotifyTrack[] }>(
+      `/artists/${artistId}/top-tracks?market=${market}`
+    );
+    return data.tracks;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetch the albums (albums + singles) for a Spotify artist.
+ * Returns up to `limit` results (default 10).
+ */
+export async function getSpotifyArtistAlbums(
+  artistId: string,
+  limit = 10
+): Promise<SpotifyAlbum[]> {
+  const params = new URLSearchParams({
+    include_groups: "album,single",
+    limit: String(Math.min(limit, 50)),
+    market: "US",
+  });
+  try {
+    const data = await spotifyFetch<{ items: SpotifyAlbum[] }>(
+      `/artists/${artistId}/albums?${params}`
+    );
+    return data.items;
+  } catch {
+    return [];
+  }
+}

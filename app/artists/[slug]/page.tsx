@@ -3,6 +3,7 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
 import { getAllArtists, getArtistBySlug, getArtistReleases, getSongsForArtist } from "@/lib/cms";
+import { SpotifyArtistCard } from "@/components/SpotifyArtistCard";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
@@ -142,6 +143,11 @@ export default async function ArtistPage({ params }: Props) {
               </div>
             </div>
           </section>
+        )}
+
+        {/* Spotify enrichment — only rendered when a Spotify URL/ID is stored on the artist */}
+        {artist.socialLinks?.spotify && (
+          <SpotifyArtistCard spotifyUrl={artist.socialLinks.spotify} />
         )}
       </main>
       <Footer />
