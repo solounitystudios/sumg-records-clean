@@ -215,6 +215,30 @@ export function extractSpotifyAlbumId(urlOrId: string): string | null {
   return null;
 }
 
+/**
+ * Extract a bare Spotify track ID from either a full Spotify URL or a raw ID.
+ *
+ * Accepts:
+ *   - https://open.spotify.com/track/4aawyAB9vmqN3uQ7FjRGTy
+ *   - spotify:track:4aawyAB9vmqN3uQ7FjRGTy
+ *   - 4aawyAB9vmqN3uQ7FjRGTy (22-char alphanumeric)
+ *
+ * Returns null when the value cannot be parsed.
+ */
+export function extractSpotifyTrackId(urlOrId: string): string | null {
+  if (!urlOrId) return null;
+
+  const urlMatch = urlOrId.match(/spotify\.com\/track\/([A-Za-z0-9]{22})/);
+  if (urlMatch) return urlMatch[1];
+
+  const uriMatch = urlOrId.match(/^spotify:track:([A-Za-z0-9]{22})$/);
+  if (uriMatch) return uriMatch[1];
+
+  if (/^[A-Za-z0-9]{22}$/.test(urlOrId)) return urlOrId;
+
+  return null;
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /** Fetch a single Spotify artist by ID.  Returns null on any failure. */
@@ -303,3 +327,46 @@ export async function searchSpotify(
     return {};
   }
 }
+
+// ─── Audio features ───────────────────────────────────────────────────────────
+
+/**
+ * Raw shape of the Spotify audio-features endpoint response.
+ * Mirrors SpotifyAudioFeatures in lib/types.ts — kept here as a private
+ * internal type so lib/spotify.ts remains import-free of lib/types.ts.
+ */
+interface RawAudioFeatures {
+  id: string;
+  danceability: number;
+  energy: number;
+  key: number;
+  loudness: number;
+  mode: 0 | 1;
+  speechiness: number;
+  acousticness: number;
+  instrumentalness: number;
+  liveness: number;
+  valence: number;
+  tempo: number;
+  duration_ms: number;
+  time_signature: number;
+}
+
+/**
+ * Fetch audio-feature data for a single Spotify track.
+ * Returns null on any failure (missing credentials, bad ID, track not found).
+ */
+export async function getSpotifyAudioFeatures(
+  trackId: string
+): Promise<RawAudioFeatures | null> {
+  try {
+    return await spotifyFetch<RawAudioFeatures>(
+      `/audio-features/${trackId}`,
+      86400 // cache for 24 h — audio features never change for a track
+    );
+  } catch (err) {
+    console.error("[spotify] getSpotifyAudioFeatures:", err);
+    return null;
+  }
+}
+
