@@ -8,6 +8,7 @@ const navLinks = [
   { label: "Songs", href: "/songs" },
   { label: "Producers", href: "/producers" },
   { label: "Brands", href: "/brands" },
+  { label: "Shop", href: "/shop" },
 ];
 
 export function Navbar() {
