@@ -417,7 +417,7 @@ CREATE POLICY "auth write spotify_snapshots"
   ON spotify_snapshots FOR ALL USING (auth.role() = 'authenticated');
 
 -- ─── Phase MB — MusicBrainz ISRC Enrichment ──────────────────────────────────
--- Additive — safe to run multiple times (IF NOT EXISTS / IF NOT EXISTS).
+-- Additive — safe to run multiple times (IF NOT EXISTS).
 --
 -- Adds musicbrainz_id to songs so the app can:
 --   • Skip re-fetching songs already enriched (idempotency check).
