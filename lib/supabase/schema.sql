@@ -495,10 +495,3 @@ create policy "role delete media"
   to authenticated
   using (bucket_id = 'media' and is_cms_role());
 
-create policy "role delete media"
-  on storage.objects for delete
-  to authenticated
-  using (
-    bucket_id = 'media' and
-    (auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager')
-  );
