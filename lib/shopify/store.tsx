@@ -154,16 +154,26 @@ export function ShopifyStoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Refresh data from Shopify.
-   * TODO: Implement server-side route `/api/shopify/sync` that uses
-   * SHOPIFY_ADMIN_ACCESS_TOKEN to fetch products, orders, and inventory
-   * via the Shopify Admin REST or GraphQL API, then call this endpoint here.
+   * Sync from Shopify Admin API — NOT YET IMPLEMENTED.
+   *
+   * This function is a deliberate stub.  The admin pages show static fallback
+   * data and a "Shopify not configured" banner when `connected` is false.
+   *
+   * To implement live sync:
+   *   1. Create app/api/shopify/sync/route.ts (server-side, uses SHOPIFY_ADMIN_ACCESS_TOKEN)
+   *   2. Fetch products, orders, and inventory via Shopify Admin REST or GraphQL API
+   *   3. Persist results to the shopify_* Supabase tables
+   *   4. Replace the console.info below with a fetch() to that route
+   *
+   * Required env vars (server-side only):
+   *   NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN — storefront domain (e.g. mystore.myshopify.com)
+   *   SHOPIFY_ADMIN_ACCESS_TOKEN       — Admin API access token (never expose in the browser)
    */
   const refreshFromShopify = useCallback(async () => {
     if (!shopDomain) {
       console.info(
-        "[ShopifyStore] Shopify sync requires server-side setup. " +
-        "Set NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN env vars."
+        "[ShopifyStore] Shopify sync not yet implemented. " +
+        "Set NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_ACCESS_TOKEN to enable live sync."
       );
       setSyncStatus((prev) => ({
         ...prev,
@@ -174,8 +184,8 @@ export function ShopifyStoreProvider({ children }: { children: ReactNode }) {
 
     setIsLoading(true);
     try {
-      // TODO: Replace with actual /api/shopify/sync fetch when server route is implemented.
-      console.info("[ShopifyStore] refreshFromShopify() called — server-side Shopify integration pending.");
+      // Stub — replace with fetch("/api/shopify/sync") once the server route is implemented.
+      console.info("[ShopifyStore] refreshFromShopify() stub — Shopify Admin API integration pending.");
       setSyncStatus((prev) => ({ ...prev, lastSync: now(), error: undefined }));
     } finally {
       setIsLoading(false);

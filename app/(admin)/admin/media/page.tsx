@@ -5,27 +5,26 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { MediaUploader } from "@/components/admin/MediaUploader";
 import { MediaLibraryGrid } from "@/components/admin/MediaLibraryGrid";
 import { useCmsStore } from "@/lib/cms/store";
+import { uploadAsset } from "@/lib/media";
 import { AssetType } from "@/lib/types";
 
 export default function AdminMedia() {
   const { addAsset, notify } = useCmsStore();
   const [uploadPanel, setUploadPanel] = useState<AssetType | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   async function handleUpload(file: File, type: AssetType) {
-    // In Phase 4, call the real upload API here.
-    // For now, create a local object URL as a preview.
-    const url = URL.createObjectURL(file);
-    addAsset({
-      type,
-      url,
-      filename: file.name,
-      mimeType: file.type,
-      sizeBytes: file.size,
-      altText: "",
-      attachedTo: [],
-      uploadedBy: "admin",
-    });
-    notify("success", `"${file.name}" added to media library.`);
+    setUploading(true);
+    const result = await uploadAsset(file, type, "admin");
+    setUploading(false);
+
+    if (!result.success || !result.asset) {
+      notify("error", result.error ?? "Upload failed.");
+      return;
+    }
+
+    addAsset(result.asset);
+    notify("success", `"${file.name}" uploaded to media library.`);
     setUploadPanel(null);
   }
 
@@ -67,23 +66,20 @@ export default function AdminMedia() {
                 ✕ Close
               </button>
             </div>
-            <MediaUploader
-              type={uploadPanel}
-              label={`Select ${uploadPanel} file`}
-              onUpload={(file) => handleUpload(file, uploadPanel)}
-            />
+            {uploading ? (
+              <p className="text-[11px] text-white/30 italic">Uploading…</p>
+            ) : (
+              <MediaUploader
+                type={uploadPanel}
+                label={`Select ${uploadPanel} file`}
+                onUpload={(file) => handleUpload(file, uploadPanel)}
+              />
+            )}
           </div>
         )}
 
         {/* Library grid */}
         <MediaLibraryGrid />
-
-        {/* Phase 4 note */}
-        <div className="border-t border-white/5 pt-6">
-          <p className="text-[10px] text-white/15 italic">
-            Phase 4: Connect Supabase Storage or S3 to persist uploads. Local object URLs reset on page reload.
-          </p>
-        </div>
       </div>
     </AdminShell>
   );

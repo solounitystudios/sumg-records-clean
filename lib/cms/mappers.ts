@@ -1,6 +1,5 @@
 import { CMSArtist, CMSProducer, CMSBrand, CMSRelease, CMSSong } from "@/lib/types";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function rowToArtist(r: any): CMSArtist {
   return {
     id: r.id,
@@ -25,7 +24,6 @@ export function rowToArtist(r: any): CMSArtist {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function rowToProducer(r: any): CMSProducer {
   return {
     id: r.id,
@@ -46,7 +44,6 @@ export function rowToProducer(r: any): CMSProducer {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function rowToBrand(r: any): CMSBrand {
   return {
     id: r.id,
@@ -76,7 +73,6 @@ export function rowToBrand(r: any): CMSBrand {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function rowToRelease(r: any): CMSRelease {
   return {
     id: r.id,
@@ -96,7 +92,6 @@ export function rowToRelease(r: any): CMSRelease {
     description: r.description ?? "",
     coverArtUrl: r.cover_art_url ?? undefined,
     tracklist: r.tracklist ?? undefined,
-    streamingLinks: r.streaming_links ?? undefined,
     dspLinks: r.dsp_links ?? undefined,
     providerConfig: r.provider_config ?? undefined,
     rightsMetadata: r.rights_metadata ?? undefined,
@@ -107,7 +102,6 @@ export function rowToRelease(r: any): CMSRelease {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function rowToSong(r: any): CMSSong {
   return {
     id: r.id,

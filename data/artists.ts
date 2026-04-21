@@ -1,21 +1,6 @@
-export interface Artist {
-  id: string;
-  slug: string;
-  name: string;
-  role: string;
-  genre: string;
-  bio: string;
-  longBio?: string;
-  featured: boolean;
-  tier: "primary" | "secondary";
-  heroImageUrl?: string;
-  profileImageUrl?: string;
-  socialLinks?: { instagram?: string; spotify?: string; soundcloud?: string };
-  createdAt: string;
-  updatedAt: string;
-}
+import { CMSArtist } from "@/lib/types";
 
-export const artists: Artist[] = [
+export const artists: CMSArtist[] = [
   { id: "zyson", slug: "zyson", name: "Zyson", role: "Artist", genre: "Dark R&B / Trap Soul", bio: "Zyson moves between shadows and sound, crafting worlds out of silence.", longBio: "Zyson operates at the outer edge of R&B — where silence is a weapon and restraint becomes devastation. His process is architectural, his delivery surgical. Every release is a world unto itself.", featured: true, tier: "primary", createdAt: "2024-01-01", updatedAt: "2025-01-01" },
   { id: "lysandra-noir", slug: "lysandra-noir", name: "Lysandra Noir", role: "Artist", genre: "Alt Soul / Noir Pop", bio: "Lysandra Noir dissolves genre lines with cold precision and raw vulnerability.", longBio: "Lysandra Noir exists at the convergence of alt-soul, noir pop, and cinematic minimalism. Her voice is a duality — simultaneously intimate and unreachable. She writes her own world.", featured: true, tier: "primary", createdAt: "2024-01-01", updatedAt: "2025-01-01" },
   { id: "turkz", slug: "turkz", name: "Turkz", role: "Artist", genre: "Cinematic Rap", bio: "Turkz builds sonic architecture — every bar a blueprint, every drop a monument.", longBio: "Turkz approaches rap as an architectural discipline. The bars are load-bearing. The cadences are structural. What he builds does not collapse under scrutiny — it deepens.", featured: true, tier: "primary", createdAt: "2024-01-01", updatedAt: "2025-01-01" },

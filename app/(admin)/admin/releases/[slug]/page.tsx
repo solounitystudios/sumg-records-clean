@@ -394,11 +394,6 @@ export default function EditReleasePage() {
     featuredOnHomepage: boolean;
     description: string;
     coverArtUrl: string;
-    "streamingLinks.spotify": string;
-    "streamingLinks.appleMusic": string;
-    "streamingLinks.tidal": string;
-    "streamingLinks.soundcloud": string;
-    "streamingLinks.youtube": string;
   } | null>(null);
   const [tracklist, setTracklist] = useState<CMSSong[]>([]);
   const [featuredArtistSlugs, setFeaturedArtistSlugs] = useState<string[]>([]);
@@ -424,11 +419,6 @@ export default function EditReleasePage() {
       featuredOnHomepage: release.featuredOnHomepage ?? false,
       description: release.description,
       coverArtUrl: release.coverArtUrl ?? "",
-      "streamingLinks.spotify": release.streamingLinks?.spotify ?? "",
-      "streamingLinks.appleMusic": release.streamingLinks?.appleMusic ?? "",
-      "streamingLinks.tidal": release.streamingLinks?.tidal ?? "",
-      "streamingLinks.soundcloud": release.streamingLinks?.soundcloud ?? "",
-      "streamingLinks.youtube": release.streamingLinks?.youtube ?? "",
     });
     setTracklist(release.tracklist ?? []);
     setFeaturedArtistSlugs(release.featuredArtistSlugs ?? []);
@@ -473,13 +463,6 @@ export default function EditReleasePage() {
       coverArtUrl: form.coverArtUrl || undefined,
       featuredArtistSlugs: featuredArtistSlugs.length ? featuredArtistSlugs : undefined,
       producerSlugs: producerSlugs.length ? producerSlugs : undefined,
-      streamingLinks: {
-        spotify: form["streamingLinks.spotify"] || undefined,
-        appleMusic: form["streamingLinks.appleMusic"] || undefined,
-        tidal: form["streamingLinks.tidal"] || undefined,
-        soundcloud: form["streamingLinks.soundcloud"] || undefined,
-        youtube: form["streamingLinks.youtube"] || undefined,
-      },
       dspLinks: Object.keys(dspLinks).some((k) => dspLinks[k as keyof DSPLinks])
         ? dspLinks
         : undefined,
@@ -723,20 +706,6 @@ export default function EditReleasePage() {
             tracks={tracklist}
             onChange={setTracklist}
           />
-        </FormSection>
-
-        {/* Streaming links */}
-        <FormSection title="Streaming Links (legacy)">
-          <FormField type="url" label="Spotify" value={form["streamingLinks.spotify"]}
-            placeholder="https://open.spotify.com/…" mono onChange={(v) => set("streamingLinks.spotify", v)} />
-          <FormField type="url" label="Apple Music" value={form["streamingLinks.appleMusic"]}
-            placeholder="https://music.apple.com/…" mono onChange={(v) => set("streamingLinks.appleMusic", v)} />
-          <FormField type="url" label="Tidal" value={form["streamingLinks.tidal"]}
-            mono onChange={(v) => set("streamingLinks.tidal", v)} />
-          <FormField type="url" label="SoundCloud" value={form["streamingLinks.soundcloud"]}
-            mono onChange={(v) => set("streamingLinks.soundcloud", v)} />
-          <FormField type="url" label="YouTube" value={form["streamingLinks.youtube"]}
-            mono onChange={(v) => set("streamingLinks.youtube", v)} />
         </FormSection>
 
         {/* DSP links */}

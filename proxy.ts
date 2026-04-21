@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Only gate admin routes
@@ -9,25 +9,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // If Supabase is not configured, fall back to the legacy cookie check so
-  // local-dev without a DB still works.
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey || !supabaseUrl.startsWith("https://")) {
-    const sessionToken = request.cookies.get("sumg_session")?.value;
-    if (!sessionToken) {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-    return NextResponse.next();
+  // Supabase must be configured in all environments — the legacy sumg_session
+  // cookie fallback has been removed.  If env vars are missing the server is
+  // misconfigured; redirect to login so the error is visible.
+  if (!supabaseUrl || !supabaseKey || !supabaseUrl.startsWith("https://")) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
   // ── Supabase SSR session check ────────────────────────────────────────────
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();

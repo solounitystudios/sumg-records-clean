@@ -26,11 +26,6 @@ export default function NewReleasePage() {
     featuredOnHomepage: false,
     description: "",
     coverArtUrl: "",
-    "streamingLinks.spotify": "",
-    "streamingLinks.appleMusic": "",
-    "streamingLinks.tidal": "",
-    "streamingLinks.soundcloud": "",
-    "streamingLinks.youtube": "",
   });
   const [tracklist, setTracklist] = useState<CMSSong[]>([]);
   const [saving, setSaving] = useState(false);
@@ -73,13 +68,6 @@ export default function NewReleasePage() {
       description: form.description,
       coverArtUrl: form.coverArtUrl || undefined,
       tracklist: tracklist.length ? tracklist : undefined,
-      streamingLinks: {
-        spotify: form["streamingLinks.spotify"] || undefined,
-        appleMusic: form["streamingLinks.appleMusic"] || undefined,
-        tidal: form["streamingLinks.tidal"] || undefined,
-        soundcloud: form["streamingLinks.soundcloud"] || undefined,
-        youtube: form["streamingLinks.youtube"] || undefined,
-      },
     });
 
     notify("success", `Release "${form.title}" created.`);
@@ -158,19 +146,7 @@ export default function NewReleasePage() {
           />
         </FormSection>
 
-        {/* Streaming links */}
-        <FormSection title="Streaming Links">
-          <FormField type="url" label="Spotify" value={form["streamingLinks.spotify"]}
-            placeholder="https://open.spotify.com/…" mono onChange={(v) => set("streamingLinks.spotify", v)} />
-          <FormField type="url" label="Apple Music" value={form["streamingLinks.appleMusic"]}
-            placeholder="https://music.apple.com/…" mono onChange={(v) => set("streamingLinks.appleMusic", v)} />
-          <FormField type="url" label="Tidal" value={form["streamingLinks.tidal"]}
-            placeholder="https://tidal.com/…" mono onChange={(v) => set("streamingLinks.tidal", v)} />
-          <FormField type="url" label="SoundCloud" value={form["streamingLinks.soundcloud"]}
-            mono onChange={(v) => set("streamingLinks.soundcloud", v)} />
-          <FormField type="url" label="YouTube" value={form["streamingLinks.youtube"]}
-            mono onChange={(v) => set("streamingLinks.youtube", v)} />
-        </FormSection>
+        {/* DSP links section available in the edit page after creation */}
 
         <div className="pt-4 border-t border-white/5">
           <SaveButton onClick={handleSave} saving={saving} label="Create Release" />

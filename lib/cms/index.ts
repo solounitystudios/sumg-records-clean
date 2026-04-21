@@ -9,7 +9,7 @@ import { songs as rawSongs } from "@/data/songs";
 
 function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url?.startsWith("https://") || !key) return null;
   return createClient(url, key);
 }

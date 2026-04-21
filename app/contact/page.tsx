@@ -34,9 +34,11 @@ export default function ContactPage() {
                 ))}
               </div>
 
-              {/* Message form scaffold */}
+              {/* Message form — not yet wired to a submission endpoint.
+                  Replace the fieldset + button with a server action before launch. */}
               <div className="space-y-4">
                 <p className="text-[9px] tracking-[0.35em] uppercase text-white/20 mb-6">Send a Message</p>
+                <fieldset disabled className="space-y-4 opacity-50 cursor-not-allowed">
                 {["Name", "Email", "Subject"].map((field) => (
                   <div key={field}>
                     <label className="block text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2">{field}</label>
@@ -55,12 +57,17 @@ export default function ContactPage() {
                     placeholder="Your message..."
                   />
                 </div>
+                </fieldset>
                 <button
-                  type="submit"
-                  className="border border-white/20 text-white text-[10px] tracking-[0.3em] uppercase px-8 py-3 hover:bg-white hover:text-black transition-all duration-300"
+                  type="button"
+                  disabled
+                  className="border border-white/10 text-white/25 text-[10px] tracking-[0.3em] uppercase px-8 py-3 cursor-not-allowed"
                 >
-                  Send
+                  Coming Soon
                 </button>
+                <p className="text-[9px] text-white/20 pt-1">
+                  Direct email above while this form is being configured.
+                </p>
               </div>
             </div>
           </div>
