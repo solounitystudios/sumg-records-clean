@@ -492,6 +492,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               social_links: u.socialLinks ?? null,
               associated_brands: u.associatedBrands ?? null,
               provider_config: u.providerConfig ?? null,
+              spotify_id: u.spotifyId ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
           orig ? () => setArtists((prev) => prev.map((a) => (a.id === id ? orig : a))) : undefined
@@ -1040,6 +1041,8 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               isrc: u.isrc ?? null,
               rights_metadata: u.rightsMetadata ?? null,
               data_source: u.dataSource ?? null,
+              spotify_track_id: u.spotifyTrackId ?? null,
+              spotify_audio_features: u.spotifyAudioFeatures ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
           orig ? () => setSongs((prev) => prev.map((s) => (s.id === id ? orig : s))) : undefined
