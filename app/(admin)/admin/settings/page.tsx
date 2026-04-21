@@ -2,30 +2,75 @@
 
 import { AdminShell } from "@/components/admin/AdminShell";
 import { FormField, FormSection, SaveButton } from "@/components/admin/FormField";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+
+const CONFIG_ROW_ID = "homepage";
+
+interface SiteSettings {
+  siteName: string;
+  siteTagline: string;
+  contactEmail: string;
+  instagramUrl: string;
+  twitterUrl: string;
+  youtubeUrl: string;
+  googleAnalyticsId: string;
+}
+
+const DEFAULT_SETTINGS: SiteSettings = {
+  siteName: "SUMG Records",
+  siteTagline: "Sound. Vision. Culture.",
+  contactEmail: "",
+  instagramUrl: "",
+  twitterUrl: "",
+  youtubeUrl: "",
+  googleAnalyticsId: "",
+};
 
 export default function AdminSettings() {
-  const [form, setForm] = useState({
-    siteName: "SUMG Records",
-    siteTagline: "Sound. Vision. Culture.",
-    contactEmail: "",
-    instagramUrl: "",
-    twitterUrl: "",
-    youtubeUrl: "",
-    googleAnalyticsId: "",
-  });
+  const [form, setForm] = useState<SiteSettings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  function set(key: string, value: string) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+  // Load persisted settings on mount
+  useEffect(() => {
+    const sb = createClient();
+    sb.from("homepage_config")
+      .select("site_settings")
+      .eq("id", CONFIG_ROW_ID)
+      .single()
+      .then(({ data }: { data: { site_settings: unknown } | null }) => {
+        if (data?.site_settings && typeof data.site_settings === "object") {
+          setForm((prev: SiteSettings) => ({
+            ...prev,
+            ...(data.site_settings as Partial<SiteSettings>),
+          }));
+        }
+      });
+  }, []);
+
+  function set(key: keyof SiteSettings, value: string) {
+    setForm((prev: SiteSettings) => ({ ...prev, [key]: value }));
     setSaved(false);
+    setSaveError(null);
   }
 
-  function handleSave() {
-    // TODO: persist site settings to the database (homepage_config or a dedicated table).
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  async function handleSave() {
+    setSaving(true);
+    setSaveError(null);
+    const sb = createClient();
+    const { error } = await sb
+      .from("homepage_config")
+      .upsert({ id: CONFIG_ROW_ID, site_settings: form });
+    setSaving(false);
+    if (error) {
+      setSaveError(error.message);
+    } else {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    }
   }
 
   return (
@@ -79,10 +124,20 @@ export default function AdminSettings() {
           </p>
         </div>
 
+        {saveError && (
+          <p className="text-[11px] text-red-400 border border-red-900/40 bg-red-950/20 px-3 py-2">
+            {saveError}
+          </p>
+        )}
+
         <div className="pt-4 border-t border-white/5">
-          <SaveButton onClick={handleSave} label={saved ? "Saved ✓" : "Save Settings"} />
+          <SaveButton
+            onClick={handleSave}
+            label={saving ? "Saving…" : saved ? "Saved ✓" : "Save Settings"}
+          />
         </div>
       </div>
     </AdminShell>
   );
 }
+

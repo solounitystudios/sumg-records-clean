@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CMSArtist } from "@/lib/types";
 
 interface ArtistCardProps {
@@ -9,7 +10,8 @@ export function ArtistCard({ artist, size = "large" }: ArtistCardProps) {
   const isLarge = size === "large";
 
   return (
-    <div
+    <Link
+      href={`/artists/${artist.slug}`}
       className={`group relative overflow-hidden border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent transition-all duration-500 hover:border-white/10 hover:from-white/[0.06] ${
         isLarge ? "aspect-[3/4]" : "aspect-[4/5]"
       }`}
@@ -51,6 +53,6 @@ export function ArtistCard({ artist, size = "large" }: ArtistCardProps) {
 
       {/* Hover bottom line */}
       <div className="absolute bottom-0 left-0 w-0 h-px bg-white/30 group-hover:w-full transition-all duration-500 z-30" />
-    </div>
+    </Link>
   );
 }
