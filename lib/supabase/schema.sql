@@ -363,3 +363,8 @@ CREATE TABLE IF NOT EXISTS shopify_campaigns (
 
 -- Remove deprecated song coupling from brands (safe — columns may not exist)
 ALTER TABLE brands DROP COLUMN IF EXISTS featured_song_slugs;
+
+-- Additive: site-wide settings persisted via /admin/settings
+ALTER TABLE homepage_config
+  ADD COLUMN IF NOT EXISTS site_settings jsonb NOT NULL DEFAULT '{}'::jsonb;
+

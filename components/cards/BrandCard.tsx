@@ -1,7 +1,7 @@
-import { Brand } from "@/data/brands";
+import { CMSBrand } from "@/lib/types";
 
 interface BrandCardProps {
-  brand: Brand;
+  brand: CMSBrand;
 }
 
 export function BrandCard({ brand }: BrandCardProps) {
