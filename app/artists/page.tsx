@@ -3,7 +3,16 @@ import { Footer } from "@/components/site/Footer";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { getAllArtists } from "@/lib/cms";
 
-export const metadata = { title: "Artists — SUMG Records" };
+export const metadata = {
+  title: "Artists",
+  description:
+    "Explore the SUMG Records artist roster — seven independent artists each with a distinct sound, vision, and world.",
+  openGraph: {
+    title: "Artists — SUMG Records",
+    description:
+      "Explore the SUMG Records artist roster — seven independent artists each with a distinct sound, vision, and world.",
+  },
+};
 
 export default async function ArtistsPage() {
   const artists = await getAllArtists();

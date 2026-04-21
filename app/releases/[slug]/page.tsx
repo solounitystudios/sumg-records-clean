@@ -14,7 +14,19 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const release = await getReleaseBySlug(slug);
-  return { title: release ? `${release.title} — SUMG Records` : "Release Not Found" };
+  if (!release) return { title: "Release Not Found" };
+  const desc = release.description
+    ? `${release.description.slice(0, 155)}${release.description.length > 155 ? "…" : ""}`
+    : `${release.title} by ${release.artistName} — available on SUMG Records.`;
+  return {
+    title: release.title,
+    description: desc,
+    openGraph: {
+      title: `${release.title} — SUMG Records`,
+      description: desc,
+      ...(release.coverArtUrl ? { images: [{ url: release.coverArtUrl }] } : {}),
+    },
+  };
 }
 
 export default async function ReleasePage({ params }: Props) {

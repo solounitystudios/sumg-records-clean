@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { FeaturedArtists } from "@/components/home/FeaturedArtists";
@@ -6,6 +7,22 @@ import { BrandWorlds } from "@/components/home/BrandWorlds";
 import { LatestReleases } from "@/components/home/LatestReleases";
 import { VisionSection } from "@/components/home/VisionSection";
 import { getAllArtists, getPublishedReleases, getAllProducers, getAllBrands } from "@/lib/cms";
+
+export const metadata: Metadata = {
+  title: {
+    absolute:
+      "SUMG Records — Modern Music Label, Creator Platform & Artist Ecosystem",
+  },
+  description:
+    "SUMG Records is a modern music label, creator platform, artist ecosystem, and commerce brand built for the future of entertainment.",
+  openGraph: {
+    title:
+      "SUMG Records — Modern Music Label, Creator Platform & Artist Ecosystem",
+    description:
+      "SUMG Records is a modern music label, creator platform, artist ecosystem, and commerce brand built for the future of entertainment.",
+    url: "/",
+  },
+};
 
 export default async function Home() {
   const [artists, releases, producers, brands] = await Promise.all([

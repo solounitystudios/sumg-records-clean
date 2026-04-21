@@ -1,7 +1,16 @@
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 
-export const metadata = { title: "About — SUMG Records" };
+export const metadata = {
+  title: "About",
+  description:
+    "SUMG Records is an independent music label and creator platform built from the ground up — prioritising artist ownership, creative control, and long-term vision.",
+  openGraph: {
+    title: "About — SUMG Records",
+    description:
+      "SUMG Records is an independent music label and creator platform built from the ground up — prioritising artist ownership, creative control, and long-term vision.",
+  },
+};
 
 export default function AboutPage() {
   return (

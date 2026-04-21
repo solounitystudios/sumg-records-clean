@@ -1,7 +1,16 @@
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 
-export const metadata = { title: "Contact — SUMG Records" };
+export const metadata = {
+  title: "Contact",
+  description:
+    "Get in touch with SUMG Records for general enquiries, press and media, artist submissions, and brand partnerships.",
+  openGraph: {
+    title: "Contact — SUMG Records",
+    description:
+      "Get in touch with SUMG Records for general enquiries, press and media, artist submissions, and brand partnerships.",
+  },
+};
 
 export default function ContactPage() {
   return (

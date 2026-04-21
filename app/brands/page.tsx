@@ -3,7 +3,16 @@ import { Footer } from "@/components/site/Footer";
 import { BrandCard } from "@/components/cards/BrandCard";
 import { getAllBrands } from "@/lib/cms";
 
-export const metadata = { title: "Brand Worlds — SUMG Records" };
+export const metadata = {
+  title: "Brand Worlds",
+  description:
+    "Discover the five brand worlds of SUMG Records — spanning fashion, lifestyle, sound, visual arts, and publishing.",
+  openGraph: {
+    title: "Brand Worlds — SUMG Records",
+    description:
+      "Discover the five brand worlds of SUMG Records — spanning fashion, lifestyle, sound, visual arts, and publishing.",
+  },
+};
 
 export default async function BrandsPage() {
   const brands = await getAllBrands();

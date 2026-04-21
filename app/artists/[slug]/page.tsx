@@ -14,7 +14,18 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const artist = await getArtistBySlug(slug);
-  return { title: artist ? `${artist.name} — SUMG Records` : "Artist Not Found" };
+  if (!artist) return { title: "Artist Not Found" };
+  return {
+    title: artist.name,
+    description:
+      artist.bio
+        ? `${artist.bio.slice(0, 155)}${artist.bio.length > 155 ? "…" : ""}`
+        : `${artist.name} — Artist on SUMG Records.`,
+    openGraph: {
+      title: `${artist.name} — SUMG Records`,
+      description: artist.bio ?? `${artist.name} — Artist on SUMG Records.`,
+    },
+  };
 }
 
 export default async function ArtistPage({ params }: Props) {
