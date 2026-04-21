@@ -4,6 +4,7 @@ import { Footer } from "@/components/site/Footer";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
 import { getAllArtists, getArtistBySlug, getArtistReleases, getSongsForArtist } from "@/lib/cms";
 import { SocialLinks } from "@/lib/types";
+import { AudioPlayButton } from "@/components/AudioPlayButton";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
@@ -120,6 +121,7 @@ export default async function ArtistPage({ params }: Props) {
                     <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
                       {String(i + 1).padStart(2, "0")}
                     </span>
+                    <AudioPlayButton audioUrl={song.audioUrl} />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm text-white/70 group-hover:text-white transition-colors">
                         {song.title}
