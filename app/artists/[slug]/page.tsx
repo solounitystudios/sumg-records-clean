@@ -3,6 +3,7 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
 import { getAllArtists, getArtistBySlug, getArtistReleases, getSongsForArtist } from "@/lib/cms";
+import { EmailCapture } from "@/components/site/EmailCapture";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
