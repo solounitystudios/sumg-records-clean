@@ -42,29 +42,34 @@ export default function NewProducerPage() {
     return errs;
   }
 
-  function handleSave() {
+  async function handleSave() {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setSaving(true);
 
-    createProducer({
-      slug: form.slug,
-      name: form.name,
-      specialty: form.specialty,
-      credits: form.credits,
-      signature: form.signature,
-      bio: form.bio || undefined,
-      heroImageUrl: form.heroImageUrl || undefined,
-      profileImageUrl: form.profileImageUrl || undefined,
-      socialLinks: {
-        instagram: form["socialLinks.instagram"] || undefined,
-        spotify: form["socialLinks.spotify"] || undefined,
-        soundcloud: form["socialLinks.soundcloud"] || undefined,
-      },
-    });
+    try {
+      await createProducer({
+        slug: form.slug,
+        name: form.name,
+        specialty: form.specialty,
+        credits: form.credits,
+        signature: form.signature,
+        bio: form.bio || undefined,
+        heroImageUrl: form.heroImageUrl || undefined,
+        profileImageUrl: form.profileImageUrl || undefined,
+        socialLinks: {
+          instagram: form["socialLinks.instagram"] || undefined,
+          spotify: form["socialLinks.spotify"] || undefined,
+          soundcloud: form["socialLinks.soundcloud"] || undefined,
+        },
+      });
 
-    notify("success", `Producer "${form.name}" created.`);
-    router.push(`/admin/producers/${form.slug}`);
+      notify("success", `Producer "${form.name}" created.`);
+      router.push(`/admin/producers/${form.slug}`);
+    } catch {
+      // Error toast already shown by store
+      setSaving(false);
+    }
   }
 
   return (

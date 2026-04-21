@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { CMSProducer } from "@/lib/types";
 
 interface ProducerCardProps {
@@ -8,11 +7,7 @@ interface ProducerCardProps {
 
 export function ProducerCard({ producer, index }: ProducerCardProps) {
   return (
-    <div className="group relative border-b border-white/[0.05] py-7 px-3 flex items-start gap-6 hover:border-white/10 hover:bg-white/[0.015] transition-all duration-300 cursor-default">
-    <Link
-      href={`/producers/${producer.slug}`}
-      className="group relative border-b border-white/5 py-7 px-2 flex items-start gap-6 hover:border-white/10 transition-all duration-300"
-    >
+    <div className="group relative border-b border-white/[0.05] py-7 px-3 flex items-start gap-6 hover:border-white/10 hover:bg-white/[0.015] transition-all duration-300 cursor-pointer">
       {/* Index */}
       <span className="text-[11px] tracking-[0.2em] text-white/15 font-mono mt-1 min-w-[2rem]">
         {String(index + 1).padStart(2, "0")}
@@ -41,7 +36,5 @@ export function ProducerCard({ producer, index }: ProducerCardProps) {
       {/* Hover left accent */}
       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0 h-0 group-hover:w-px group-hover:h-10 bg-white/25 transition-all duration-300" />
     </div>
-      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0 h-0 group-hover:w-px group-hover:h-8 bg-white/20 transition-all duration-300" />
-    </Link>
   );
 }

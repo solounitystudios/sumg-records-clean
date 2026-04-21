@@ -6,7 +6,7 @@ interface ReleaseCardProps {
 
 export function ReleaseCard({ release }: ReleaseCardProps) {
   return (
-    <div className="group relative border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent hover:border-white/15 hover:from-white/[0.06] transition-all duration-400 cursor-default overflow-hidden">
+    <div className="group relative border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent hover:border-white/15 hover:from-white/[0.06] transition-all duration-300 cursor-pointer overflow-hidden">
       {/* Cover art area */}
       <div className="aspect-square relative bg-gradient-to-br from-white/[0.04] to-black/50 flex items-center justify-center overflow-hidden">
         {release.coverArtUrl ? (
@@ -37,7 +37,7 @@ export function ReleaseCard({ release }: ReleaseCardProps) {
         </div>
 
         {/* Hover gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-400 z-[5]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-[5]" />
       </div>
 
       {/* Content */}

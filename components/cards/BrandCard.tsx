@@ -6,7 +6,7 @@ interface BrandCardProps {
 
 export function BrandCard({ brand }: BrandCardProps) {
   return (
-    <div className="group relative p-8 md:p-10 border border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent hover:border-white/15 hover:from-white/[0.05] transition-all duration-500 cursor-default overflow-hidden">
+    <div className="group relative p-8 md:p-10 border border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent hover:border-white/15 hover:from-white/[0.05] transition-all duration-500 cursor-pointer overflow-hidden">
       {/* Corner accent — expands on hover */}
       <div className="absolute top-0 left-0 w-0 h-px bg-white/30 group-hover:w-12 transition-all duration-500" />
       <div className="absolute top-0 left-0 w-px h-0 bg-white/30 group-hover:h-12 transition-all duration-500" />

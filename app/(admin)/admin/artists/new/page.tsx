@@ -49,33 +49,38 @@ export default function NewArtistPage() {
     return errs;
   }
 
-  function handleSave() {
+  async function handleSave() {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setSaving(true);
 
-    createArtist({
-      slug: form.slug,
-      name: form.name,
-      role: form.role,
-      genre: form.genre,
-      bio: form.bio,
-      longBio: form.longBio || undefined,
-      featured: form.featured,
-      featuredOnHomepage: form.featuredOnHomepage,
-      tier: form.tier,
-      status: form.status,
-      heroImageUrl: form.heroImageUrl || undefined,
-      profileImageUrl: form.profileImageUrl || undefined,
-      socialLinks: {
-        instagram: form["socialLinks.instagram"] || undefined,
-        spotify: form["socialLinks.spotify"] || undefined,
-        soundcloud: form["socialLinks.soundcloud"] || undefined,
-      },
-    });
+    try {
+      await createArtist({
+        slug: form.slug,
+        name: form.name,
+        role: form.role,
+        genre: form.genre,
+        bio: form.bio,
+        longBio: form.longBio || undefined,
+        featured: form.featured,
+        featuredOnHomepage: form.featuredOnHomepage,
+        tier: form.tier,
+        status: form.status,
+        heroImageUrl: form.heroImageUrl || undefined,
+        profileImageUrl: form.profileImageUrl || undefined,
+        socialLinks: {
+          instagram: form["socialLinks.instagram"] || undefined,
+          spotify: form["socialLinks.spotify"] || undefined,
+          soundcloud: form["socialLinks.soundcloud"] || undefined,
+        },
+      });
 
-    notify("success", `Artist "${form.name}" created.`);
-    router.push(`/admin/artists/${form.slug}`);
+      notify("success", `Artist "${form.name}" created.`);
+      router.push(`/admin/artists/${form.slug}`);
+    } catch {
+      // Error toast already shown by store
+      setSaving(false);
+    }
   }
 
   return (

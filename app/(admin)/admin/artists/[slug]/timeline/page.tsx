@@ -628,12 +628,16 @@ export default function ArtistTimelinePage() {
     );
   }
 
-  function handleCreate(
+  async function handleCreate(
     data: Omit<ArtistTimelineItem, "id" | "createdAt" | "updatedAt">
   ) {
-    createTimelineItem(data);
-    notify("success", `Timeline item "${data.title}" created.`);
-    setShowForm(false);
+    try {
+      await createTimelineItem(data);
+      notify("success", `Timeline item "${data.title}" created.`);
+      setShowForm(false);
+    } catch {
+      // Error toast already shown by store
+    }
   }
 
   function handleUpdate(

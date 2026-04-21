@@ -83,7 +83,7 @@ export function VisionSection() {
         <div className="mt-20 text-center">
           <a
             href="/about"
-            className="inline-flex flex-col items-center gap-2 border border-white/10 px-10 py-7 hover:border-white/25 hover:bg-white/[0.02] transition-all duration-400 group"
+            className="inline-flex flex-col items-center gap-2 border border-white/10 px-10 py-7 hover:border-white/25 hover:bg-white/[0.02] transition-all duration-300 group"
           >
             <p className="text-[10px] tracking-[0.4em] uppercase text-white/25 mb-1 group-hover:text-white/40 transition-colors duration-300">
               Est. Independent
