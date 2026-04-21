@@ -406,7 +406,8 @@ CREATE TABLE IF NOT EXISTS spotify_snapshots (
   followers       INTEGER NOT NULL DEFAULT 0,
   popularity      INTEGER NOT NULL DEFAULT 0,
   snapshot_date   DATE NOT NULL DEFAULT CURRENT_DATE,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (artist_slug, snapshot_date)
 );
 
 ALTER TABLE spotify_snapshots ENABLE ROW LEVEL SECURITY;

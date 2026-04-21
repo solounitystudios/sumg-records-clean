@@ -9,8 +9,6 @@
  * Docs: https://musicbrainz.org/doc/MusicBrainz_API
  */
 
-import "server-only";
-
 const MB_BASE = "https://musicbrainz.org/ws/2";
 
 /**
