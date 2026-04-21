@@ -62,25 +62,88 @@ export interface MusicBrainzReleaseRef {
 /**
  * The result wrapper returned by every lookup function.
  *
- * On success: `{ found: true, recording: MusicBrainzRecording }`
+ * On success:   `{ found: true,        recording: MusicBrainzRecording }`
+ * On ambiguous: `{ found: "ambiguous", candidates: MusicBrainzRecording[], reason: string }`
  * On not-found: `{ found: false }`
- * On network / parse error: `{ found: false, error: string }`
+ * On error:     `{ found: false, error: string }`
+ *
+ * Callers must handle all three discriminants — the `"ambiguous"` arm means a
+ * plausible match was found but confidence is insufficient to write without
+ * human review.
  */
 export type MusicBrainzResult =
   | { found: true; recording: MusicBrainzRecording }
+  | { found: "ambiguous"; candidates: MusicBrainzRecording[]; reason: string }
   | { found: false; error?: string };
+
+/**
+ * Options accepted by every public lookup function.
+ *
+ * `noCache`     — bypass Next.js ISR cache; always use for admin/enrichment
+ *                 calls so a previous not-found result is not replayed.
+ * `titleHint`   — candidate title used to disambiguate when multiple recordings
+ *                 are returned for the same ISRC.
+ * `artistHint`  — candidate artist name used alongside `titleHint`.
+ */
+export interface MBLookupOptions {
+  noCache?: boolean;
+  titleHint?: string;
+  artistHint?: string;
+}
+
+// ─── Normalisation utilities ──────────────────────────────────────────────────
+
+/**
+ * Normalises an ISRC string: strips surrounding whitespace, uppercases,
+ * removes hyphens, and validates the canonical 12-character format
+ * (CC-XXX-YY-NNNNN without dashes: two letters, three alphanumerics, seven digits).
+ *
+ * Returns `null` if the input cannot be coerced into a valid ISRC.
+ * Handles both the canonical form (USUM71234567) and the print form (US-UM7-12-34567).
+ */
+export function normalizeISRC(s: string): string | null {
+  const stripped = s.trim().toUpperCase().replace(/-/g, "");
+  if (!/^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/.test(stripped)) return null;
+  return stripped;
+}
+
+/**
+ * Normalises a freeform text string for comparison: lowercases, strips
+ * non-word/non-space characters, and collapses runs of whitespace.
+ *
+ * Used to compare song titles and artist names across sources that may differ
+ * in punctuation, capitalisation, or Unicode presentation.
+ */
+export function normalizeText(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Escapes double-quote characters for use inside a Lucene phrase query. */
+function escapeForLucene(s: string): string {
+  return s.replace(/"/g, '\\"');
+}
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
-/** Shared fetch wrapper — sets headers, handles non-200, returns parsed JSON. */
-async function mbFetch(url: string): Promise<unknown> {
+/**
+ * Shared fetch wrapper — sets headers, handles non-200, returns parsed JSON.
+ *
+ * Pass `noCache = true` for admin/enrichment paths so stale not-found results
+ * are not served from the Next.js ISR cache for up to an hour.
+ */
+async function mbFetch(url: string, noCache = false): Promise<unknown> {
   const res = await fetch(url, {
     headers: {
       "User-Agent": USER_AGENT,
       Accept: "application/json",
     },
-    // Next.js ISR cache: revalidate every hour — MB data is stable
-    next: { revalidate: 3600 },
+    ...(noCache
+      ? { cache: "no-store" as const }
+      : { next: { revalidate: 3600 } }),
   });
 
   if (res.status === 404) {
@@ -140,25 +203,43 @@ function parseRecording(raw: any, isrc?: string): MusicBrainzRecording {
   };
 }
 
+// ─── Confidence thresholds ────────────────────────────────────────────────────
+
+/** Minimum MusicBrainz search score (0–100) to consider a result at all. */
+const MB_SCORE_MIN = 80;
+
+/**
+ * Minimum score gap between the top two results for the top result to be
+ * considered a clear, unambiguous winner.
+ */
+const MB_SCORE_GAP_MIN = 10;
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * Looks up a recording by its ISRC code.
  *
+ * Normalises the ISRC (strips hyphens, validates format) before querying.
  * Uses MusicBrainz `/recording?isrcs=` with `inc=artist-credits+releases+isrcs`.
  *
- * Returns the first result when MusicBrainz returns multiple recordings for the
- * same ISRC (rare, but possible when the same recording is re-issued).
+ * When MusicBrainz maps a single ISRC to multiple recordings (a remaster, live
+ * reissue, or re-recording), the function attempts to pick the best match using
+ * `titleHint` / `artistHint` from `options`.  If no clear winner can be
+ * determined it returns `{ found: "ambiguous" }` rather than auto-selecting.
  *
  * Failure paths:
- *   - ISRC not in MusicBrainz → `{ found: false }`
- *   - Network error or non-200 → `{ found: false, error: "..." }`
- *   - Malformed response → `{ found: false, error: "..." }`
+ *   - Invalid ISRC format         → `{ found: false, error: "..." }`
+ *   - ISRC not in MusicBrainz    → `{ found: false }`
+ *   - Multiple ambiguous matches  → `{ found: "ambiguous", candidates, reason }`
+ *   - Network error or non-200   → `{ found: false, error: "..." }`
  */
-export async function lookupByISRC(isrc: string): Promise<MusicBrainzResult> {
-  const normalised = isrc.trim().toUpperCase();
+export async function lookupByISRC(
+  isrc: string,
+  options: MBLookupOptions = {}
+): Promise<MusicBrainzResult> {
+  const normalised = normalizeISRC(isrc);
   if (!normalised) {
-    return { found: false, error: "ISRC is empty" };
+    return { found: false, error: `Invalid ISRC format: "${isrc}"` };
   }
 
   const url =
@@ -169,14 +250,48 @@ export async function lookupByISRC(isrc: string): Promise<MusicBrainzResult> {
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = (await mbFetch(url)) as any;
+    const data = (await mbFetch(url, options.noCache)) as any;
 
     if (!data) return { found: false };
 
     const recordings: unknown[] = data.recordings ?? [];
     if (recordings.length === 0) return { found: false };
 
-    return { found: true, recording: parseRecording(recordings[0], normalised) };
+    // Single result — unambiguous.
+    if (recordings.length === 1) {
+      return { found: true, recording: parseRecording(recordings[0], normalised) };
+    }
+
+    // Multiple recordings share this ISRC.  Try to pick the best match using
+    // the caller-supplied title/artist hints.
+    const parsed = recordings.map((r) => parseRecording(r as never, normalised));
+
+    if (options.titleHint) {
+      const normTitle = normalizeText(options.titleHint);
+      const normArtist = options.artistHint
+        ? normalizeText(options.artistHint)
+        : null;
+
+      const exact = parsed.filter((rec) => {
+        const titleMatch = normalizeText(rec.title) === normTitle;
+        const artistMatch = normArtist
+          ? rec.artistName !== undefined &&
+            normalizeText(rec.artistName) === normArtist
+          : true;
+        return titleMatch && artistMatch;
+      });
+
+      if (exact.length === 1) {
+        return { found: true, recording: exact[0] };
+      }
+    }
+
+    // Cannot determine a clear winner — surface candidates for human review.
+    return {
+      found: "ambiguous",
+      candidates: parsed,
+      reason: `ISRC ${normalised} maps to ${recordings.length} recordings`,
+    };
   } catch (err) {
     return { found: false, error: String(err) };
   }
@@ -186,43 +301,91 @@ export async function lookupByISRC(isrc: string): Promise<MusicBrainzResult> {
  * Searches for a recording by artist name and song title.
  *
  * Uses MusicBrainz Lucene search: `/recording?query=`.
- * Returns the highest-scoring match (MusicBrainz orders by relevance).
+ * Fetches up to three candidates and applies confidence checks before
+ * committing to a single result:
  *
- * Useful when the ISRC is not yet known — e.g. for new catalog entries.
- * Results are less authoritative than an ISRC lookup; verify before saving.
+ *   1. Score threshold: the top result must score ≥ 80/100.
+ *   2. Normalised exact match: both title and artist must match after
+ *      lowercasing and stripping punctuation.
+ *   3. Gap check: the score gap between the top two results must exceed
+ *      10 points — a narrow gap means multiple plausible candidates.
+ *
+ * If all three conditions are met, returns `{ found: true }`.
+ * If the score threshold is met but the match or gap checks fail, returns
+ * `{ found: "ambiguous" }` with the candidate list for human review.
+ *
+ * Results are less authoritative than an ISRC lookup — never auto-write ISRC
+ * from this path.
  *
  * Failure paths:
- *   - No results → `{ found: false }`
- *   - Network error → `{ found: false, error: "..." }`
+ *   - No results / score too low  → `{ found: false }`
+ *   - Low-confidence match        → `{ found: "ambiguous", candidates, reason }`
+ *   - Network error               → `{ found: false, error: "..." }`
  */
 export async function lookupByArtistTitle(
   artistName: string,
-  songTitle: string
+  songTitle: string,
+  options: MBLookupOptions = {}
 ): Promise<MusicBrainzResult> {
   if (!artistName.trim() || !songTitle.trim()) {
     return { found: false, error: "artistName and songTitle are required" };
   }
 
-  // Lucene query — exact phrase matching via quoted strings
-  const query = `recording:"${songTitle.trim()}" AND artist:"${artistName.trim()}"`;
+  // Lucene query — exact phrase matching with special-char escaping
+  const query =
+    `recording:"${escapeForLucene(songTitle.trim())}"` +
+    ` AND artist:"${escapeForLucene(artistName.trim())}"`;
 
   const url =
     `${MB_BASE}/recording` +
     `?query=${encodeURIComponent(query)}` +
     `&inc=artist-credits+releases+isrcs` +
     `&fmt=json` +
-    `&limit=1`;
+    `&limit=3`;
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = (await mbFetch(url)) as any;
+    const data = (await mbFetch(url, options.noCache)) as any;
 
     if (!data) return { found: false };
 
-    const recordings: unknown[] = data.recordings ?? [];
-    if (recordings.length === 0) return { found: false };
+    const rawRecordings: unknown[] = data.recordings ?? [];
+    if (rawRecordings.length === 0) return { found: false };
 
-    return { found: true, recording: parseRecording(recordings[0]) };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const score0: number = (rawRecordings[0] as any).score ?? 0;
+
+    // Reject results below the minimum credibility threshold.
+    if (score0 < MB_SCORE_MIN) return { found: false };
+
+    const top = parseRecording(rawRecordings[0]);
+
+    // Normalised exact-match check — title AND artist must both match.
+    const normTitle = normalizeText(songTitle);
+    const normArtist = normalizeText(artistName);
+    const titleMatch = normalizeText(top.title) === normTitle;
+    const artistMatch =
+      top.artistName !== undefined &&
+      normalizeText(top.artistName) === normArtist;
+    const normalizedMatch = titleMatch && artistMatch;
+
+    // Gap check — the top result must be a clear winner over the second.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const score1: number =
+      rawRecordings.length > 1 ? ((rawRecordings[1] as any).score ?? 0) : 0;
+    const clearWinner = score0 - score1 > MB_SCORE_GAP_MIN;
+
+    if (normalizedMatch && clearWinner) {
+      return { found: true, recording: top };
+    }
+
+    // Score is adequate but the match is not clean enough to auto-write.
+    const candidates = rawRecordings.map((r) => parseRecording(r));
+    const reason = !normalizedMatch
+      ? "Title or artist did not match exactly after normalisation"
+      : `Score gap too small (${score0} vs ${score1}) — multiple plausible matches`;
+
+    return { found: "ambiguous", candidates, reason };
   } catch (err) {
     return { found: false, error: String(err) };
   }

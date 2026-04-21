@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { CMSArtist, CMSBrand, CMSProducer, CMSRelease, CMSSong, RoyaltyStatement, SpotifySnapshot } from "@/lib/types";
+import type { MusicBrainzRecording } from "@/lib/integrations/musicbrainz";
 import { rowToArtist, rowToProducer, rowToBrand, rowToRelease, rowToSong, rowToRoyaltyStatement, rowToSpotifySnapshot } from "./mappers";
 import { artists as rawArtists } from "@/data/artists";
 import { brands as rawBrands } from "@/data/brands";
@@ -251,26 +252,43 @@ export async function getAllPublicSongSlugs(): Promise<string[]> {
 // ─── MusicBrainz ISRC enrichment ─────────────────────────────────────────────
 
 /**
+ * Parses a "M:SS" duration string into milliseconds.
+ * Returns null if the string cannot be parsed.
+ */
+function parseDurationToMs(s: string): number | null {
+  const m = s.match(/^(\d+):(\d{2})$/);
+  if (!m) return null;
+  return (parseInt(m[1], 10) * 60 + parseInt(m[2], 10)) * 1000;
+}
+
+/**
  * Enriches a song record in Supabase with metadata from MusicBrainz.
  *
  * Strategy:
- *   1. If the song already has an ISRC, call `lookupByISRC`.
- *   2. Otherwise, call `lookupByArtistTitle` as a fallback.
- *   3. On a successful hit, write `musicbrainz_id`, and optionally `isrc`
- *      (when the song lacked one) and `duration` back to the `songs` row.
+ *   1. If the song already has an ISRC, call `lookupByISRC` (authoritative path).
+ *   2. Otherwise, call `lookupByArtistTitle` as a fallback (less authoritative).
+ *   3. On a high-confidence hit, write `musicbrainz_id` and optionally `duration`
+ *      (when the song lacked one and the MusicBrainz duration is within tolerance).
  *
- * Safe to call multiple times — skips the Supabase write if nothing changed.
- * Returns a summary of what was updated, or null when Supabase is not configured.
+ * ISRC backfill is intentionally omitted: ISRC is a legal royalty identifier
+ * that must come from an authoritative source (e.g. distributor import), not
+ * inferred from a fuzzy text search.
+ *
+ * Safe to call multiple times — skips everything when `musicbrainz_id` is
+ * already set.  Returns null when Supabase is not configured.
  *
  * Failure paths:
- *   - MusicBrainz returns no result → no-op, returns `{ enriched: false }`
- *   - MusicBrainz network error    → logs to console, returns `{ enriched: false, error }`
- *   - Supabase write error         → throws
+ *   - MusicBrainz returns no result  → no-op, `{ enriched: false }`
+ *   - Ambiguous / low-confidence     → no write, `{ enriched: false, ambiguous: true, candidates }`
+ *   - Duration mismatch > 10 s       → no write, `{ enriched: false, error: "duration mismatch" }`
+ *   - MusicBrainz network error      → logs, `{ enriched: false, error }`
+ *   - Supabase write error           → throws
  */
 export async function enrichSongFromMusicBrainz(songId: string): Promise<{
   enriched: boolean;
+  ambiguous?: boolean;
+  candidates?: MusicBrainzRecording[];
   mbid?: string;
-  isrcWritten?: string;
   durationWritten?: string;
   error?: string;
 } | null> {
@@ -287,17 +305,33 @@ export async function enrichSongFromMusicBrainz(songId: string): Promise<{
   if (fetchErr) throw new Error(fetchErr.message);
   if (!row) return { enriched: false, error: "Song not found" };
 
-  // Skip if we already have a MBID (already enriched)
+  // Skip if we already have a MBID (already enriched — no external fetch needed)
   if (row.musicbrainz_id) return { enriched: false };
 
   const { lookupByISRC, lookupByArtistTitle } = await import(
     "@/lib/integrations/musicbrainz"
   );
 
-  // Prefer ISRC lookup; fall back to title search
+  // Prefer ISRC lookup; fall back to artist/title search.
+  // Always bypass the ISR cache so stale not-found results are not replayed.
   const result = row.isrc
-    ? await lookupByISRC(row.isrc)
-    : await lookupByArtistTitle(row.artist_name ?? "", row.title ?? "");
+    ? await lookupByISRC(row.isrc, {
+        noCache: true,
+        titleHint: row.title ?? undefined,
+        artistHint: row.artist_name ?? undefined,
+      })
+    : await lookupByArtistTitle(row.artist_name ?? "", row.title ?? "", {
+        noCache: true,
+      });
+
+  // Ambiguous result — surface candidates for human review, do not write.
+  if (result.found === "ambiguous") {
+    console.warn(
+      `[musicbrainz] enrichSong(${songId}): ambiguous —`,
+      result.reason
+    );
+    return { enriched: false, ambiguous: true, candidates: result.candidates };
+  }
 
   if (!result.found) {
     if (result.error) {
@@ -309,21 +343,31 @@ export async function enrichSongFromMusicBrainz(songId: string): Promise<{
 
   const { recording } = result;
 
-  // Build the update payload — only fields we intend to write
-  const update: Record<string, string> = {
-    musicbrainz_id: recording.mbid,
-  };
-
-  let isrcWritten: string | undefined;
-  let durationWritten: string | undefined;
-
-  // Fill in ISRC if the song didn't have one and MusicBrainz returned one
-  if (!row.isrc && recording.isrcs.length > 0) {
-    update.isrc = recording.isrcs[0];
-    isrcWritten = recording.isrcs[0];
+  // Duration mismatch guard: if the song already has a duration, reject any
+  // MusicBrainz recording whose duration differs by more than 10 seconds.
+  if (row.duration && recording.durationMs !== undefined) {
+    const existingMs = parseDurationToMs(row.duration);
+    if (
+      existingMs !== null &&
+      Math.abs(recording.durationMs - existingMs) > 10_000
+    ) {
+      console.warn(
+        `[musicbrainz] enrichSong(${songId}): duration mismatch ` +
+          `(existing ${row.duration}, MB ${recording.duration ?? recording.durationMs + "ms"})`
+      );
+      return { enriched: false, error: "duration mismatch" };
+    }
   }
 
-  // Fill in duration if the song didn't have one and MusicBrainz returned one
+  // Build the update payload — only fields we intend to write.
+  const update: Record<string, string> = {
+    musicbrainz_id: recording.mbid,
+    updated_at: new Date().toISOString(),
+  };
+
+  let durationWritten: string | undefined;
+
+  // Back-fill duration only when the song has none and MB has a value.
   if (!row.duration && recording.duration) {
     update.duration = recording.duration;
     durationWritten = recording.duration;
@@ -339,7 +383,6 @@ export async function enrichSongFromMusicBrainz(songId: string): Promise<{
   return {
     enriched: true,
     mbid: recording.mbid,
-    isrcWritten,
     durationWritten,
   };
 }
