@@ -10,8 +10,66 @@ import { searchSpotify } from "@/lib/spotify";
  *   limit  — max results per type, 1–50             (default: 10)
  *
  * Calls Spotify server-side so credentials are never exposed to the browser.
+ *
+ * Rate limit: 20 requests per 60-second window per IP.  This is an in-memory
+ * sliding window — it resets when the server process restarts.  Sufficient for
+ * an internal admin tool; add Redis-backed rate limiting if this route is ever
+ * exposed publicly at scale.
  */
+
+// ─── Simple per-IP rate limiter ───────────────────────────────────────────────
+
+const RATE_LIMIT_MAX = 20;        // requests allowed per window
+const RATE_LIMIT_WINDOW_MS = 60_000; // 60-second window
+
+interface RateEntry {
+  count: number;
+  windowStart: number;
+}
+
+// Module-level map — intentionally not shared across Node.js processes.
+// Cleared on each cold start / serverless instance lifecycle.
+const _rateLimitMap = new Map<string, RateEntry>();
+
+function getClientIp(req: NextRequest): string {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    req.headers.get("x-real-ip") ??
+    "unknown"
+  );
+}
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = _rateLimitMap.get(ip);
+
+  if (!entry || now - entry.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    _rateLimitMap.set(ip, { count: 1, windowStart: now });
+    return true; // allowed
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return false; // blocked
+  }
+
+  entry.count += 1;
+  return true; // allowed
+}
+
+// ─── Route handler ────────────────────────────────────────────────────────────
+
 export async function GET(request: NextRequest) {
+  const ip = getClientIp(request);
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { error: "Too many requests — please wait before searching again" },
+      {
+        status: 429,
+        headers: { "Retry-After": "60" },
+      }
+    );
+  }
+
   const { searchParams } = request.nextUrl;
   const q = searchParams.get("q")?.trim();
 

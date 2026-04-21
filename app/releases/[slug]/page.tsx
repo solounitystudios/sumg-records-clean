@@ -3,6 +3,7 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { getPublishedReleases, getReleaseBySlug, getSongsForRelease, getAllProducers, getArtistBySlug } from "@/lib/cms";
 import { DSPButtonGroup } from "@/components/admin/DSPLinksPanel";
+import { SpotifyReleasePanel } from "@/components/SpotifyReleasePanel";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
@@ -198,6 +199,11 @@ export default async function ReleasePage({ params }: Props) {
               </div>
             </div>
           </section>
+        )}
+
+        {/* Spotify enrichment — streams in when release.dspLinks.spotify is set */}
+        {release.dspLinks?.spotify && (
+          <SpotifyReleasePanel spotifyUrl={release.dspLinks.spotify} />
         )}
 
         {/* DSP links */}

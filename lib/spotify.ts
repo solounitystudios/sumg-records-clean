@@ -6,6 +6,7 @@
  * browser.  All public API functions return null / empty arrays on failure so
  * callers can render gracefully without Spotify data.
  */
+import "server-only";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,26 @@ export interface SpotifySearchResult {
   artists?: { items: SpotifyArtist[] };
   albums?: { items: SpotifyAlbum[] };
   tracks?: { items: SpotifyTrack[] };
+}
+
+/**
+ * A simplified track as it appears inline inside an album response.
+ * Unlike SpotifyTrack it has no nested album object (it is already inside one).
+ */
+export interface SpotifySimpleTrack {
+  id: string;
+  name: string;
+  track_number: number;
+  duration_ms: number;
+  explicit: boolean;
+  preview_url: string | null;
+  external_urls: { spotify: string };
+}
+
+/** Full album object returned by GET /albums/{id} — includes inline tracks. */
+export interface SpotifyAlbumFull extends SpotifyAlbum {
+  label?: string;
+  tracks: { items: SpotifySimpleTrack[] };
 }
 
 // ─── Token cache (module-level, server-only) ──────────────────────────────────
@@ -170,6 +191,30 @@ export function extractSpotifyArtistId(urlOrId: string): string | null {
   return null;
 }
 
+/**
+ * Extract a bare Spotify album ID from either a full Spotify URL or a raw ID.
+ *
+ * Accepts:
+ *   - https://open.spotify.com/album/4aawyAB9vmqN3uQ7FjRGTy
+ *   - spotify:album:4aawyAB9vmqN3uQ7FjRGTy
+ *   - 4aawyAB9vmqN3uQ7FjRGTy (22-char alphanumeric)
+ *
+ * Returns null when the value cannot be parsed.
+ */
+export function extractSpotifyAlbumId(urlOrId: string): string | null {
+  if (!urlOrId) return null;
+
+  const urlMatch = urlOrId.match(/spotify\.com\/album\/([A-Za-z0-9]+)/);
+  if (urlMatch) return urlMatch[1];
+
+  const uriMatch = urlOrId.match(/^spotify:album:([A-Za-z0-9]+)$/);
+  if (uriMatch) return uriMatch[1];
+
+  if (/^[A-Za-z0-9]{22}$/.test(urlOrId)) return urlOrId;
+
+  return null;
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /** Fetch a single Spotify artist by ID.  Returns null on any failure. */
@@ -219,6 +264,21 @@ export async function getSpotifyArtistAlbums(
   } catch (err) {
     console.error("[spotify] getSpotifyArtistAlbums:", err);
     return [];
+  }
+}
+
+/**
+ * Fetch a single Spotify album by ID, including its inline tracklist.
+ * Returns null on any failure.
+ */
+export async function getSpotifyAlbum(
+  id: string
+): Promise<SpotifyAlbumFull | null> {
+  try {
+    return await spotifyFetch<SpotifyAlbumFull>(`/albums/${id}`);
+  } catch (err) {
+    console.error("[spotify] getSpotifyAlbum:", err);
+    return null;
   }
 }
 
