@@ -3,9 +3,19 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
 import { getAllArtists, getArtistBySlug, getArtistReleases, getSongsForArtist } from "@/lib/cms";
+import { SocialLinks } from "@/lib/types";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
+
+/** Maps each SocialLinks key to a display label and URL prefix for validation. */
+const SOCIAL_META: { key: keyof SocialLinks; label: string }[] = [
+  { key: "spotify",    label: "Spotify" },
+  { key: "instagram",  label: "Instagram" },
+  { key: "youtube",    label: "YouTube" },
+  { key: "twitter",    label: "X / Twitter" },
+  { key: "soundcloud", label: "SoundCloud" },
+];
 
 export async function generateStaticParams() {
   return (await getAllArtists()).map((a) => ({ slug: a.slug }));
@@ -52,7 +62,24 @@ export default async function ArtistPage({ params }: Props) {
             <h1 className="text-6xl md:text-8xl font-black tracking-tight text-white leading-none mb-6">
               {artist.name}
             </h1>
-            <p className="text-base text-white/40 max-w-xl leading-relaxed">{artist.bio}</p>
+            <p className="text-base text-white/60 max-w-xl leading-relaxed">{artist.bio}</p>
+
+            {/* Social links */}
+            {artist.socialLinks && (
+              <div className="flex flex-wrap gap-2 mt-6">
+                {SOCIAL_META.filter(({ key }) => artist.socialLinks?.[key]).map(({ key, label }) => (
+                  <a
+                    key={key}
+                    href={artist.socialLinks?.[key]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="border border-white/15 px-3.5 py-1.5 text-[10px] tracking-[0.2em] uppercase text-white/40 hover:border-white/35 hover:text-white/80 transition-all duration-300"
+                  >
+                    {label}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
@@ -62,7 +89,7 @@ export default async function ArtistPage({ params }: Props) {
             <div className="max-w-7xl mx-auto px-6 lg:px-10">
               <div className="max-w-2xl">
                 <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">About</p>
-                <p className="text-base text-white/50 leading-loose">{artist.longBio}</p>
+                <p className="text-base text-white/65 leading-loose">{artist.longBio}</p>
               </div>
             </div>
           </section>
