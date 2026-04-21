@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
+import { SpotifyArtistCard } from "@/components/SpotifyArtistCard";
 import { getAllArtists, getArtistBySlug, getArtistReleases, getSongsForArtist } from "@/lib/cms";
 import Link from "next/link";
 
@@ -129,6 +130,10 @@ export default async function ArtistPage({ params }: Props) {
               </div>
             </div>
           </section>
+        )}
+        {/* Spotify data — rendered only when artist.socialLinks.spotify is set */}
+        {artist.socialLinks?.spotify && (
+          <SpotifyArtistCard spotifyUrl={artist.socialLinks.spotify} />
         )}
       </main>
       <Footer />
