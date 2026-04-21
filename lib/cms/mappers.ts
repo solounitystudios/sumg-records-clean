@@ -161,6 +161,7 @@ export function rowToSong(r: any): CMSSong {
     mediaAssetId: r.media_asset_id ?? undefined,
     dspLinks: r.dsp_links ?? undefined,
     isrc: r.isrc ?? undefined,
+    musicbrainzId: r.musicbrainz_id ?? undefined,
     rightsMetadata: r.rights_metadata ?? undefined,
     dataSource: r.data_source ?? undefined,
     createdAt: r.created_at,

@@ -248,7 +248,102 @@ export async function getAllPublicSongSlugs(): Promise<string[]> {
   return songs.map((s) => s.slug);
 }
 
-// ─── Royalty Statements ──────────────────────────────────────────────────────
+// ─── MusicBrainz ISRC enrichment ─────────────────────────────────────────────
+
+/**
+ * Enriches a song record in Supabase with metadata from MusicBrainz.
+ *
+ * Strategy:
+ *   1. If the song already has an ISRC, call `lookupByISRC`.
+ *   2. Otherwise, call `lookupByArtistTitle` as a fallback.
+ *   3. On a successful hit, write `musicbrainz_id`, and optionally `isrc`
+ *      (when the song lacked one) and `duration` back to the `songs` row.
+ *
+ * Safe to call multiple times — skips the Supabase write if nothing changed.
+ * Returns a summary of what was updated, or null when Supabase is not configured.
+ *
+ * Failure paths:
+ *   - MusicBrainz returns no result → no-op, returns `{ enriched: false }`
+ *   - MusicBrainz network error    → logs to console, returns `{ enriched: false, error }`
+ *   - Supabase write error         → throws
+ */
+export async function enrichSongFromMusicBrainz(songId: string): Promise<{
+  enriched: boolean;
+  mbid?: string;
+  isrcWritten?: string;
+  durationWritten?: string;
+  error?: string;
+} | null> {
+  const sb = getSupabaseClient();
+  if (!sb) return null;
+
+  // Fetch the current song row
+  const { data: row, error: fetchErr } = await sb
+    .from("songs")
+    .select("id, title, artist_name, isrc, musicbrainz_id, duration")
+    .eq("id", songId)
+    .maybeSingle();
+
+  if (fetchErr) throw new Error(fetchErr.message);
+  if (!row) return { enriched: false, error: "Song not found" };
+
+  // Skip if we already have a MBID (already enriched)
+  if (row.musicbrainz_id) return { enriched: false };
+
+  const { lookupByISRC, lookupByArtistTitle } = await import(
+    "@/lib/integrations/musicbrainz"
+  );
+
+  // Prefer ISRC lookup; fall back to title search
+  const result = row.isrc
+    ? await lookupByISRC(row.isrc)
+    : await lookupByArtistTitle(row.artist_name ?? "", row.title ?? "");
+
+  if (!result.found) {
+    if (result.error) {
+      console.warn(`[musicbrainz] enrichSong(${songId}):`, result.error);
+      return { enriched: false, error: result.error };
+    }
+    return { enriched: false };
+  }
+
+  const { recording } = result;
+
+  // Build the update payload — only fields we intend to write
+  const update: Record<string, string> = {
+    musicbrainz_id: recording.mbid,
+  };
+
+  let isrcWritten: string | undefined;
+  let durationWritten: string | undefined;
+
+  // Fill in ISRC if the song didn't have one and MusicBrainz returned one
+  if (!row.isrc && recording.isrcs.length > 0) {
+    update.isrc = recording.isrcs[0];
+    isrcWritten = recording.isrcs[0];
+  }
+
+  // Fill in duration if the song didn't have one and MusicBrainz returned one
+  if (!row.duration && recording.duration) {
+    update.duration = recording.duration;
+    durationWritten = recording.duration;
+  }
+
+  const { error: updateErr } = await sb
+    .from("songs")
+    .update(update)
+    .eq("id", songId);
+
+  if (updateErr) throw new Error(updateErr.message);
+
+  return {
+    enriched: true,
+    mbid: recording.mbid,
+    isrcWritten,
+    durationWritten,
+  };
+}
+
 
 /**
  * Returns all royalty statement rows, newest first.

@@ -332,6 +332,8 @@ export interface CMSSong {
   dspLinks?: DSPLinks;
   /** International Standard Recording Code — song-level identifier. */
   isrc?: string;
+  /** MusicBrainz Recording MBID — set after MusicBrainz ISRC enrichment. */
+  musicbrainzId?: string;
   /** Publishing / rights metadata for this composition. */
   rightsMetadata?: RightsMetadata;
   /** Where this record's data originated (manual entry, import, etc.). */
