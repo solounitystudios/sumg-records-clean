@@ -178,7 +178,7 @@ export function extractSpotifyArtistId(urlOrId: string): string | null {
   if (!urlOrId) return null;
 
   // Full URL: https://open.spotify.com/artist/{id}
-  const urlMatch = urlOrId.match(/spotify\.com\/artist\/([A-Za-z0-9]+)/);
+  const urlMatch = urlOrId.match(/spotify\.com\/artist\/([A-Za-z0-9]{22})/);
   if (urlMatch) return urlMatch[1];
 
   // URI: spotify:artist:{id}
@@ -204,7 +204,7 @@ export function extractSpotifyArtistId(urlOrId: string): string | null {
 export function extractSpotifyAlbumId(urlOrId: string): string | null {
   if (!urlOrId) return null;
 
-  const urlMatch = urlOrId.match(/spotify\.com\/album\/([A-Za-z0-9]+)/);
+  const urlMatch = urlOrId.match(/spotify\.com\/album\/([A-Za-z0-9]{22})/);
   if (urlMatch) return urlMatch[1];
 
   const uriMatch = urlOrId.match(/^spotify:album:([A-Za-z0-9]+)$/);

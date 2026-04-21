@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Suspense } from "react";
 import {
   getSpotifyArtist,
@@ -47,8 +48,7 @@ function SpotifyArtistCardInner({
         {/* Artist header */}
         <div className="flex items-start gap-6 mb-12">
           {image && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={image.url}
               alt={artist.name}
               width={80}
@@ -107,8 +107,7 @@ function SpotifyArtistCardInner({
                     </span>
 
                     {track.album.images[0] && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <Image
                         src={track.album.images[0].url}
                         alt={track.album.name}
                         width={36}
@@ -156,8 +155,7 @@ function SpotifyArtistCardInner({
                     className="group border border-white/5 hover:border-white/10 transition-colors overflow-hidden"
                   >
                     {album.images[0] ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <Image
                         src={album.images[0].url}
                         alt={album.name}
                         width={200}

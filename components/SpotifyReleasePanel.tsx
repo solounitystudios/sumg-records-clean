@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Suspense } from "react";
 import {
   getSpotifyAlbum,
@@ -34,8 +35,7 @@ function SpotifyReleasePanelInner({ album }: SpotifyReleasePanelInnerProps) {
           {/* Album art */}
           {image && (
             <div className="flex-none">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={image.url}
                 alt={album.name}
                 width={160}

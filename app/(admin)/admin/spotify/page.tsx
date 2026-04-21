@@ -106,26 +106,28 @@ function ResultCard({ artist }: ResultCardProps) {
         )}
 
         {/* Spotify URL — monospace, selectable */}
-        <div className="mt-3 flex items-center gap-2">
-          <code className="text-[10px] font-mono text-white/30 truncate flex-1 bg-white/[0.03] px-2 py-1 border border-white/[0.06]">
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+          <code className="text-[10px] font-mono text-white/30 truncate sm:flex-1 bg-white/[0.03] px-2 py-1 border border-white/[0.06]">
             {artist.external_urls.spotify}
           </code>
 
-          <button
-            onClick={handleCopy}
-            className="flex-none text-[9px] tracking-[0.15em] uppercase border border-white/10 text-white/30 px-3 py-1.5 hover:border-white/25 hover:text-white/70 transition-colors whitespace-nowrap"
-          >
-            {copied ? "Copied ✓" : "Copy URL"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopy}
+              className="flex-1 sm:flex-none text-[9px] tracking-[0.15em] uppercase border border-white/10 text-white/30 px-3 py-1.5 hover:border-white/25 hover:text-white/70 transition-colors whitespace-nowrap"
+            >
+              {copied ? "Copied ✓" : "Copy URL"}
+            </button>
 
-          <a
-            href={artist.external_urls.spotify}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-none text-[9px] tracking-[0.15em] uppercase border border-white/10 text-white/30 px-3 py-1.5 hover:border-white/25 hover:text-white/70 transition-colors"
-          >
-            Open ↗
-          </a>
+            <a
+              href={artist.external_urls.spotify}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 sm:flex-none text-center text-[9px] tracking-[0.15em] uppercase border border-white/10 text-white/30 px-3 py-1.5 hover:border-white/25 hover:text-white/70 transition-colors"
+            >
+              Open ↗
+            </a>
+          </div>
         </div>
       </div>
     </div>
