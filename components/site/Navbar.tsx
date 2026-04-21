@@ -9,6 +9,7 @@ const navLinks = [
   { label: "Producers", href: "/producers" },
   { label: "Brands", href: "/brands" },
   { label: "About", href: "/about" },
+  { label: "Shop", href: "/shop" },
 ];
 
 export function Navbar() {

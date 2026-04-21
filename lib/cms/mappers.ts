@@ -17,6 +17,7 @@ export function rowToArtist(r: any): CMSArtist {
     heroImageUrl: r.hero_image_url ?? undefined,
     profileImageUrl: r.profile_image_url ?? undefined,
     socialLinks: r.social_links ?? undefined,
+    shopUrl: r.shop_url ?? undefined,
     associatedBrands: r.associated_brands ?? undefined,
     providerConfig: r.provider_config ?? undefined,
     createdAt: r.created_at,

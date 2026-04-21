@@ -3,6 +3,8 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { getPublishedReleases, getReleaseBySlug, getSongsForRelease, getAllProducers, getArtistBySlug } from "@/lib/cms";
 import { DSPButtonGroup } from "@/components/admin/DSPLinksPanel";
+import { AudioPlayButton } from "@/components/AudioPlayButton";
+import { EmailCapture } from "@/components/site/EmailCapture";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
@@ -131,6 +133,8 @@ export default async function ReleasePage({ params }: Props) {
                       {String(song.trackNumber ?? i + 1).padStart(2, "0")}
                     </span>
                     <span className="flex-1 text-sm text-white/70 group-hover:text-white transition-colors duration-200 font-medium">
+                    <AudioPlayButton audioUrl={song.audioUrl} />
+                    <span className="flex-1 text-sm text-white/70 group-hover:text-white transition-colors">
                       {song.title}
                       {song.isExplicit && (
                         <span className="ml-2 text-[9px] border border-white/15 text-white/20 px-1.5 py-0.5">E</span>
@@ -158,6 +162,7 @@ export default async function ReleasePage({ params }: Props) {
                     <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
                       {String(track.trackNumber ?? i + 1).padStart(2, "0")}
                     </span>
+                    <AudioPlayButton audioUrl={track.audioUrl} />
                     <span className="text-sm text-white/70 group-hover:text-white transition-colors">{track.title}</span>
                     {track.duration && (
                       <span className="ml-auto text-[11px] font-mono text-white/20">{track.duration}</span>
@@ -221,6 +226,28 @@ export default async function ReleasePage({ params }: Props) {
           </section>
         )}
 
+        {/* Shop merch CTA */}
+        <section className="py-12 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-6 lg:px-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border border-white/[0.06] px-6 py-6 hover:border-white/10 transition-colors">
+              <div>
+                <p className="text-[9px] tracking-[0.35em] uppercase text-white/20 mb-1">
+                  Official Merch
+                </p>
+                <p className="text-sm text-white/60">
+                  Shop apparel, accessories, and limited editions from the SUMG brand worlds.
+                </p>
+              </div>
+              <Link
+                href="/shop"
+                className="bg-white text-black text-[10px] tracking-[0.25em] uppercase px-6 py-3 hover:bg-white/90 transition-colors shrink-0"
+              >
+                Shop Now →
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* Artist CTA */}
         {artist && (
           <section className="py-12 border-b border-white/5">
@@ -257,6 +284,18 @@ export default async function ReleasePage({ params }: Props) {
             </div>
           </section>
         )}
+
+        {/* Email capture */}
+        <section className="py-16 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-6 lg:px-10 max-w-xl">
+            <EmailCapture
+              source="release"
+              variant="inline"
+              heading="Stay in the loop"
+              subtext="New releases, merch drops, and label dispatches. No spam."
+            />
+          </div>
+        </section>
       </main>
       <Footer />
     </>
