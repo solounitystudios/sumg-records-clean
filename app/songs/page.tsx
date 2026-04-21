@@ -9,9 +9,12 @@ export const metadata = {
 
 export default async function SongsPage() {
   const songs = (await getPublicSongs()).sort((a, b) => {
-    // Sort by release date (newest first), then alphabetically
+    // Sort by publish date (newest first), then alphabetically
     if (a.releaseSlug && b.releaseSlug) {
-      return a.title.localeCompare(b.title);
+      const dateA = a.publishAt ?? a.createdAt;
+      const dateB = b.publishAt ?? b.createdAt;
+      const dateDiff = dateB.localeCompare(dateA);
+      if (dateDiff !== 0) return dateDiff;
     }
     return a.title.localeCompare(b.title);
   });

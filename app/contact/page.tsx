@@ -1,9 +1,24 @@
+"use client";
+
+import { useState } from "react";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 
-export const metadata = { title: "Contact — SUMG Records" };
-
 export default function ContactPage() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [sent, setSent] = useState(false);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const body = `Name: ${name}\nEmail: ${email}\n\n${message}`;
+    const mailtoUrl = `mailto:contact@sumgrecords.com?subject=${encodeURIComponent(subject || "Enquiry")}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailtoUrl;
+    setSent(true);
+  }
+
   return (
     <>
       <Navbar />
@@ -34,41 +49,59 @@ export default function ContactPage() {
                 ))}
               </div>
 
-              {/* Message form — not yet wired to a submission endpoint.
-                  Replace the fieldset + button with a server action before launch. */}
-              <div className="space-y-4">
+              {/* Message form */}
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <p className="text-[9px] tracking-[0.35em] uppercase text-white/20 mb-6">Send a Message</p>
-                <fieldset disabled className="space-y-4 opacity-50 cursor-not-allowed">
-                {["Name", "Email", "Subject"].map((field) => (
-                  <div key={field}>
-                    <label className="block text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2">{field}</label>
-                    <input
-                      type={field === "Email" ? "email" : "text"}
-                      className="w-full bg-transparent border border-white/10 px-4 py-3 text-sm text-white placeholder-white/20 focus:border-white/30 focus:outline-none transition-colors duration-300"
-                      placeholder={field}
-                    />
-                  </div>
-                ))}
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2">Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-transparent border border-white/10 px-4 py-3 text-sm text-white placeholder-white/20 focus:border-white/30 focus:outline-none transition-colors duration-300"
+                    placeholder="Name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-transparent border border-white/10 px-4 py-3 text-sm text-white placeholder-white/20 focus:border-white/30 focus:outline-none transition-colors duration-300"
+                    placeholder="Email"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2">Subject</label>
+                  <input
+                    type="text"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    className="w-full bg-transparent border border-white/10 px-4 py-3 text-sm text-white placeholder-white/20 focus:border-white/30 focus:outline-none transition-colors duration-300"
+                    placeholder="Subject"
+                  />
+                </div>
                 <div>
                   <label className="block text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2">Message</label>
                   <textarea
+                    required
                     rows={6}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
                     className="w-full bg-transparent border border-white/10 px-4 py-3 text-sm text-white placeholder-white/20 focus:border-white/30 focus:outline-none transition-colors duration-300 resize-none"
                     placeholder="Your message..."
                   />
                 </div>
-                </fieldset>
                 <button
-                  type="button"
-                  disabled
-                  className="border border-white/10 text-white/25 text-[10px] tracking-[0.3em] uppercase px-8 py-3 cursor-not-allowed"
+                  type="submit"
+                  className="border border-white/20 text-white/60 text-[10px] tracking-[0.3em] uppercase px-8 py-3 hover:border-white/40 hover:text-white transition-colors"
                 >
-                  Coming Soon
+                  {sent ? "Opening email client…" : "Send Message"}
                 </button>
-                <p className="text-[9px] text-white/20 pt-1">
-                  Direct email above while this form is being configured.
-                </p>
-              </div>
+              </form>
             </div>
           </div>
         </section>
@@ -77,3 +110,4 @@ export default function ContactPage() {
     </>
   );
 }
+

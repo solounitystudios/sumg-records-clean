@@ -94,9 +94,9 @@ export default async function BrandPage({ params }: Props) {
               )}
 
               <div>
-                <a href="/contact" className={`inline-flex ${theme.buttonVariant} transition-all duration-300`}>
+                <Link href="/contact" className={`inline-flex ${theme.buttonVariant} transition-all duration-300`}>
                   Enquire
-                </a>
+                </Link>
               </div>
             </div>
           </div>

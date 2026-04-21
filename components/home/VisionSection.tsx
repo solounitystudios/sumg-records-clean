@@ -62,7 +62,7 @@ export function VisionSection() {
           {pillars.map((pillar) => (
             <div
               key={pillar.number}
-              className="group bg-black p-8 hover:bg-white/[0.02] transition-colors duration-400 cursor-default"
+              className="group bg-black p-8 hover:bg-white/[0.02] transition-colors duration-300 cursor-pointer"
             >
               <p className="text-[11px] font-mono text-white/15 mb-6 tracking-[0.15em]">
                 {pillar.number}
@@ -79,7 +79,7 @@ export function VisionSection() {
 
         {/* Bottom statement */}
         <div className="mt-20 text-center">
-          <div className="inline-block border border-white/10 px-10 py-6 hover:border-white/20 transition-colors duration-400">
+          <div className="inline-block border border-white/10 px-10 py-6 hover:border-white/20 transition-colors duration-300">
             <p className="text-[10px] tracking-[0.4em] uppercase text-white/25 mb-2">
               Est. Independent
             </p>

@@ -10,7 +10,7 @@ export function ArtistCard({ artist, size = "large" }: ArtistCardProps) {
 
   return (
     <div
-      className={`group relative overflow-hidden border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent transition-all duration-500 hover:border-white/10 hover:from-white/[0.06] ${
+      className={`group relative overflow-hidden border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent transition-all duration-500 hover:border-white/10 hover:from-white/[0.06] active:scale-[0.99] active:border-white/20 active:from-white/[0.05] ${
         isLarge ? "aspect-[3/4]" : "aspect-[4/5]"
       }`}
     >

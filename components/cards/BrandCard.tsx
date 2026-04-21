@@ -6,7 +6,7 @@ interface BrandCardProps {
 
 export function BrandCard({ brand }: BrandCardProps) {
   return (
-    <div className="group relative p-8 border border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent hover:border-white/10 hover:from-white/[0.05] transition-all duration-500 cursor-default">
+    <div className="group relative p-8 border border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent hover:border-white/10 hover:from-white/[0.05] transition-all duration-500 cursor-pointer">
       {/* Category tag */}
       <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-5">
         {brand.category}
