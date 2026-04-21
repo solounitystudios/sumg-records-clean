@@ -21,10 +21,10 @@ export default async function SongsPage() {
       <Navbar />
       <main>
         {/* Hero */}
-        <section className="relative min-h-[30vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
-          <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
-            <span className="text-[20vw] font-black text-white/[0.025] tracking-tighter leading-none">
-              ♫
+        <section className="relative min-h-[32vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
+          <div className="absolute inset-0 flex items-center justify-end pr-10 select-none pointer-events-none overflow-hidden">
+            <span className="text-[18vw] font-black text-white/[0.018] tracking-tighter leading-none">
+              SONGS
             </span>
           </div>
           <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-16 pt-32">
@@ -43,12 +43,12 @@ export default async function SongsPage() {
             {songs.length === 0 ? (
               <p className="text-white/20 text-sm italic">No songs available yet.</p>
             ) : (
-              <div className="divide-y divide-white/[0.04]">
+              <div className="max-w-3xl">
                 {songs.map((song, i) => (
                   <Link
                     key={song.id}
                     href={`/songs/${song.slug}`}
-                    className="flex items-center gap-5 py-4 px-2 group hover:bg-white/[0.02] transition-colors"
+                    className="flex items-center gap-5 py-4 px-3 border-b border-white/[0.04] group hover:bg-white/[0.025] hover:border-white/[0.08] transition-all duration-200"
                   >
                     {/* Index */}
                     <span className="text-[11px] font-mono text-white/15 min-w-[2.5rem]">
@@ -57,7 +57,7 @@ export default async function SongsPage() {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white/70 group-hover:text-white transition-colors truncate">
+                      <p className="text-sm text-white/70 group-hover:text-white transition-colors duration-200 truncate font-medium">
                         {song.title}
                         {song.isExplicit && (
                           <span className="ml-2 text-[9px] tracking-[0.1em] border border-white/15 text-white/25 px-1.5 py-0.5">
@@ -84,7 +84,7 @@ export default async function SongsPage() {
                     )}
 
                     {/* Arrow */}
-                    <span className="text-white/10 group-hover:text-white/40 transition-colors text-sm flex-shrink-0">
+                    <span className="text-white/10 group-hover:text-white/50 transition-colors duration-200 text-sm flex-shrink-0">
                       →
                     </span>
                   </Link>
