@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * POST /api/auth/signout
- *
- * Signs the current user out of Supabase Auth and redirects to /login.
- * This route is meant to be called by a normal form POST or by fetch().
- */
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
-
   await supabase.auth.signOut();
 
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? request.nextUrl.origin;
