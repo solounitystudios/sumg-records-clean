@@ -29,7 +29,7 @@ export function LatestReleases({ releases }: Props) {
             </h2>
           </div>
           <a
-            href="#"
+            href="/releases"
             className="hidden md:inline-flex items-center gap-3 text-[10px] tracking-[0.25em] uppercase text-white/40 hover:text-white border-b border-white/10 hover:border-white/40 pb-0.5 transition-all duration-300"
           >
             View All
@@ -40,14 +40,16 @@ export function LatestReleases({ releases }: Props) {
         {/* Release grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {releases.map((release) => (
-            <ReleaseCard key={release.id} release={release} />
+            <a key={release.id} href={`/releases/${release.slug}`} className="block">
+              <ReleaseCard release={release} />
+            </a>
           ))}
         </div>
 
         {/* Mobile view all */}
         <div className="mt-10 text-center md:hidden">
           <a
-            href="#"
+            href="/releases"
             className="inline-flex items-center gap-3 text-[10px] tracking-[0.25em] uppercase text-white/40 hover:text-white border-b border-white/10 hover:border-white/40 pb-0.5 transition-all duration-300"
           >
             View All Releases

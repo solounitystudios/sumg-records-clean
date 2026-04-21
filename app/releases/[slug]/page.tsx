@@ -3,6 +3,8 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { getPublishedReleases, getReleaseBySlug, getSongsForRelease, getAllProducers, getArtistBySlug } from "@/lib/cms";
 import { DSPButtonGroup } from "@/components/admin/DSPLinksPanel";
+import { AudioPlayButton } from "@/components/AudioPlayButton";
+import { EmailCapture } from "@/components/site/EmailCapture";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
@@ -40,13 +42,13 @@ export default async function ReleasePage({ params }: Props) {
       <Navbar />
       <main>
         {/* Hero — with cover art or giant letter */}
-        <section className="relative min-h-[55vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
+        <section className="relative min-h-[60vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
           {release.coverArtUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={release.coverArtUrl}
               alt={release.title}
-              className="absolute inset-0 w-full h-full object-cover opacity-25"
+              className="absolute inset-0 w-full h-full object-cover opacity-20"
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
@@ -55,11 +57,11 @@ export default async function ReleasePage({ params }: Props) {
               </span>
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
 
           {/* Cover art thumbnail in corner */}
           {release.coverArtUrl && (
-            <div className="absolute right-8 bottom-8 w-32 h-32 md:w-48 md:h-48 border border-white/10 overflow-hidden hidden md:block">
+            <div className="absolute right-8 bottom-8 w-36 h-36 md:w-56 md:h-56 border border-white/10 overflow-hidden hidden md:block shadow-2xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={release.coverArtUrl}
@@ -69,8 +71,17 @@ export default async function ReleasePage({ params }: Props) {
             </div>
           )}
 
-          <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-20 pt-40">
-            <p className="text-[10px] tracking-[0.35em] uppercase text-white/25 mb-2">
+          {/* Top breadcrumb */}
+          <div className="absolute top-24 left-0 right-0 z-10">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <Link href="/releases" className="text-[10px] tracking-[0.25em] uppercase text-white/25 hover:text-white/60 transition-colors duration-300">
+                ← Releases
+              </Link>
+            </div>
+          </div>
+
+          <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-24 pt-44">
+            <p className="text-[10px] tracking-[0.35em] uppercase text-white/30 mb-2">
               <Link href={`/artists/${release.artistSlug}`} className="hover:text-white/60 transition-colors">
                 {release.artistName}
               </Link>
@@ -116,11 +127,13 @@ export default async function ReleasePage({ params }: Props) {
                   <Link
                     key={song.id}
                     href={`/songs/${song.slug}`}
-                    className="flex items-center gap-5 py-4 border-b border-white/5 group hover:bg-white/[0.02] px-2 transition-colors"
+                    className="flex items-center gap-5 py-4 border-b border-white/[0.05] group hover:bg-white/[0.025] hover:border-white/[0.08] px-3 transition-all duration-200"
                   >
                     <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
                       {String(song.trackNumber ?? i + 1).padStart(2, "0")}
                     </span>
+                    <span className="flex-1 text-sm text-white/70 group-hover:text-white transition-colors duration-200 font-medium">
+                    <AudioPlayButton audioUrl={song.audioUrl} />
                     <span className="flex-1 text-sm text-white/70 group-hover:text-white transition-colors">
                       {song.title}
                       {song.isExplicit && (
@@ -130,7 +143,7 @@ export default async function ReleasePage({ params }: Props) {
                     {song.duration && (
                       <span className="text-[11px] font-mono text-white/20">{song.duration}</span>
                     )}
-                    <span className="text-white/15 group-hover:text-white/40 transition-colors text-xs">→</span>
+                    <span className="text-white/15 group-hover:text-white/50 transition-colors duration-200 text-xs">→</span>
                   </Link>
                 ))}
               </div>
@@ -149,6 +162,7 @@ export default async function ReleasePage({ params }: Props) {
                     <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
                       {String(track.trackNumber ?? i + 1).padStart(2, "0")}
                     </span>
+                    <AudioPlayButton audioUrl={track.audioUrl} />
                     <span className="text-sm text-white/70 group-hover:text-white transition-colors">{track.title}</span>
                     {track.duration && (
                       <span className="ml-auto text-[11px] font-mono text-white/20">{track.duration}</span>
@@ -212,6 +226,28 @@ export default async function ReleasePage({ params }: Props) {
           </section>
         )}
 
+        {/* Shop merch CTA */}
+        <section className="py-12 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-6 lg:px-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border border-white/[0.06] px-6 py-6 hover:border-white/10 transition-colors">
+              <div>
+                <p className="text-[9px] tracking-[0.35em] uppercase text-white/20 mb-1">
+                  Official Merch
+                </p>
+                <p className="text-sm text-white/60">
+                  Shop apparel, accessories, and limited editions from the SUMG brand worlds.
+                </p>
+              </div>
+              <Link
+                href="/shop"
+                className="bg-white text-black text-[10px] tracking-[0.25em] uppercase px-6 py-3 hover:bg-white/90 transition-colors shrink-0"
+              >
+                Shop Now →
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* Artist CTA */}
         {artist && (
           <section className="py-12 border-b border-white/5">
@@ -248,6 +284,18 @@ export default async function ReleasePage({ params }: Props) {
             </div>
           </section>
         )}
+
+        {/* Email capture */}
+        <section className="py-16 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-6 lg:px-10 max-w-xl">
+            <EmailCapture
+              source="release"
+              variant="inline"
+              heading="Stay in the loop"
+              subtext="New releases, merch drops, and label dispatches. No spam."
+            />
+          </div>
+        </section>
       </main>
       <Footer />
     </>
