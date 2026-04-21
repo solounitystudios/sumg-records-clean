@@ -20,7 +20,7 @@ export function ArtistCard({ artist, size = "large" }: ArtistCardProps) {
         <img
           src={artist.profileImageUrl}
           alt={artist.name}
-          className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-65 transition-opacity duration-500 scale-100 group-hover:scale-[1.03] transition-transform"
+          className="absolute inset-0 w-full h-full object-cover opacity-50 group-hover:opacity-65 transition-all duration-500 group-hover:scale-[1.03]"
         />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center opacity-5 group-hover:opacity-[0.08] transition-opacity duration-500">
