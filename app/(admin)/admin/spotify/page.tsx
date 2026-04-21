@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useCallback } from "react";
 import { AdminShell } from "@/components/admin/AdminShell";
 
@@ -66,10 +67,11 @@ function ResultCard({ artist }: ResultCardProps) {
       {/* Avatar */}
       <div className="flex-none w-12 h-12 rounded-full overflow-hidden border border-white/10 bg-white/[0.03]">
         {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={image.url}
             alt={artist.name}
+            width={48}
+            height={48}
             className="w-full h-full object-cover"
           />
         ) : (

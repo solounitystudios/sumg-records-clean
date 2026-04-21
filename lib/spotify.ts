@@ -182,7 +182,7 @@ export function extractSpotifyArtistId(urlOrId: string): string | null {
   if (urlMatch) return urlMatch[1];
 
   // URI: spotify:artist:{id}
-  const uriMatch = urlOrId.match(/^spotify:artist:([A-Za-z0-9]+)$/);
+  const uriMatch = urlOrId.match(/^spotify:artist:([A-Za-z0-9]{22})$/);
   if (uriMatch) return uriMatch[1];
 
   // Bare 22-char alphanumeric ID
@@ -207,7 +207,7 @@ export function extractSpotifyAlbumId(urlOrId: string): string | null {
   const urlMatch = urlOrId.match(/spotify\.com\/album\/([A-Za-z0-9]{22})/);
   if (urlMatch) return urlMatch[1];
 
-  const uriMatch = urlOrId.match(/^spotify:album:([A-Za-z0-9]+)$/);
+  const uriMatch = urlOrId.match(/^spotify:album:([A-Za-z0-9]{22})$/);
   if (uriMatch) return uriMatch[1];
 
   if (/^[A-Za-z0-9]{22}$/.test(urlOrId)) return urlOrId;
