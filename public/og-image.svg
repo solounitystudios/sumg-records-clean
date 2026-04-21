@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#000000"/>
+  <!-- Subtle radial glow -->
+  <radialGradient id="glow" cx="50%" cy="30%" r="60%">
+    <stop offset="0%" stop-color="#ffffff" stop-opacity="0.04"/>
+    <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+  </radialGradient>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <!-- Top rule -->
+  <line x1="0" y1="1" x2="1200" y2="1" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+  <!-- Bottom rule -->
+  <line x1="0" y1="629" x2="1200" y2="629" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+  <!-- Wordmark -->
+  <text x="600" y="295" font-family="Arial Black, Helvetica, sans-serif" font-weight="900"
+        font-size="144" fill="#ffffff" text-anchor="middle" letter-spacing="-4">SUMG</text>
+  <!-- Sub-label -->
+  <text x="600" y="370" font-family="Arial, Helvetica, sans-serif" font-weight="400"
+        font-size="22" fill="#ffffff" fill-opacity="0.35" text-anchor="middle" letter-spacing="8">RECORDS</text>
+  <!-- Tag line -->
+  <text x="600" y="430" font-family="Arial, Helvetica, sans-serif" font-weight="400"
+        font-size="14" fill="#ffffff" fill-opacity="0.2" text-anchor="middle" letter-spacing="4">SOUND · VISION · CULTURE</text>
+</svg>

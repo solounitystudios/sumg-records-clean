@@ -5,6 +5,7 @@ import { ReleaseCard } from "@/components/cards/ReleaseCard";
 import { SpotifyArtistCard } from "@/components/SpotifyArtistCard";
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { getAllArtists, getArtistBySlug, getArtistReleases, getSongsForArtist } from "@/lib/cms";
+import { SpotifyArtistCard } from "@/components/SpotifyArtistCard";
 import { SocialLinks } from "@/lib/types";
 import { AudioPlayButton } from "@/components/AudioPlayButton";
 import { EmailSignup } from "@/components/site/EmailSignup";
@@ -29,7 +30,20 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const artist = await getArtistBySlug(slug);
-  return { title: artist ? `${artist.name} — SUMG Records` : "Artist Not Found" };
+  if (!artist) return { title: "Artist Not Found" };
+  const bioDesc = artist.bio
+    ? artist.bio.length > 160
+      ? `${artist.bio.slice(0, 160)}…`
+      : artist.bio
+    : `${artist.name} — Artist on SUMG Records.`;
+  return {
+    title: artist.name,
+    description: bioDesc,
+    openGraph: {
+      title: `${artist.name} — SUMG Records`,
+      description: bioDesc,
+    },
+  };
 }
 
 export default async function ArtistPage({ params }: Props) {
@@ -174,6 +188,11 @@ export default async function ArtistPage({ params }: Props) {
               </div>
             </div>
           </section>
+        )}
+
+        {/* Spotify enrichment — only rendered when a Spotify URL/ID is stored on the artist */}
+        {artist.socialLinks?.spotify && (
+          <SpotifyArtistCard spotifyUrl={artist.socialLinks.spotify} />
         )}
         {/* Spotify data — rendered only when artist.socialLinks.spotify is set */}
         {artist.socialLinks?.spotify && (

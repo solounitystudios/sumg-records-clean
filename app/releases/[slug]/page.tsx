@@ -17,7 +17,20 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const release = await getReleaseBySlug(slug);
-  return { title: release ? `${release.title} — SUMG Records` : "Release Not Found" };
+  if (!release) return { title: "Release Not Found" };
+  const rawDesc = release.description
+    ? release.description
+    : `${release.title} by ${release.artistName} — available on SUMG Records.`;
+  const desc = rawDesc.length > 160 ? `${rawDesc.slice(0, 160)}…` : rawDesc;
+  return {
+    title: release.title,
+    description: desc,
+    openGraph: {
+      title: `${release.title} — SUMG Records`,
+      description: desc,
+      ...(release.coverArtUrl ? { images: [{ url: release.coverArtUrl }] } : {}),
+    },
+  };
 }
 
 export default async function ReleasePage({ params }: Props) {
@@ -232,6 +245,13 @@ export default async function ReleasePage({ params }: Props) {
           </section>
         )}
 
+        {/* Spotify release enrichment — album art (when missing locally), tracklist, metadata */}
+        {release.dspLinks?.spotify && (
+          <SpotifyReleasePanel
+            spotifyUrl={release.dspLinks.spotify}
+            hasCoverArt={!!release.coverArtUrl}
+          />
+        )}
         {/* Shop merch CTA */}
         <section className="py-12 border-b border-white/5">
           <div className="max-w-7xl mx-auto px-6 lg:px-10">

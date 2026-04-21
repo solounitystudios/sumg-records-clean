@@ -23,10 +23,18 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const song = await getSongBySlug(slug);
+  if (!song) return { title: "Song Not Found" };
+  const parts = [song.artistName, song.genre].filter(Boolean).join(" · ");
+  const desc = parts
+    ? `${song.title} by ${parts} — listen on SUMG Records.`
+    : `${song.title} — listen on SUMG Records.`;
   return {
-    title: song
-      ? `${song.title} — ${song.artistName} — SUMG Records`
-      : "Song Not Found",
+    title: `${song.title} — ${song.artistName}`,
+    description: desc,
+    openGraph: {
+      title: `${song.title} — ${song.artistName} — SUMG Records`,
+      description: desc,
+    },
   };
 }
 

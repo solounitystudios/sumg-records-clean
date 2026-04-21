@@ -2,7 +2,16 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { ContactForm } from "@/components/site/ContactForm";
 
-export const metadata = { title: "Contact — SUMG Records" };
+export const metadata = {
+  title: "Contact",
+  description:
+    "Get in touch with SUMG Records for general enquiries, press and media, artist submissions, and brand partnerships.",
+  openGraph: {
+    title: "Contact — SUMG Records",
+    description:
+      "Get in touch with SUMG Records for general enquiries, press and media, artist submissions, and brand partnerships.",
+  },
+};
 
 interface Props {
   searchParams: Promise<{ subject?: string }>;

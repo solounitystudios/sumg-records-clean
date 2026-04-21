@@ -15,7 +15,19 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const brand = await getBrandBySlug(slug);
-  return { title: brand ? `${brand.name} — SUMG Records` : "Brand Not Found" };
+  if (!brand) return { title: "Brand Not Found" };
+  const rawDesc = brand.descriptor || brand.tagline
+    ? `${brand.descriptor ?? brand.tagline}`
+    : `${brand.name} — a SUMG Records brand world.`;
+  const desc = rawDesc.length > 160 ? `${rawDesc.slice(0, 160)}…` : rawDesc;
+  return {
+    title: brand.name,
+    description: desc,
+    openGraph: {
+      title: `${brand.name} — SUMG Records`,
+      description: desc,
+    },
+  };
 }
 
 export default async function BrandPage({ params }: Props) {

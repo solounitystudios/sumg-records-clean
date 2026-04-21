@@ -3,7 +3,16 @@ import { Footer } from "@/components/site/Footer";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
 import { getPublishedReleases } from "@/lib/cms";
 
-export const metadata = { title: "Releases — SUMG Records" };
+export const metadata = {
+  title: "Releases",
+  description:
+    "Browse the full SUMG Records catalogue — singles, EPs, albums, and projects from our independent artist roster.",
+  openGraph: {
+    title: "Releases — SUMG Records",
+    description:
+      "Browse the full SUMG Records catalogue — singles, EPs, albums, and projects from our independent artist roster.",
+  },
+};
 
 export default async function ReleasesPage() {
   const releases = await getPublishedReleases();
