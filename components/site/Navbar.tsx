@@ -17,12 +17,28 @@ export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 40);
-    };
+    const handleScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Lock body scroll while mobile menu is open
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
+
+  // Escape key closes the mobile menu — listener only active while menu is open
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -76,9 +92,9 @@ export function Navbar() {
           </a>
         </div>
 
-        {/* Mobile menu toggle */}
+        {/* Mobile menu toggle — padded to ≥44×44 px touch target */}
         <button
-          className="md:hidden flex flex-col gap-1.5 p-1"
+          className="md:hidden flex flex-col gap-1.5 p-3 -mr-3"
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
@@ -95,6 +111,19 @@ export function Navbar() {
         </button>
       </div>
 
+      {/* Mobile menu panel — CSS slide animation via max-h/opacity */}
+      <nav
+        className={`md:hidden bg-black/95 border-t border-white/5 px-6 flex flex-col gap-1 overflow-hidden transition-all duration-300 ease-in-out ${
+          menuOpen ? "max-h-80 py-6 opacity-100" : "max-h-0 py-0 opacity-0 pointer-events-none"
+        }`}
+        aria-hidden={!menuOpen}
+      >
+        {navLinks.map((link) => (
+          <a
+            key={link.label}
+            href={link.href}
+            onClick={closeMenu}
+            className="block py-3 text-[12px] tracking-[0.25em] uppercase text-white/50 hover:text-white transition-colors duration-300"
       {/* Mobile menu panel */}
       <div
         className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
@@ -124,8 +153,17 @@ export function Navbar() {
             onClick={closeMenu}
             className="mt-3 inline-flex items-center justify-center text-[10px] tracking-[0.25em] uppercase text-black bg-white hover:bg-white/90 px-5 py-3.5 transition-all duration-300"
           >
-            Listen Now
+            {link.label}
           </a>
+        ))}
+        <a
+          href="/releases"
+          onClick={closeMenu}
+          className="mt-3 inline-flex items-center justify-center text-[10px] tracking-[0.25em] uppercase text-black bg-white hover:bg-white/90 px-5 py-4 transition-all duration-300"
+        >
+          Listen Now
+        </a>
+      </nav>
         </nav>
       </div>
     </header>
