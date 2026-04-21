@@ -60,9 +60,12 @@ export default function AdminInventoryPage() {
 
         {/* Sync status banner */}
         {!syncStatus.connected && (
-          <div className="border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-[10px] tracking-[0.1em] text-white/30">
-            Shopify not configured — showing manual fallback data.{" "}
-            Set <span className="font-mono text-white/40">NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN</span> to enable live sync.
+          <div className="border border-yellow-700/60 bg-yellow-950/40 px-4 py-3 text-[11px] text-yellow-400/90 flex items-start gap-2">
+            <span className="flex-shrink-0 mt-px">⚠</span>
+            <span>
+              <strong>Mock data — not real.</strong> Shopify is not configured so all numbers below are from static sample data.{" "}
+              Set <span className="font-mono text-yellow-300/70">NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN</span> to enable live sync.
+            </span>
           </div>
         )}
 

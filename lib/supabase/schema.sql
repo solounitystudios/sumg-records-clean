@@ -363,3 +363,135 @@ CREATE TABLE IF NOT EXISTS shopify_campaigns (
 
 -- Remove deprecated song coupling from brands (safe — columns may not exist)
 ALTER TABLE brands DROP COLUMN IF EXISTS featured_song_slugs;
+
+
+-- ============================================================
+-- Phase Security-1 — Role-based RLS write policies
+--
+-- Replaces the authenticated-wide write policies ("auth.role() = 'authenticated'")
+-- with app_metadata.role-based enforcement so that only users who have been
+-- explicitly provisioned with a CMS role can write to any table.
+--
+-- Valid CMS roles: admin | editor | media_manager | release_manager
+--
+-- Run this migration after all previous migrations.
+-- All statements are idempotent: drop-if-exists then create.
+-- ============================================================
+
+-- ─── Drop old authenticated-wide write policies ───────────────────────────────
+drop policy if exists "auth write artists"   on artists;
+drop policy if exists "auth write producers" on producers;
+drop policy if exists "auth write brands"    on brands;
+drop policy if exists "auth write releases"  on releases;
+drop policy if exists "auth write songs"     on songs;
+drop policy if exists "auth write assets"    on assets;
+drop policy if exists "auth write homepage"  on homepage_config;
+drop policy if exists "auth write timeline"  on artist_timeline_items;
+
+-- ─── Role-based write policies (INSERT / UPDATE / DELETE) ────────────────────
+-- Any user with a recognised CMS role in app_metadata may write.
+-- Users who are authenticated but have no app_metadata.role are rejected.
+
+create policy "role write artists"
+  on artists for all
+  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
+  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+
+create policy "role write producers"
+  on producers for all
+  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
+  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+
+create policy "role write brands"
+  on brands for all
+  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
+  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+
+create policy "role write releases"
+  on releases for all
+  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
+  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+
+create policy "role write songs"
+  on songs for all
+  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
+  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+
+create policy "role write assets"
+  on assets for all
+  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
+  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+
+create policy "role write homepage"
+  on homepage_config for all
+  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
+  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+
+create policy "role write timeline"
+  on artist_timeline_items for all
+  using  ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'))
+  with check ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+
+-- ─── Admin read policies — draft / non-visible content ───────────────────────
+-- The public read policies only expose published + visible rows.
+-- These supplemental policies allow role-bearing users to SELECT all rows
+-- (including drafts) so the admin UI can display unpublished content.
+
+create policy "role read all releases"
+  on releases for select
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+
+create policy "role read all songs"
+  on songs for select
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager'));
+
+-- ─── Storage object RLS policies — "media" bucket ────────────────────────────
+-- Supabase Storage uses RLS on the storage.objects system table.
+-- These policies apply after the "media" bucket has been created.
+--
+-- Public read: any user (anon or authenticated) can read stored files.
+--   This preserves existing public-URL behaviour for published assets.
+-- Role-gated write: only role-bearing users can upload, update, or delete.
+--
+-- NOTE: To restrict unreleased content from public access, change the
+-- bucket to "Private" in the Supabase Dashboard (Storage → media → Edit)
+-- and use signed URLs (sb.storage.createSignedUrl) for display.  That
+-- change requires broader app-level updates and is tracked for Phase 2.
+
+drop policy if exists "allow public read media"  on storage.objects;
+drop policy if exists "role insert media"         on storage.objects;
+drop policy if exists "role update media"         on storage.objects;
+drop policy if exists "role delete media"         on storage.objects;
+
+create policy "allow public read media"
+  on storage.objects for select
+  to anon, authenticated
+  using (bucket_id = 'media');
+
+create policy "role insert media"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'media' and
+    (auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager')
+  );
+
+create policy "role update media"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'media' and
+    (auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager')
+  )
+  with check (
+    bucket_id = 'media' and
+    (auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager')
+  );
+
+create policy "role delete media"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'media' and
+    (auth.jwt() -> 'app_metadata' ->> 'role') in ('admin','editor','media_manager','release_manager')
+  );

@@ -18,6 +18,7 @@ import {
   ACCEPTED_AUDIO_TYPES,
   MAX_AUDIO_SIZE,
 } from "@/lib/media";
+import { createClient } from "@/lib/supabase/client";
 import { DSPLinksPanel } from "@/components/admin/DSPLinksPanel";
 
 // ─── Producer multi-picker ───────────────────────────────────────────────────
@@ -103,7 +104,13 @@ function AudioUploadPanel({
       return;
     }
     setUploading(true);
-    const result = await uploadAsset(file, "audio", "admin");
+
+    // Resolve the actual user identity for the audit trail.
+    const sb = createClient();
+    const { data: { user } } = await sb.auth.getUser();
+    const uploadedBy = user?.email ?? user?.id ?? "unknown";
+
+    const result = await uploadAsset(file, "audio", uploadedBy);
     setUploading(false);
     if (!result.success || !result.asset) {
       // If Supabase is not configured, create a local-only asset with a blob URL
@@ -115,7 +122,7 @@ function AudioUploadPanel({
         filename: file.name,
         mimeType: file.type,
         sizeBytes: file.size,
-        uploadedBy: "admin",
+        uploadedBy,
         attachedTo: [{ entityType: "song", entityId: songId, role: "audio" }],
       });
       onUploaded(localUrl, asset.id);

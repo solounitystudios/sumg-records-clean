@@ -6,6 +6,7 @@ import { MediaUploader } from "@/components/admin/MediaUploader";
 import { MediaLibraryGrid } from "@/components/admin/MediaLibraryGrid";
 import { useCmsStore } from "@/lib/cms/store";
 import { uploadAsset } from "@/lib/media";
+import { createClient } from "@/lib/supabase/client";
 import { AssetType } from "@/lib/types";
 
 export default function AdminMedia() {
@@ -15,7 +16,13 @@ export default function AdminMedia() {
 
   async function handleUpload(file: File, type: AssetType) {
     setUploading(true);
-    const result = await uploadAsset(file, type, "admin");
+
+    // Resolve the actual user identity for the audit trail.
+    const sb = createClient();
+    const { data: { user } } = await sb.auth.getUser();
+    const uploadedBy = user?.email ?? user?.id ?? "unknown";
+
+    const result = await uploadAsset(file, type, uploadedBy);
     setUploading(false);
 
     if (!result.success || !result.asset) {
