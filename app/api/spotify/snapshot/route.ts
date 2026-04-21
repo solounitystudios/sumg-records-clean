@@ -33,6 +33,9 @@ function isAuthorized(request: Request): boolean {
 
 // ─── Spotify ID extractor ─────────────────────────────────────────────────────
 
+/** Expected character length of a bare Spotify artist ID. */
+const SPOTIFY_ARTIST_ID_LENGTH = 22;
+
 /**
  * Extracts the Spotify artist ID from a spotify.com URL or bare ID.
  * Handles: https://open.spotify.com/artist/<id>, spotify:artist:<id>, or raw <id>
@@ -43,7 +46,7 @@ function extractSpotifyId(value: string | undefined): string | undefined {
   if (urlMatch) return urlMatch[1];
   const uriMatch = value.match(/^spotify:artist:([A-Za-z0-9]+)$/);
   if (uriMatch) return uriMatch[1];
-  if (/^[A-Za-z0-9]{22}$/.test(value)) return value;
+  if (new RegExp(`^[A-Za-z0-9]{${SPOTIFY_ARTIST_ID_LENGTH}}$`).test(value)) return value;
   return undefined;
 }
 

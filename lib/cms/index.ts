@@ -345,7 +345,8 @@ export async function upsertSpotifySnapshot(
   });
 
   // Silently ignore unique-constraint violations (already have today's snapshot)
-  if (error && !error.message.includes("duplicate")) {
+  // PostgreSQL error code 23505 = unique_violation
+  if (error && (error as { code?: string }).code !== "23505") {
     throw new Error(error.message);
   }
 }

@@ -119,7 +119,14 @@ function parseNum(val: string): number {
   return isNaN(n) ? 0 : n;
 }
 
-function parseInt10(val: string): number | undefined {
+const MONTHS_EN: Record<string, number> = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+  jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9,
+  oct: 10, nov: 11, dec: 12,
+};
+
+function parseNullableInt(val: string): number | undefined {
   const n = parseInt(val.replace(/[^0-9]/g, ""), 10);
   return isNaN(n) ? undefined : n;
 }
@@ -139,14 +146,8 @@ function parsePeriod(raw: string): { periodStart: string; periodEnd: string } {
     month = parseInt(isoMatch[2], 10);
   } else {
     // "January 2024" or "Jan 2024"
-    const months: Record<string, number> = {
-      january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
-      july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
-      jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9,
-      oct: 10, nov: 11, dec: 12,
-    };
     const parts = raw.toLowerCase().split(/\s+/);
-    month = months[parts[0]] ?? 1;
+    month = MONTHS_EN[parts[0]] ?? 1;
     year = parseInt(parts[1] ?? "2024", 10);
   }
 
@@ -170,7 +171,7 @@ export function mapDistroKidRow(
   const saleMonth = col(row, "Sale Month");
   const { periodStart, periodEnd } = parsePeriod(saleMonth || "2024-01");
   const netRev = parseNum(col(row, "Earnings/USD", "Net Revenue USD", "Earnings USD"));
-  const qty = parseInt10(col(row, "Quantity"));
+  const qty = parseNullableInt(col(row, "Quantity"));
 
   return {
     source: "distrokid",
@@ -236,7 +237,7 @@ export function mapSoundExchangeRow(
   const period = col(row, "Period", "Statement Period", "Royalty Period");
   const { periodStart, periodEnd } = parsePeriod(period || "2024-01");
   const royaltyAmount = parseNum(col(row, "Royalty Amount", "Amount"));
-  const streams = parseInt10(col(row, "Total Digital Performance", "Plays"));
+  const streams = parseNullableInt(col(row, "Total Digital Performance", "Plays"));
   const albumOrTitle = col(row, "Album", "Title", "Sound Recording");
 
   return {
@@ -270,7 +271,7 @@ export function mapAppleRow(
   const period = col(row, "Period", "Fiscal Period", "Start Date");
   const { periodStart, periodEnd } = parsePeriod(period || "2024-01");
   const earnings = parseNum(col(row, "Earnings", "Royalty Earned", "Extended Partner Share"));
-  const streams = parseInt10(col(row, "Streams", "Plays", "Units"));
+  const streams = parseNullableInt(col(row, "Streams", "Plays", "Units"));
 
   return {
     source: "apple",

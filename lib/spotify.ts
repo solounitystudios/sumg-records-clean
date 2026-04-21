@@ -38,11 +38,14 @@ interface TokenCache {
   expiresAt: number;
 }
 
+/** Buffer before token expiry at which we proactively refresh (milliseconds). */
+const TOKEN_REFRESH_BUFFER_MS = 60_000;
+
 let _tokenCache: TokenCache | null = null;
 
 async function getAccessToken(): Promise<string> {
   const now = Date.now();
-  if (_tokenCache && _tokenCache.expiresAt > now + 60_000) {
+  if (_tokenCache && _tokenCache.expiresAt > now + TOKEN_REFRESH_BUFFER_MS) {
     return _tokenCache.token;
   }
 

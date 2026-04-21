@@ -80,12 +80,26 @@ function BarChart({
             className="flex-1 text-center text-[8px] text-white/20 font-mono truncate"
             title={`${d.label}: ${formatValue(d.value)}`}
           >
-            {data.length <= 12 ? d.label.slice(5) : i % 3 === 0 ? d.label.slice(2, 7) : ""}
+            {formatAxisLabel(d.label, i, data.length)}
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+/**
+ * Formats an axis label for a bar chart depending on available space.
+ * - With 12 or fewer bars: shows "MM" portion of "YYYY-MM"
+ * - With more bars: shows the middle 5 chars every 3rd label to avoid overlap
+ */
+function formatAxisLabel(label: string, index: number, totalCount: number): string {
+  if (totalCount <= 12) {
+    // "YYYY-MM" → show just "MM"
+    return label.slice(5);
+  }
+  // Show abbreviated label every 3rd index to prevent crowding
+  return index % 3 === 0 ? label.slice(2, 7) : "";
 }
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
