@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        // Spotify CDN — pre-authorised for future next/image adoption.
+        // Spotify CDN — pre-authorized for future next/image adoption.
         // Current Spotify components use plain <img> with eslint-disable comments;
         // this entry is in place so migrating to next/image requires no config change.
         protocol: "https",

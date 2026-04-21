@@ -4,11 +4,11 @@ import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 
 export const metadata: Metadata = {
-  title: "Access | Artist & Creator Login Portal",
+  title: "Access — Artist & Creator Login Portal",
   description:
     "Sign in to the SUMG Records creator portal. Access your artist dashboard, release management, royalty data, and brand operations.",
   openGraph: {
-    title: "Access SUMG Records | Artist & Creator Login Portal",
+    title: "Access — SUMG Records Artist & Creator Portal",
     description:
       "Sign in to the SUMG Records creator portal. Access your artist dashboard, release management, royalty data, and brand operations.",
     url: "/access",

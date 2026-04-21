@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props) {
   const parts = [song.artistName, song.genre].filter(Boolean).join(" · ");
   const desc = parts
     ? `${song.title} by ${parts} — listen on SUMG Records.`
-    : `${song.title} by ${song.artistName} — listen on SUMG Records.`;
+    : `${song.title} — listen on SUMG Records.`;
   return {
     title: `${song.title} — ${song.artistName}`,
     description: desc,
