@@ -40,7 +40,9 @@ export function LatestReleases({ releases }: Props) {
         {/* Release grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {releases.map((release) => (
-            <ReleaseCard key={release.id} release={release} />
+            <a key={release.id} href={`/releases/${release.slug}`} className="block">
+              <ReleaseCard release={release} />
+            </a>
           ))}
         </div>
 

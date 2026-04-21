@@ -46,14 +46,14 @@ export default async function ArtistPage({ params }: Props) {
       <Navbar />
       <main>
         {/* Hero — with optional hero image */}
-        <section className="relative min-h-[60vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
+        <section className="relative min-h-[65vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
           {/* Background: hero image or giant letter */}
           {artist.heroImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={artist.heroImageUrl}
               alt={artist.name}
-              className="absolute inset-0 w-full h-full object-cover opacity-30"
+              className="absolute inset-0 w-full h-full object-cover opacity-35"
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
@@ -62,9 +62,19 @@ export default async function ArtistPage({ params }: Props) {
               </span>
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
-          <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-20 pt-40">
-            <p className="text-[10px] tracking-[0.35em] uppercase text-white/25 mb-3">{artist.genre}</p>
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+
+          {/* Top breadcrumb */}
+          <div className="absolute top-24 left-0 right-0 z-10">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <a href="/artists" className="text-[10px] tracking-[0.25em] uppercase text-white/25 hover:text-white/60 transition-colors duration-300">
+                ← Artists
+              </a>
+            </div>
+          </div>
+
+          <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-24 pt-44">
+            <p className="text-[10px] tracking-[0.35em] uppercase text-white/30 mb-3">{artist.genre}</p>
             <h1 className="text-6xl md:text-8xl font-black tracking-tight text-white leading-none mb-6">
               {artist.name}
             </h1>
@@ -121,14 +131,14 @@ export default async function ArtistPage({ params }: Props) {
                   <Link
                     key={song.id}
                     href={`/songs/${song.slug}`}
-                    className="flex items-center gap-5 py-4 border-b border-white/[0.04] group hover:bg-white/[0.02] px-2 transition-colors"
+                    className="flex items-center gap-5 py-4 border-b border-white/[0.04] group hover:bg-white/[0.025] hover:border-white/[0.08] px-3 transition-all duration-200"
                   >
                     <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <AudioPlayButton audioUrl={song.audioUrl} />
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm text-white/70 group-hover:text-white transition-colors">
+                      <span className="text-sm text-white/70 group-hover:text-white transition-colors duration-200 font-medium">
                         {song.title}
                         {song.isExplicit && (
                           <span className="ml-2 text-[9px] border border-white/15 text-white/20 px-1.5 py-0.5">E</span>
@@ -141,7 +151,7 @@ export default async function ArtistPage({ params }: Props) {
                     {song.duration && (
                       <span className="text-[11px] font-mono text-white/20">{song.duration}</span>
                     )}
-                    <span className="text-white/10 group-hover:text-white/40 transition-colors text-xs">→</span>
+                    <span className="text-white/10 group-hover:text-white/50 transition-colors duration-200 text-xs">→</span>
                   </Link>
                 ))}
               </div>
