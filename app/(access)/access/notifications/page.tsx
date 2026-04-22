@@ -11,7 +11,7 @@ const MOCK_NOTIFS = [
   { id: "3", category: "system" as const, title: "Welcome to SUMG ACCESS", message: "Your creator portal is active. Explore your releases, royalties, and analytics.", time: "3 days ago", read: true },
 ];
 
-const CAT_LABELS: Record<NotifCategory | "release" | "royalty" | "system", string> = {
+const CAT_LABELS: Record<NotifCategory, string> = {
   all: "All",
   release: "Releases",
   royalty: "Royalties",
@@ -100,7 +100,7 @@ export default function NotificationsPage() {
                         : n.category === "royalty" ? "border-green-800/40 text-green-400/50"
                         : "border-white/10 text-white/25"
                       }`}>
-                        {CAT_LABELS[n.category as NotifCategory]}
+                        {CAT_LABELS[n.category]}
                       </span>
                     </div>
                   </div>

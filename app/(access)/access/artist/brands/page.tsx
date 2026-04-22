@@ -35,7 +35,7 @@ export default function ArtistBrandsPage() {
         <div>
           <h2 className="text-xl font-black tracking-tight text-white">Brand Worlds</h2>
           <p className="text-[11px] text-white/30 mt-1">
-            SUMG&apos;s five brand ecosystems you are associated with.
+            SUMG's five brand ecosystems you are associated with.
           </p>
         </div>
 

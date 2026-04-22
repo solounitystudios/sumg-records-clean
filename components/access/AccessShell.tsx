@@ -20,33 +20,33 @@ import { useAccessUser } from "@/lib/auth/use-access-user";
 
 // ─── Navigation definitions ──────────────────────────────────────────────────
 
-type NavItem = { label: string; href: string; icon: string; mobileShow?: boolean };
+type NavItem = { label: string; href: string; icon: string; showOnMobile?: boolean };
 type NavDivider = { divider: true };
 
 const artistNav: Array<NavItem | NavDivider> = [
-  { label: "Dashboard",    href: "/access/dashboard",          icon: "⊞", mobileShow: true },
-  { label: "Releases",     href: "/access/artist/releases",    icon: "◑", mobileShow: true },
+  { label: "Dashboard",    href: "/access/dashboard",          icon: "⊞", showOnMobile: true },
+  { label: "Releases",     href: "/access/artist/releases",    icon: "◑", showOnMobile: true },
   { label: "Songs",        href: "/access/artist/songs",       icon: "♫" },
-  { label: "Royalties",    href: "/access/artist/royalties",   icon: "◎", mobileShow: true },
-  { label: "Analytics",    href: "/access/artist/analytics",   icon: "◈", mobileShow: true },
+  { label: "Royalties",    href: "/access/artist/royalties",   icon: "◎", showOnMobile: true },
+  { label: "Analytics",    href: "/access/artist/analytics",   icon: "◈", showOnMobile: true },
   { label: "Distribution", href: "/access/artist/distribution",icon: "▤" },
   { divider: true },
   { label: "Timeline",     href: "/access/artist/timeline",    icon: "◫" },
   { label: "Brands",       href: "/access/artist/brands",      icon: "◐" },
   { label: "Media",        href: "/access/artist/media",       icon: "◒" },
   { divider: true },
-  { label: "Profile",      href: "/access/artist/profile",     icon: "◉", mobileShow: true },
+  { label: "Profile",      href: "/access/artist/profile",     icon: "◉", showOnMobile: true },
 ];
 
 const staffNav: Array<NavItem | NavDivider> = [
-  { label: "Overview",     href: "/access/staff",              icon: "⊞", mobileShow: true },
-  { label: "Artists",      href: "/access/staff/artists",      icon: "◎", mobileShow: true },
-  { label: "Releases",     href: "/access/staff/releases",     icon: "◑", mobileShow: true },
+  { label: "Overview",     href: "/access/staff",              icon: "⊞", showOnMobile: true },
+  { label: "Artists",      href: "/access/staff/artists",      icon: "◎", showOnMobile: true },
+  { label: "Releases",     href: "/access/staff/releases",     icon: "◑", showOnMobile: true },
   { label: "Publishing",   href: "/access/staff/publishing",   icon: "◙" },
-  { label: "Royalties",    href: "/access/staff/royalties",    icon: "◎", mobileShow: true },
+  { label: "Royalties",    href: "/access/staff/royalties",    icon: "◎", showOnMobile: true },
   { divider: true },
   { label: "Distribution", href: "/access/staff/distribution", icon: "▤" },
-  { label: "Calendar",     href: "/access/staff/calendar",     icon: "◫", mobileShow: true },
+  { label: "Calendar",     href: "/access/staff/calendar",     icon: "◫", showOnMobile: true },
   { label: "Media",        href: "/access/staff/media",        icon: "◒" },
 ];
 
@@ -103,9 +103,9 @@ export function AccessShell({ children, title, breadcrumbs }: AccessShellProps) 
   const isCms = user.isCmsRole;
   const nav = isArtist ? artistNav : staffNav;
 
-  // Mobile bottom-nav: items flagged mobileShow (max 5)
+  // Mobile bottom-nav: items flagged showOnMobile (max 5)
   const mobileNav = nav
-    .filter((item): item is NavItem => !("divider" in item) && !!item.mobileShow)
+    .filter((item): item is NavItem => !("divider" in item) && !!item.showOnMobile)
     .slice(0, 5);
 
   const sidebarWidth = collapsed ? "w-16" : "w-56";
