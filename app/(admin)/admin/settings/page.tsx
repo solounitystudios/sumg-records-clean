@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-const CONFIG_ROW_ID = "homepage";
+const SITE_CONFIG_ID = "global";
 
 interface SiteSettings {
   siteName: string;
@@ -37,9 +37,9 @@ export default function AdminSettings() {
   // Load persisted settings on mount
   useEffect(() => {
     const sb = createClient();
-    sb.from("homepage_config")
+    sb.from("site_config")
       .select("site_settings")
-      .eq("id", CONFIG_ROW_ID)
+      .eq("id", SITE_CONFIG_ID)
       .single()
       .then(({ data }: { data: { site_settings: unknown } | null }) => {
         if (data?.site_settings && typeof data.site_settings === "object") {
@@ -65,8 +65,8 @@ export default function AdminSettings() {
     setSaveError(null);
     const sb = createClient();
     const { error } = await sb
-      .from("homepage_config")
-      .upsert({ id: CONFIG_ROW_ID, site_settings: form });
+      .from("site_config")
+      .upsert({ id: SITE_CONFIG_ID, site_settings: form });
     setSaving(false);
     if (error) {
       setSaveError(error.message);

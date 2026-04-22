@@ -67,7 +67,9 @@ export async function proxy(request: NextRequest) {
 
   // ── Settings restricted to admin only ────────────────────────────────────
   if (pathname.startsWith("/admin/settings") && role !== "admin") {
-    return NextResponse.redirect(new URL("/admin", request.url));
+    const adminUrl = new URL("/admin", request.url);
+    adminUrl.searchParams.set("error", "settings_admin_only");
+    return NextResponse.redirect(adminUrl);
   }
 
   return response;
