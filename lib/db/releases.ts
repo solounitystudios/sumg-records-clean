@@ -1,30 +1,12 @@
 import { supabase } from "./supabase"
 import type { Release, Track } from "@/lib/data"
 
-const SELECT =
-  "id, slug, title, artist_slug, artist_name, release_date, type, status, streams, platforms, accent_color, tracklist"
+const SELECT = "*"
 
-type TrackRow = {
-  number: number
-  title: string
-  duration: string
-  streams: number
-}
-
-type ReleaseRow = {
-  id: string
-  slug: string
-  title: string
-  artist_slug: string
-  artist_name: string
-  release_date: string
-  type: string
-  status: string
-  streams: number
-  platforms: string[] | null
-  accent_color: string
-  tracklist: TrackRow[] | null
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TrackRow = Record<string, any>
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ReleaseRow = Record<string, any>
 
 function toTrack(row: TrackRow): Track {
   return {
@@ -49,6 +31,7 @@ function toRelease(row: ReleaseRow): Release {
     platforms: row.platforms ?? [],
     accentColor: row.accent_color,
     tracks: (row.tracklist ?? []).map(toTrack),
+    spotifyUrl: (row.dsp_links as { spotify?: string } | null)?.spotify ?? null,
   }
 }
 

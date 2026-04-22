@@ -70,6 +70,20 @@ export default async function EditReleasePage({ params }: { params: Promise<{ sl
           </div>
         </div>
 
+        <div>
+          <label className={labelClass}>Spotify URL</label>
+          <input
+            type="url"
+            name="spotifyUrl"
+            defaultValue={release.spotifyUrl ?? ""}
+            placeholder="https://open.spotify.com/album/…"
+            className={inputClass}
+          />
+          <p className="mt-1 text-xs text-white/25">
+            Paste the Spotify album or single URL. Powers the On Spotify panel on the release page.
+          </p>
+        </div>
+
         <div className="rounded-2xl border border-white/8 bg-white/3 px-5 py-4 space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-white/40">Title</span>

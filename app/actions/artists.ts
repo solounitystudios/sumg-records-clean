@@ -57,6 +57,34 @@ export async function uploadArtistPhoto(
   return { url }
 }
 
+export async function unlinkArtistSpotify(slug: string): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin()
+
+  const { data: existing } = await supabase
+    .from("artists")
+    .select("social_links")
+    .eq("slug", slug)
+    .maybeSingle()
+
+  const socialLinks = { ...(existing?.social_links ?? {}) }
+  delete socialLinks.spotify
+
+  const { error } = await supabase
+    .from("artists")
+    .update({
+      spotify_id: null,
+      social_links: socialLinks,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("slug", slug)
+
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/admin/artists")
+  revalidatePath(`/artists/${slug}`)
+  return { ok: true }
+}
+
 export async function updateArtist(slug: string, formData: FormData) {
   await requireAdmin()
 

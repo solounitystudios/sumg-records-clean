@@ -11,15 +11,31 @@ export async function updateRelease(slug: string, formData: FormData) {
   const status = formData.get("status")?.toString() ?? ""
   const releaseDate = formData.get("releaseDate")?.toString() ?? ""
   const accentColor = formData.get("accentColor")?.toString() ?? ""
+  const spotifyUrl = formData.get("spotifyUrl")?.toString().trim() ?? ""
+
+  // Fetch existing dsp_links to merge Spotify URL without clobbering other platforms
+  const { data: existing } = await supabase
+    .from("releases")
+    .select("dsp_links")
+    .eq("slug", slug)
+    .maybeSingle()
+
+  const dspLinks = { ...(existing?.dsp_links ?? {}) }
+  if (spotifyUrl) {
+    dspLinks.spotify = spotifyUrl
+  } else {
+    delete dspLinks.spotify
+  }
 
   const { error } = await supabase
     .from("releases")
-    .update({ status, release_date: releaseDate, accent_color: accentColor })
+    .update({ status, release_date: releaseDate, accent_color: accentColor, dsp_links: dspLinks })
     .eq("slug", slug)
 
   if (error) throw new Error(error.message)
 
   revalidatePath("/admin/releases")
+  revalidatePath(`/releases/${slug}`)
   redirect("/admin/releases")
 }
 

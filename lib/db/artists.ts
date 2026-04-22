@@ -1,22 +1,10 @@
 import { supabase } from "./supabase"
 import type { Artist } from "@/lib/data"
 
-const SELECT =
-  "id, slug, name, role, genre, bio, tags, monthly_listeners, total_streams, release_count, profile_image_url"
+const SELECT = "*"
 
-type ArtistRow = {
-  id: string
-  slug: string
-  name: string
-  role: string
-  genre: string
-  bio: string
-  tags: string[] | null
-  monthly_listeners: number
-  total_streams: number
-  release_count: number
-  profile_image_url: string | null
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ArtistRow = Record<string, any>
 
 function toArtist(row: ArtistRow): Artist {
   return {
@@ -31,6 +19,8 @@ function toArtist(row: ArtistRow): Artist {
     totalStreams: row.total_streams,
     releaseCount: row.release_count,
     profileImageUrl: row.profile_image_url,
+    spotifyId: row.spotify_id,
+    socialLinks: row.social_links,
   }
 }
 

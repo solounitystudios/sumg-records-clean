@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { getArtistBySlug } from "@/lib/db/artists"
 import { updateArtist } from "@/app/actions/artists"
+import { SpotifyLinkPanel } from "@/components/admin/SpotifyLinkPanel"
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -141,6 +142,15 @@ export default async function EditArtistPage({ params }: { params: Promise<{ slu
           </Link>
         </div>
       </form>
+
+      {/* Spotify linking — separate from the main form so it submits via API */}
+      <div className="mt-10 space-y-3">
+        <p className="text-xs uppercase tracking-[0.2em] text-white/25">Streaming</p>
+        <SpotifyLinkPanel
+          artistSlug={artist.slug}
+          initialSpotifyUrl={artist.socialLinks?.spotify}
+        />
+      </div>
     </main>
   )
 }
