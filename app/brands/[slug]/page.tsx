@@ -1,21 +1,22 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { brands, getBrand } from "@/lib/data"
+import { getBrands, getBrandBySlug } from "@/lib/db/brands"
 
 export async function generateStaticParams() {
+  const brands = await getBrands()
   return brands.map((b) => ({ slug: b.slug }))
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const brand = getBrand(slug)
+  const brand = await getBrandBySlug(slug)
   if (!brand) return { title: "Brand Not Found — SUMG Records" }
   return { title: `${brand.name} — SUMG Records` }
 }
 
 export default async function BrandPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const brand = getBrand(slug)
+  const brand = await getBrandBySlug(slug)
   if (!brand) notFound()
 
   return (

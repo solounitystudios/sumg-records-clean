@@ -1,4 +1,4 @@
-import { news } from "@/lib/data"
+import { getNews } from "@/lib/db/news"
 
 export const metadata = { title: "News — SUMG Records" }
 
@@ -10,7 +10,8 @@ const categoryStyle: Record<string, string> = {
   Business: "bg-slate-500/15 text-slate-400",
 }
 
-export default function NewsPage() {
+export default async function NewsPage() {
+  const news = await getNews()
   const featured = news.filter((n) => n.featured)
   const rest = news.filter((n) => !n.featured)
 

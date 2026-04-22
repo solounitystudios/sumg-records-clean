@@ -4,7 +4,7 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { encodeSession, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/session"
 import type { Role } from "@/lib/session"
-import { artists } from "@/lib/data"
+import { getArtists } from "@/lib/db/artists"
 
 // Minimum milliseconds every login response takes, regardless of outcome.
 // This slows brute-force and masks username-existence timing differences.
@@ -22,7 +22,7 @@ interface Credential {
   sub: string
 }
 
-function getCredentials(): Record<string, Credential> {
+async function getCredentials(): Promise<Record<string, Credential>> {
   const adminPassword = process.env.ADMIN_PASSWORD ?? "sumg2024"
   const defaultArtistPassword = process.env.ARTIST_PASSWORD ?? "artist-portal"
 
@@ -30,6 +30,7 @@ function getCredentials(): Record<string, Credential> {
     admin: { password: adminPassword, role: "admin", sub: "admin" },
   }
 
+  const artists = await getArtists()
   for (const artist of artists) {
     const envKey = `ARTIST_PASSWORD_${artist.slug.toUpperCase().replace(/-/g, "_")}`
     creds[artist.slug] = {
@@ -72,7 +73,7 @@ export async function login(_prev: unknown, formData: FormData) {
   const password = formData.get("password")?.toString() ?? ""
   const returnTo = safeReturnTo(formData.get("returnTo")?.toString())
 
-  const creds = getCredentials()
+  const creds = await getCredentials()
   const credential = creds[username]
 
   // Always compare a password string so this branch takes the same time

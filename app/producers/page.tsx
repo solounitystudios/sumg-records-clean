@@ -1,8 +1,10 @@
-import { producers } from "@/lib/data"
+import { getProducers } from "@/lib/db/producers"
 
 export const metadata = { title: "Producers — SUMG Records" }
 
-export default function ProducersPage() {
+export default async function ProducersPage() {
+  const producers = await getProducers()
+
   return (
     <main className="min-h-screen bg-[#06070a] text-white">
       <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">

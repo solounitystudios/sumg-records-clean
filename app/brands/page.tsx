@@ -1,9 +1,11 @@
 import Link from "next/link"
-import { brands } from "@/lib/data"
+import { getBrands } from "@/lib/db/brands"
 
 export const metadata = { title: "Brands — SUMG Records" }
 
-export default function BrandsPage() {
+export default async function BrandsPage() {
+  const brands = await getBrands()
+
   return (
     <main className="min-h-screen bg-[#06070a] text-white">
       <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">
