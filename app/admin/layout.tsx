@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { requireAuth } from "@/lib/auth"
+import { requireAdmin } from "@/lib/auth"
 import { logout } from "@/app/actions/auth"
 
 const adminNav = [
@@ -10,7 +10,7 @@ const adminNav = [
 ]
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await requireAuth()
+  await requireAdmin()
 
   return (
     <div className="min-h-screen bg-[#06070a] text-white flex">
