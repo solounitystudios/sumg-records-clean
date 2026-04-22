@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { getReleases } from "@/lib/db/releases"
 import { formatStreams } from "@/lib/data"
 
@@ -49,9 +50,12 @@ export default async function ReleasesAdminPage() {
             <div className="text-xs uppercase tracking-[0.2em] text-white/35 mb-1">Live Catalog Streams</div>
             <div className="text-2xl font-semibold">{formatStreams(totalLiveStreams)}</div>
           </div>
-          <button className="rounded-full border border-white/20 px-5 py-2 text-xs font-medium text-white/70 hover:border-white/40 hover:text-white transition">
+          <Link
+            href="/admin/releases/new"
+            className="rounded-full border border-white/20 px-5 py-2 text-xs font-medium text-white/70 hover:border-white/40 hover:text-white transition"
+          >
             + New Release
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -81,7 +85,12 @@ export default async function ReleasesAdminPage() {
                     <span className={`text-xs px-2 py-1 rounded-full ${statusStyle[release.status]}`}>
                       {release.status}
                     </span>
-                    <button className="text-xs text-white/40 hover:text-white transition">Edit</button>
+                    <Link
+                      href={`/admin/releases/${release.slug}/edit`}
+                      className="text-xs text-white/40 hover:text-white transition"
+                    >
+                      Edit
+                    </Link>
                   </div>
                 </div>
 

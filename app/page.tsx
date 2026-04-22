@@ -1,32 +1,15 @@
-import Link from "next/link";
+import Link from "next/link"
+import { getArtists } from "@/lib/db/artists"
+import { getProducers } from "@/lib/db/producers"
+import { getBrands } from "@/lib/db/brands"
 
-const featuredArtists = [
-  { name: "Zyson", role: "Lead Artist" },
-  { name: "Lysandra Noir", role: "Ethereal R&B" },
-  { name: "Marrick", role: "Street Narrative" },
-  { name: "Turkz", role: "West Coast Energy" },
-  { name: "Sorin", role: "Sensual R&B" },
-  { name: "Yosin", role: "Melodic Hybrid" },
-  { name: "Jayno", role: "Atmospheric Voice" },
-];
+export default async function HomePage() {
+  const [artists, producers, brands] = await Promise.all([
+    getArtists(),
+    getProducers(),
+    getBrands(),
+  ])
 
-const producers = [
-  "NightWire",
-  "IronLight",
-  "DeadZone310",
-  "Tidewell",
-  "GRVND",
-];
-
-const brands = [
-  "Woronoff",
-  "Unity Standard",
-  "Moon Spell",
-  "Concrete Borough",
-  "Salt Current",
-];
-
-export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#06070a] text-white">
       <section className="relative overflow-hidden border-b border-white/10">
@@ -66,9 +49,9 @@ export default function HomePage() {
 
           <div className="mt-16 grid gap-4 md:grid-cols-3">
             {[
-              ["7", "Artists"],
-              ["5", "Producers"],
-              ["5", "Brands"],
+              [artists.length.toString(), "Artists"],
+              [producers.length.toString(), "Producers"],
+              [brands.length.toString(), "Brands"],
             ].map(([value, label]) => (
               <div
                 key={label}
@@ -103,9 +86,10 @@ export default function HomePage() {
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-          {featuredArtists.map((artist, index) => (
-            <div
-              key={artist.name}
+          {artists.map((artist, index) => (
+            <Link
+              key={artist.slug}
+              href={`/artists/${artist.slug}`}
               className="group overflow-hidden rounded-3xl border border-white/10 bg-[#0d1016] transition hover:border-white/20 hover:bg-[#11151d]"
             >
               <div className="flex aspect-[4/5] items-end justify-start bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.08))] p-6">
@@ -119,7 +103,7 @@ export default function HomePage() {
                   <p className="mt-2 text-sm text-white/55">{artist.role}</p>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
@@ -146,10 +130,10 @@ export default function HomePage() {
           <div className="grid gap-4 md:grid-cols-5">
             {producers.map((producer) => (
               <div
-                key={producer}
+                key={producer.slug}
                 className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-lg font-medium transition hover:border-white/20 hover:bg-white/8"
               >
-                {producer}
+                {producer.name}
               </div>
             ))}
           </div>
@@ -176,16 +160,17 @@ export default function HomePage() {
 
         <div className="grid gap-5 md:grid-cols-3 xl:grid-cols-5">
           {brands.map((brand) => (
-            <div
-              key={brand}
-              className="rounded-3xl border border-white/10 bg-[#0d1016] p-6 transition hover:border-white/20 hover:bg-[#11151d]"
+            <Link
+              key={brand.slug}
+              href={`/brands/${brand.slug}`}
+              className="group rounded-3xl border border-white/10 bg-[#0d1016] p-6 transition hover:border-white/20 hover:bg-[#11151d]"
             >
               <div className="mb-10 aspect-square rounded-2xl bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_45%),linear-gradient(180deg,#11151c,#090b10)]" />
-              <h3 className="text-lg font-semibold">{brand}</h3>
+              <h3 className="text-lg font-semibold">{brand.name}</h3>
               <p className="mt-2 text-sm text-white/55">
-                A distinct visual language inside the SUMG universe.
+                {brand.tagline || "A distinct visual language inside the SUMG universe."}
               </p>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
@@ -208,17 +193,11 @@ export default function HomePage() {
 
             <div className="rounded-3xl border border-white/10 bg-white/5 p-8 md:p-10">
               <p className="text-xs uppercase tracking-[0.3em] text-white/40">
-                Next Move
+                Catalog
               </p>
               <h3 className="mt-4 text-2xl font-semibold">
-                Start shaping the front page.
+                Explore the full SUMG universe.
               </h3>
-              <p className="mt-4 text-sm leading-7 text-white/60">
-                After this, the next step is swapping these placeholder cards
-                for real artist photos, release covers, motion sections, and
-                luxury brand visuals.
-              </p>
-
               <div className="mt-8 flex flex-col gap-3">
                 <Link
                   href="/news"
@@ -238,5 +217,5 @@ export default function HomePage() {
         </div>
       </section>
     </main>
-  );
+  )
 }

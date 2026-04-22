@@ -2,6 +2,7 @@ import Link from "next/link"
 import { getArtists } from "@/lib/db/artists"
 import { getReleases } from "@/lib/db/releases"
 import { formatStreams } from "@/lib/data"
+import ArtistPhotoUpload from "./ArtistPhotoUpload"
 
 export const metadata = { title: "Artist Management — SUMG Admin" }
 
@@ -38,9 +39,11 @@ export default async function ArtistsAdminPage() {
               className="rounded-2xl border border-white/10 bg-[#0d1016] overflow-hidden"
             >
               <div className="flex items-start gap-5 p-6">
-                <div className="shrink-0 w-12 h-12 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center text-lg font-semibold text-white/60">
-                  {artist.name.charAt(0)}
-                </div>
+                <ArtistPhotoUpload
+                  artistSlug={artist.slug}
+                  artistInitial={artist.name.charAt(0)}
+                  currentImageUrl={artist.profileImageUrl}
+                />
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4 flex-wrap">

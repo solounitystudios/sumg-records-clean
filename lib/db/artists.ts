@@ -2,7 +2,7 @@ import { supabase } from "./supabase"
 import type { Artist } from "@/lib/data"
 
 const SELECT =
-  "id, slug, name, role, genre, bio, tags, monthly_listeners, total_streams, release_count"
+  "id, slug, name, role, genre, bio, tags, monthly_listeners, total_streams, release_count, profile_image_url"
 
 type ArtistRow = {
   id: string
@@ -15,6 +15,7 @@ type ArtistRow = {
   monthly_listeners: number
   total_streams: number
   release_count: number
+  profile_image_url: string | null
 }
 
 function toArtist(row: ArtistRow): Artist {
@@ -29,6 +30,7 @@ function toArtist(row: ArtistRow): Artist {
     monthlyListeners: row.monthly_listeners,
     totalStreams: row.total_streams,
     releaseCount: row.release_count,
+    profileImageUrl: row.profile_image_url,
   }
 }
 

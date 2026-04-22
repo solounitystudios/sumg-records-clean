@@ -9,6 +9,7 @@ export interface Artist {
   monthlyListeners: number
   totalStreams: number
   releaseCount: number
+  profileImageUrl?: string | null
 }
 
 export interface Producer {
