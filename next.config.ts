@@ -14,11 +14,17 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           // Only send origin in Referer header on same-site; strip on cross-origin
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          // Force HTTPS for one year once the site is fully TLS-only
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=31536000; includeSubDomains",
-          },
+          // Force HTTPS for one year — production only.
+          // Applying HSTS in dev/staging would lock browsers to HTTPS for
+          // those origins for a full year, which is impractical.
+          ...(!isDev
+            ? [
+                {
+                  key: "Strict-Transport-Security",
+                  value: "max-age=31536000; includeSubDomains",
+                },
+              ]
+            : []),
           // Content Security Policy.
           // 'unsafe-inline' is required by Tailwind CSS v4 (injected styles) and
           // Next.js App Router (hydration inline scripts).

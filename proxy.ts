@@ -52,6 +52,23 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Role gate — any authenticated user without a valid CMS role is blocked.
+  // app_metadata is set server-side only (service-role client) and cannot be
+  // self-assigned, so only explicitly provisioned SUMG operators will pass.
+  const VALID_CMS_ROLES = ["admin", "editor", "media_manager", "release_manager"];
+  const role = user.app_metadata?.role as string | undefined;
+
+  if (!role || !VALID_CMS_ROLES.includes(role)) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("error", "no_role");
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // /admin/settings is restricted to admin only
+  if (pathname.startsWith("/admin/settings") && role !== "admin") {
+    return NextResponse.redirect(new URL("/admin", request.url));
+  }
+
   return response;
 }
 

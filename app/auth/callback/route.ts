@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { sanitizeRedirect } from "@/lib/auth/sanitize-redirect";
 
 /**
  * GET /auth/callback
@@ -12,24 +13,12 @@ import { cookies } from "next/headers";
  *  - Generic PKCE code exchange → redirect to /admin or ?next param
  */
 
-/**
- * Returns `value` unchanged when it is a safe same-origin path
- * (starts with "/" but not "//"), otherwise returns `fallback`.
- * Prevents open-redirect attacks via the ?next= query parameter.
- */
-function safeInternalPath(value: string | null | undefined, fallback = "/admin"): string {
-  if (!value) return fallback;
-  if (!value.startsWith("/")) return fallback;
-  if (value.startsWith("//")) return fallback;
-  return value;
-}
-
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
 
   const code = searchParams.get("code");
   const type = searchParams.get("type"); // present for recovery links
-  const next = safeInternalPath(searchParams.get("next"));
+  const next = sanitizeRedirect(searchParams.get("next"));
 
   // No code — nothing to exchange; send to login with an error hint
   if (!code) {

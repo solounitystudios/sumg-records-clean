@@ -4,29 +4,19 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
-
-/**
- * Returns `value` unchanged when it is a safe same-origin path
- * (starts with "/" but not "//"), otherwise returns `fallback`.
- * Prevents open-redirect attacks via the ?redirect= query parameter.
- */
-function safeInternalPath(value: string | null, fallback = "/admin"): string {
-  if (!value) return fallback;
-  if (!value.startsWith("/")) return fallback;
-  if (value.startsWith("//")) return fallback;
-  return value;
-}
+import { sanitizeRedirect } from "@/lib/auth/sanitize-redirect";
 
 const ERROR_MESSAGES: Record<string, string> = {
   link_expired: "That recovery link has expired. Please request a new one below.",
   auth_error: "Authentication failed. The link may be invalid or already used.",
   missing_code: "No authentication code was found in the link.",
+  no_role: "Your account is not provisioned for admin access. Contact your SUMG administrator.",
 };
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = safeInternalPath(searchParams.get("redirect"));
+  const redirect = sanitizeRedirect(searchParams.get("redirect"));
   const errorParam = searchParams.get("error");
 
   const [email, setEmail] = useState("");
