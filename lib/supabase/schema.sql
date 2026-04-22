@@ -569,3 +569,75 @@ create policy "cms update songs"     on songs
 create policy "cms delete songs"     on songs for delete using (is_publisher_role());
 
 
+-- ─── Phase 3 — SUMG ACCESS: Artist Role & Portal RLS ─────────────────────────
+-- Adds a 5th role (artist) scoped to the ACCESS creator portal.
+-- Artists can read their own entity data only — they cannot write CMS tables
+-- directly; all portal writes go through /api/access/* server routes.
+--
+-- app_metadata shape for artist users:
+--   { "role": "artist", "artist_slug": "<slug>" }
+--
+-- is_artist_role()    — true when JWT role = 'artist'
+-- own_artist_slug()   — extracts app_metadata.artist_slug from the JWT
+-- is_own_artist_slug(slug) — true when the row's slug matches the caller's slug
+
+-- Returns true when the caller has the artist portal role.
+create or replace function is_artist_role()
+  returns boolean
+  language sql
+  security definer
+  stable
+as $$
+  select coalesce(
+    auth.jwt() -> 'app_metadata' ->> 'role',
+    ''
+  ) = 'artist'
+$$;
+
+-- Returns the artist_slug bound to the current artist-role user.
+create or replace function own_artist_slug()
+  returns text
+  language sql
+  security definer
+  stable
+as $$
+  select coalesce(
+    auth.jwt() -> 'app_metadata' ->> 'artist_slug',
+    ''
+  )
+$$;
+
+grant execute on function is_artist_role()    to authenticated, anon;
+grant execute on function own_artist_slug()   to authenticated, anon;
+
+-- ── Artist-scoped SELECT policies ────────────────────────────────────────────
+-- Artists can read their own row from each core entity table.
+-- These policies layer on top of existing CMS policies (RLS OR-logic).
+
+create policy "artist read own artist"
+  on artists for select
+  using (is_artist_role() and slug = own_artist_slug());
+
+create policy "artist read own releases"
+  on releases for select
+  using (is_artist_role() and artist_slug = own_artist_slug());
+
+create policy "artist read own songs"
+  on songs for select
+  using (is_artist_role() and artist_slug = own_artist_slug());
+
+-- Artists can read the full artists table (needed to display collaborators / featured artists).
+-- Restrict to active/published artists only.
+create policy "artist read all artists public"
+  on artists for select
+  using (is_artist_role() and status = 'active');
+
+-- Artists can read timeline items for their own artist.
+create policy "artist read own timeline"
+  on artist_timeline_items for select
+  using (is_artist_role() and artist_slug = own_artist_slug());
+
+-- Artists can read brands (brands are public within the label ecosystem).
+create policy "artist read brands"
+  on brands for select
+  using (is_artist_role() and is_active = true);

@@ -176,14 +176,18 @@ export interface ArtistTimelineItem {
   updatedAt: string;
 }
 /**
- * Admin user roles — controls what actions each user can perform.
+ * User roles — controls what areas and actions each user can access.
  *
  *   admin           → full access (all CRUD, settings, delete, publish, upload)
  *   release_manager → can publish releases and songs; cannot delete or change settings
  *   media_manager   → can upload / replace / delete media assets; cannot publish or delete entities
  *   editor          → can edit content (text, metadata) but cannot publish, delete, or manage media
+ *   artist          → authenticated creator portal access; scoped to own artist entity only
  */
-export type UserRole = "admin" | "editor" | "media_manager" | "release_manager";
+export type UserRole = "admin" | "editor" | "media_manager" | "release_manager" | "artist";
+
+/** CMS-only roles — used to gate /admin/* routes. */
+export type CmsRole = Exclude<UserRole, "artist">;
 export type AssetType = "image" | "video" | "audio" | "document";
 export type HeroStyle = "editorial" | "minimal" | "mystic" | "industrial" | "coastal";
 
@@ -372,6 +376,8 @@ export interface CMSUser {
   email: string;
   name: string;
   role: UserRole;
+  /** Set for `artist` role users — the CMSArtist slug this user is bound to. */
+  artistSlug?: string;
   createdAt: string;
 }
 
@@ -471,6 +477,10 @@ export interface AuthSession {
   isMediaManager: boolean;
   /** True for admin + release_manager */
   isReleaseManager: boolean;
+  /** True when role === "artist" */
+  isArtist: boolean;
+  /** The CMSArtist slug this user is bound to (artist role only). */
+  artistSlug?: string;
 }
 
 export interface UploadResult {
