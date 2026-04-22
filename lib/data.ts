@@ -28,6 +28,14 @@ export interface Brand {
   tagline: string
   description: string
   category: string
+  accentColor: string | null
+  logoUrl: string | null
+  heroImageUrl: string | null
+  shopifyUrl: string | null
+  isActive: boolean
+  campaignStatus: string | null
+  collectionName: string | null
+  manifesto: string | null
 }
 
 export interface Track {
