@@ -6,6 +6,16 @@ import { encodeSession, SESSION_COOKIE, SESSION_TTL_SECONDS } from "@/lib/sessio
 import type { Role } from "@/lib/session"
 import { artists } from "@/lib/data"
 
+// Minimum milliseconds every login response takes, regardless of outcome.
+// This slows brute-force and masks username-existence timing differences.
+// For production, add request-level rate limiting via Upstash Rate Limit
+// or a WAF (e.g. Cloudflare) — this delay alone is not sufficient.
+const LOGIN_MIN_MS = 150
+
+// Never matches any real password; ensures the credential-lookup code
+// path is identical whether the username exists or not.
+const SENTINEL_PASSWORD = "00000000-0000-0000-0000-000000000000"
+
 interface Credential {
   password: string
   role: Role
@@ -32,13 +42,32 @@ function getCredentials(): Record<string, Credential> {
   return creds
 }
 
+// Validates that returnTo is a same-origin relative path.
+// Uses the URL constructor as the parser so all encoding/backslash
+// edge cases are handled by the platform, not bespoke string checks.
 function safeReturnTo(value: string | null | undefined): string | null {
-  if (!value) return null
-  if (!value.startsWith("/") || value.startsWith("//")) return null
-  return value
+  if (!value || value.length > 200) return null
+  try {
+    const url = new URL(value, "https://x.local")
+    if (url.origin !== "https://x.local") return null
+    // Reconstruct from parsed parts — strips any smuggled fragments
+    return url.pathname + url.search
+  } catch {
+    return null
+  }
+}
+
+const COOKIE_BASE = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
 }
 
 export async function login(_prev: unknown, formData: FormData) {
+  // Start the floor timer immediately so all paths take at least LOGIN_MIN_MS
+  const floor = new Promise<void>((r) => setTimeout(r, LOGIN_MIN_MS))
+
   const username = formData.get("username")?.toString().trim().toLowerCase() ?? ""
   const password = formData.get("password")?.toString() ?? ""
   const returnTo = safeReturnTo(formData.get("returnTo")?.toString())
@@ -46,29 +75,36 @@ export async function login(_prev: unknown, formData: FormData) {
   const creds = getCredentials()
   const credential = creds[username]
 
-  if (!credential || credential.password !== password) {
+  // Always compare a password string so this branch takes the same time
+  // whether the username exists or not (prevents username enumeration).
+  const expected = credential?.password ?? SENTINEL_PASSWORD
+  const passwordMatch = expected === password
+  const credentialValid = credential !== undefined && passwordMatch
+
+  if (!credentialValid) {
+    await floor
     return { error: "Invalid username or password." }
   }
 
-  const token = await encodeSession(credential.role, credential.sub)
+  // Run token signing in parallel with the floor delay
+  const [token] = await Promise.all([
+    encodeSession(credential.role, credential.sub),
+    floor,
+  ])
 
   const cookieStore = await cookies()
   cookieStore.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    ...COOKIE_BASE,
     maxAge: SESSION_TTL_SECONDS,
-    path: "/",
   })
 
-  const destination =
-    returnTo ?? (credential.role === "admin" ? "/admin" : "/dashboard")
-
-  redirect(destination)
+  redirect(returnTo ?? (credential.role === "admin" ? "/admin" : "/dashboard"))
 }
 
 export async function logout() {
   const cookieStore = await cookies()
-  cookieStore.delete(SESSION_COOKIE)
+  // Mirror all original cookie attributes on the clearing Set-Cookie header
+  // so every browser removes the cookie regardless of attribute handling.
+  cookieStore.set(SESSION_COOKIE, "", { ...COOKIE_BASE, maxAge: 0 })
   redirect("/login")
 }

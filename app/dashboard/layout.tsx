@@ -3,13 +3,13 @@ import { requireAuth } from "@/lib/auth"
 import { logout } from "@/app/actions/auth"
 
 const dashNav = [
-  { href: "/dashboard", label: "Overview", exact: true },
+  { href: "/dashboard", label: "Overview" },
   { href: "/dashboard/royalties", label: "Royalties" },
   { href: "/dashboard/releases", label: "Releases" },
 ]
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  await requireAuth()
+  const session = await requireAuth()
 
   return (
     <div className="min-h-screen bg-[#06070a] text-white flex">
@@ -37,12 +37,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
               Sign Out
             </button>
           </form>
-          <Link
-            href="/admin"
-            className="mt-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition"
-          >
-            Admin Panel →
-          </Link>
+          {session.role === "admin" && (
+            <Link
+              href="/admin"
+              className="mt-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition"
+            >
+              Admin Panel →
+            </Link>
+          )}
         </div>
       </aside>
 

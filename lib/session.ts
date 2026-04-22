@@ -3,6 +3,7 @@ export type Role = "admin" | "artist"
 export interface SessionPayload {
   role: Role
   sub: string
+  iat: number
   exp: number
 }
 
@@ -52,12 +53,21 @@ function fromBase64Url(str: string): ArrayBuffer {
   return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0)).buffer as ArrayBuffer
 }
 
+function isValidPayload(v: unknown): v is SessionPayload {
+  if (!v || typeof v !== "object") return false
+  const p = v as Record<string, unknown>
+  return (
+    (p.role === "admin" || p.role === "artist") &&
+    typeof p.sub === "string" &&
+    p.sub.length > 0 &&
+    typeof p.iat === "number" &&
+    typeof p.exp === "number"
+  )
+}
+
 export async function encodeSession(role: Role, sub: string): Promise<string> {
-  const payload: SessionPayload = {
-    role,
-    sub,
-    exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
-  }
+  const now = Math.floor(Date.now() / 1000)
+  const payload: SessionPayload = { role, sub, iat: now, exp: now + SESSION_TTL_SECONDS }
   const key = await importKey(getSecret())
   const payloadB64 = toBase64Url(encode(JSON.stringify(payload)))
   const sig = await crypto.subtle.sign("HMAC", key, encode(payloadB64))
@@ -80,10 +90,11 @@ export async function decodeSession(token: string): Promise<SessionPayload | nul
     )
     if (!valid) return null
 
-    const payload = JSON.parse(decode(fromBase64Url(payloadB64))) as SessionPayload
-    if (payload.exp < Math.floor(Date.now() / 1000)) return null
+    const raw = JSON.parse(decode(fromBase64Url(payloadB64)))
+    if (!isValidPayload(raw)) return null
+    if (raw.exp < Math.floor(Date.now() / 1000)) return null
 
-    return payload
+    return raw
   } catch {
     return null
   }

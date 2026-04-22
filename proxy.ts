@@ -13,7 +13,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Admin routes are restricted to the admin role
+  // /admin/* is restricted to the admin role only
   if (pathname.startsWith("/admin") && session.role !== "admin") {
     return NextResponse.redirect(new URL("/dashboard", request.url))
   }
@@ -22,5 +22,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/dashboard/:path*"],
+  // Explicit base-path entries alongside nested patterns so the matcher
+  // is unambiguous regardless of path-to-regexp zero-segment behaviour.
+  matcher: ["/admin", "/admin/:path+", "/dashboard", "/dashboard/:path+"],
 }
