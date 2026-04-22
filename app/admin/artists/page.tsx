@@ -1,11 +1,12 @@
 import Link from "next/link"
 import { getArtists } from "@/lib/db/artists"
-import { getArtistReleases, formatStreams } from "@/lib/data"
+import { getReleases } from "@/lib/db/releases"
+import { formatStreams } from "@/lib/data"
 
 export const metadata = { title: "Artist Management — SUMG Admin" }
 
 export default async function ArtistsAdminPage() {
-  const artists = await getArtists()
+  const [artists, allReleases] = await Promise.all([getArtists(), getReleases()])
   return (
     <main className="px-6 py-10 md:px-10">
       <div className="mb-10">
@@ -29,7 +30,7 @@ export default async function ArtistsAdminPage() {
 
       <div className="space-y-4">
         {artists.map((artist) => {
-          const artistReleases = getArtistReleases(artist.slug)
+          const artistReleases = allReleases.filter((r) => r.artistSlug === artist.slug)
           const liveReleases = artistReleases.filter((r) => r.status === "live")
           return (
             <div

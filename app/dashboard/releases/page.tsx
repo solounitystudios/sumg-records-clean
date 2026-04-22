@@ -1,5 +1,6 @@
 import Link from "next/link"
-import { releases, formatStreams } from "@/lib/data"
+import { getReleases } from "@/lib/db/releases"
+import { formatStreams } from "@/lib/data"
 
 export const metadata = { title: "Releases — Artist Dashboard" }
 
@@ -10,7 +11,8 @@ const statusStyle: Record<string, string> = {
   archived: "bg-white/5 text-white/25",
 }
 
-export default function DashboardReleasesPage() {
+export default async function DashboardReleasesPage() {
+  const releases = await getReleases()
   const sorted = [...releases].sort((a, b) => {
     const order = { live: 0, scheduled: 1, draft: 2, archived: 3 }
     return order[a.status] - order[b.status]

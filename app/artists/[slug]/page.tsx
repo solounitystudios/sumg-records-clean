@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { getArtists, getArtistBySlug } from "@/lib/db/artists"
-import { getArtistReleases, formatStreams } from "@/lib/data"
+import { getArtistReleases } from "@/lib/db/releases"
+import { formatStreams } from "@/lib/data"
 
 export async function generateStaticParams() {
   const artists = await getArtists()
@@ -20,7 +21,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
   const artist = await getArtistBySlug(slug)
   if (!artist) notFound()
 
-  const artistReleases = getArtistReleases(artist.slug)
+  const artistReleases = await getArtistReleases(artist.slug)
 
   return (
     <main className="min-h-screen bg-[#06070a] text-white">

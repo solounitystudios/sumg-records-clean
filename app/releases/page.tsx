@@ -1,4 +1,5 @@
-import { releases, formatStreams } from "@/lib/data"
+import { getReleases } from "@/lib/db/releases"
+import { formatStreams } from "@/lib/data"
 
 export const metadata = { title: "Releases — SUMG Records" }
 
@@ -9,7 +10,8 @@ const statusStyle: Record<string, string> = {
   archived: "bg-white/5 text-white/25",
 }
 
-export default function ReleasesPage() {
+export default async function ReleasesPage() {
+  const releases = await getReleases()
   const liveReleases = releases.filter((r) => r.status === "live")
   const upcoming = releases.filter((r) => r.status === "scheduled" || r.status === "draft")
 
