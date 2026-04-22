@@ -21,10 +21,18 @@ export default async function LyricsAdminPage() {
 
   return (
     <main className="px-6 py-10 md:px-10">
-      <div className="mb-10">
-        <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">Admin</p>
-        <h1 className="text-3xl font-semibold">Lyric Engine</h1>
-        <p className="mt-2 text-sm text-white/50">Manage lyric projects, drafts, and contributor splits.</p>
+      <div className="mb-10 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">Admin</p>
+          <h1 className="text-3xl font-semibold">Lyric Engine</h1>
+          <p className="mt-2 text-sm text-white/50">Manage lyric projects, drafts, and contributor splits.</p>
+        </div>
+        <Link
+          href="/admin/lyrics/new"
+          className="shrink-0 rounded-full border border-white/20 px-5 py-2 text-xs font-medium text-white/70 hover:border-white/40 hover:text-white transition"
+        >
+          + New Project
+        </Link>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4 mb-10">
