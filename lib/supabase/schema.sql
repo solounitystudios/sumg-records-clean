@@ -569,3 +569,78 @@ create policy "cms update songs"     on songs
 create policy "cms delete songs"     on songs for delete using (is_publisher_role());
 
 
+-- ─── Agent 7 — Royalty Platform ──────────────────────────────────────────────
+-- Three tables: royalty_earnings, royalty_splits, royalty_payouts.
+-- All tables are restricted to CMS roles.  Payouts can only be created or
+-- mutated by admin + release_manager (publishers) to prevent unauthorised
+-- payment manipulation.  Earnings and splits are editable by all CMS roles.
+
+-- ── royalty_earnings ──────────────────────────────────────────────────────────
+-- One row per (song/release, platform, period_month) import batch.
+create table if not exists royalty_earnings (
+  id            text primary key,
+  song_slug     text,
+  release_slug  text,
+  artist_slug   text not null,
+  title         text not null default '',
+  platform      text not null,
+  period_month  text not null, -- YYYY-MM
+  gross_amount  numeric(14,4) not null default 0,
+  currency      text not null default 'USD',
+  streams       integer,
+  notes         text,
+  created_at    timestamptz not null default now()
+);
+
+alter table royalty_earnings enable row level security;
+create policy "cms read earnings"   on royalty_earnings for select using (is_cms_role());
+create policy "cms write earnings"  on royalty_earnings for all    using (is_cms_role()) with check (is_cms_role());
+
+-- ── royalty_splits ────────────────────────────────────────────────────────────
+-- Configures split percentages per song/release for each participant.
+-- Sum of split_pct per (song_slug or release_slug) should equal 100.
+create table if not exists royalty_splits (
+  id                text primary key,
+  song_slug         text,
+  release_slug      text,
+  participant_type  text not null default 'artist'
+    check (participant_type in ('artist', 'producer', 'other')),
+  participant_slug  text,
+  participant_name  text not null,
+  split_pct         numeric(6,3) not null default 0
+    check (split_pct >= 0 and split_pct <= 100),
+  role              text,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+alter table royalty_splits enable row level security;
+create policy "cms read splits"     on royalty_splits for select using (is_cms_role());
+create policy "cms write splits"    on royalty_splits for all    using (is_cms_role()) with check (is_cms_role());
+
+-- ── royalty_payouts ───────────────────────────────────────────────────────────
+-- Computed payout records — one per participant per period.
+-- Only publishers may create or mutate payouts to prevent tampering.
+create table if not exists royalty_payouts (
+  id                text primary key,
+  participant_type  text not null default 'artist'
+    check (participant_type in ('artist', 'producer', 'other')),
+  participant_slug  text,
+  participant_name  text not null,
+  period_month      text not null, -- YYYY-MM
+  gross_amount      numeric(14,4) not null default 0,
+  net_amount        numeric(14,4) not null default 0,
+  currency          text not null default 'USD',
+  status            text not null default 'pending'
+    check (status in ('pending', 'processing', 'paid', 'cancelled')),
+  paid_at           timestamptz,
+  notes             text,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+alter table royalty_payouts enable row level security;
+-- All CMS roles may read payouts (transparency).
+create policy "cms read payouts"      on royalty_payouts for select using (is_cms_role());
+-- Only publishers (admin, release_manager) may create / modify / delete payouts.
+create policy "publisher write payouts" on royalty_payouts for all using (is_publisher_role()) with check (is_publisher_role());

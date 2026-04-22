@@ -1,4 +1,4 @@
-import { CMSSong, CMSRelease } from "@/lib/types";
+import { CMSSong, CMSRelease, RoyaltyEarning, RoyaltySplit, RoyaltyPayout } from "@/lib/types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -233,6 +233,133 @@ export function exportRightsToJSON(songs: CMSSong[]): void {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ─── Royalty Earnings CSV ─────────────────────────────────────────────────────
+
+/**
+ * Exports all earnings rows as a CSV and triggers a browser download.
+ * Columns: Period, Title, Artist, Platform, Streams, Gross Amount, Currency, Notes
+ */
+export function exportEarningsToCSV(earnings: RoyaltyEarning[]): void {
+  const headers = [
+    "Period",
+    "Title",
+    "Artist",
+    "Platform",
+    "Streams",
+    "Gross Amount",
+    "Currency",
+    "Notes",
+  ];
+  const rows = earnings.map((e) =>
+    row([
+      e.periodMonth,
+      e.title,
+      e.artistSlug,
+      e.platform,
+      e.streams ?? "",
+      e.grossAmount,
+      e.currency,
+      e.notes ?? "",
+    ])
+  );
+  const csv = [headers.join(","), ...rows].join("\n");
+  triggerDownload(csv, `sumg-earnings-${new Date().toISOString().slice(0, 10)}.csv`);
+}
+
+/**
+ * Exports all split configurations as a CSV and triggers a browser download.
+ */
+export function exportSplitsToCSV(splits: RoyaltySplit[]): void {
+  const headers = [
+    "Song Slug",
+    "Release Slug",
+    "Participant",
+    "Type",
+    "Role",
+    "Split %",
+  ];
+  const rows = splits.map((s) =>
+    row([
+      s.songSlug ?? "",
+      s.releaseSlug ?? "",
+      s.participantName,
+      s.participantType,
+      s.role ?? "",
+      s.splitPct,
+    ])
+  );
+  const csv = [headers.join(","), ...rows].join("\n");
+  triggerDownload(csv, `sumg-splits-${new Date().toISOString().slice(0, 10)}.csv`);
+}
+
+/**
+ * Exports a monthly statement CSV for a given period and triggers a browser download.
+ * Includes both earnings detail and payout summary for the period.
+ */
+export function exportMonthlyStatementToCSV(
+  periodMonth: string,
+  earnings: RoyaltyEarning[],
+  payouts: RoyaltyPayout[]
+): void {
+  const periodEarnings = earnings.filter((e) => e.periodMonth === periodMonth);
+  const periodPayouts = payouts.filter((p) => p.periodMonth === periodMonth);
+
+  const earningsHeaders = [
+    "Period",
+    "Title",
+    "Artist",
+    "Platform",
+    "Streams",
+    "Gross Amount",
+    "Currency",
+  ];
+  const earningsRows = periodEarnings.map((e) =>
+    row([e.periodMonth, e.title, e.artistSlug, e.platform, e.streams ?? "", e.grossAmount, e.currency])
+  );
+
+  const payoutHeaders = [
+    "Period",
+    "Participant",
+    "Type",
+    "Gross",
+    "Net",
+    "Currency",
+    "Status",
+    "Paid At",
+  ];
+  const payoutRows = periodPayouts.map((p) =>
+    row([
+      p.periodMonth,
+      p.participantName,
+      p.participantType,
+      p.grossAmount,
+      p.netAmount,
+      p.currency,
+      p.status,
+      p.paidAt ? p.paidAt.slice(0, 10) : "",
+    ])
+  );
+
+  const totalGross = periodEarnings.reduce((s, e) => s + e.grossAmount, 0);
+
+  const csv = [
+    `SUMG Records — Royalty Statement — ${periodMonth}`,
+    `Generated: ${new Date().toISOString().slice(0, 10)}`,
+    "",
+    "EARNINGS",
+    earningsHeaders.join(","),
+    ...earningsRows,
+    "",
+    `Total Gross,,,,, ${totalGross.toFixed(4)}`,
+    "",
+    "PAYOUTS",
+    payoutHeaders.join(","),
+    ...payoutRows,
+  ].join("\n");
+
+  triggerDownload(csv, `sumg-statement-${periodMonth}.csv`);
 }
 
 // ─── Copy-ready metadata ──────────────────────────────────────────────────────
