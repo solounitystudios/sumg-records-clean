@@ -30,6 +30,7 @@ const adminNav: Array<NavItem | NavDivider> = [
   { label: "Calendar",     href: "/admin/calendar",     icon: "◫" },
   { label: "Integrity",    href: "/admin/integrity",    icon: "◈" },
   { label: "Spotify",      href: "/admin/spotify",      icon: "◎" },
+  { label: "AI Content",   href: "/admin/ai-content",   icon: "◍" },
   { label: "Homepage",     href: "/admin/homepage",     icon: "◇" },
   { label: "Settings",     href: "/admin/settings",     icon: "◌" },
 ];
