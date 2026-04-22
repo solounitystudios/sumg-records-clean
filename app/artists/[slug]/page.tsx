@@ -46,6 +46,7 @@ export default async function ArtistPage({ params }: Props) {
               src={artist.heroImageUrl}
               alt={artist.name}
               fill
+              sizes="100vw"
               className="absolute inset-0 object-cover opacity-30"
               priority
             />

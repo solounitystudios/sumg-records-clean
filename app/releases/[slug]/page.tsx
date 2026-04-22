@@ -53,6 +53,7 @@ export default async function ReleasePage({ params }: Props) {
               src={release.coverArtUrl}
               alt={release.title}
               fill
+              sizes="100vw"
               className="absolute inset-0 object-cover opacity-25"
               priority
             />
@@ -72,6 +73,7 @@ export default async function ReleasePage({ params }: Props) {
                 src={release.coverArtUrl}
                 alt={`${release.title} cover art`}
                 fill
+                sizes="(max-width: 768px) 128px, 192px"
                 className="object-cover"
               />
             </div>
@@ -109,6 +111,7 @@ export default async function ReleasePage({ params }: Props) {
                   src={release.coverArtUrl}
                   alt={`${release.title} cover art`}
                   fill
+                  sizes="192px"
                   className="object-cover"
                 />
               </div>
