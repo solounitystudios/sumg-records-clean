@@ -30,7 +30,14 @@ async function getCredentials(): Promise<Record<string, Credential>> {
     admin: { password: adminPassword, role: "admin", sub: "admin" },
   }
 
-  const artists = await getArtists()
+  // DB unavailability degrades artist logins but must never lock out admin.
+  let artists: Awaited<ReturnType<typeof getArtists>> = []
+  try {
+    artists = await getArtists()
+  } catch {
+    // Supabase unreachable — continue with admin-only credential map.
+  }
+
   for (const artist of artists) {
     const envKey = `ARTIST_PASSWORD_${artist.slug.toUpperCase().replace(/-/g, "_")}`
     creds[artist.slug] = {
