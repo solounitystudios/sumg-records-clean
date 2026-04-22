@@ -19,6 +19,7 @@ import {
   MAX_AUDIO_SIZE,
 } from "@/lib/media";
 import { DSPLinksPanel } from "@/components/admin/DSPLinksPanel";
+import { MusicBrainzEnrichPanel } from "@/components/admin/MusicBrainzEnrichPanel";
 
 // ─── Producer multi-picker ───────────────────────────────────────────────────
 
@@ -631,6 +632,14 @@ export default function EditSongPage() {
         {/* DSP Links */}
         <FormSection title="DSP Links">
           <DSPLinksPanel value={dspLinks} onChange={setDspLinks} />
+        </FormSection>
+
+        {/* MusicBrainz enrichment */}
+        <FormSection title="MusicBrainz">
+          <MusicBrainzEnrichPanel
+            songId={song.id}
+            existingMbid={song.musicbrainzId ?? null}
+          />
         </FormSection>
 
         {/* Actions */}
