@@ -15,7 +15,7 @@ export default function ArtistBrandsPage() {
   const artist = useMemo(() => artists.find((a) => a.slug === artistSlug), [artists, artistSlug]);
 
   const associatedBrands = useMemo(() => {
-    const slugs: string[] = Array.isArray(artist?.associatedBrands) ? (artist!.associatedBrands as string[]) : [];
+    const slugs: string[] = Array.isArray(artist?.associatedBrands) ? (artist?.associatedBrands as string[]) : [];
     return brands.filter((b) => slugs.includes(b.slug) && b.isActive);
   }, [artist, brands]);
 

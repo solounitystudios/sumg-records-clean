@@ -12,19 +12,17 @@ function monthName(month: number): string {
 export default function StaffCalendarPage() {
   const { releases } = useCmsStore();
 
-  const now = new Date();
-  const currentYear = now.getFullYear();
-
   const upcoming = useMemo(
-    () =>
-      [...releases]
+    () => {
+      const now = new Date();
+      return [...releases]
         .filter((r) => {
           const d = new Date(r.releaseDate);
           return d >= now || r.status === "scheduled";
         })
         .sort((a, b) => a.releaseDate.localeCompare(b.releaseDate))
-        .slice(0, 20),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        .slice(0, 20);
+    },
     [releases]
   );
 

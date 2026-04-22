@@ -22,4 +22,4 @@ export const CMS_ROLES: readonly UserRole[] = [
 ] as const;
 
 /** Roles that may access the ACCESS portal (/access/*). */
-export const ACCESS_ROLES: readonly UserRole[] = [...ALL_ROLES] as const;
+export const ACCESS_ROLES: readonly UserRole[] = ALL_ROLES;

@@ -135,7 +135,7 @@ export default function ArtistDistributionPage() {
           <div className="border border-white/[0.06] bg-white/[0.01] px-5 py-4">
             <p className="text-[9px] tracking-[0.2em] uppercase text-white/20 mb-1.5">No Distribution Records</p>
             <p className="text-[11px] text-white/35 leading-relaxed">
-              Distribution records haven&apos;t been set up for your releases yet.
+              Distribution records haven't been set up for your releases yet.
               Contact your label manager to add distribution information.
             </p>
           </div>

@@ -218,7 +218,7 @@ export function AccessShell({ children, title, breadcrumbs }: AccessShellProps) 
           <form action="/api/auth/signout" method="POST">
             <button
               type="submit"
-              className={`w-full text-[10px] tracking-[0.2em] uppercase text-white/20 hover:text-white/50 transition-colors duration-200 py-2 cursor-pointer ${collapsed ? "text-center" : "text-center"}`}
+              className="w-full text-[10px] tracking-[0.2em] uppercase text-white/20 hover:text-white/50 transition-colors duration-200 py-2 cursor-pointer text-center"
             >
               {collapsed ? "↑" : "Sign Out"}
             </button>
