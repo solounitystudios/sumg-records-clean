@@ -10,6 +10,8 @@ export interface Artist {
   totalStreams: number
   releaseCount: number
   profileImageUrl?: string | null
+  spotifyId?: string | null
+  socialLinks?: { spotify?: string; instagram?: string; youtube?: string; twitter?: string; soundcloud?: string } | null
 }
 
 export interface Producer {
@@ -58,6 +60,7 @@ export interface Release {
   platforms: string[]
   tracks: Track[]
   accentColor: string
+  spotifyUrl?: string | null
 }
 
 export interface PlatformRoyalty {
