@@ -363,3 +363,37 @@ CREATE TABLE IF NOT EXISTS shopify_campaigns (
 
 -- Remove deprecated song coupling from brands (safe — columns may not exist)
 ALTER TABLE brands DROP COLUMN IF EXISTS featured_song_slugs;
+
+-- ─── Spotify Enrichment migration ────────────────────────────────────────────
+-- Adds persistent Spotify IDs to artists and songs, plus audio-feature storage
+-- and a point-in-time follower snapshot table.
+-- All statements are idempotent (IF NOT EXISTS / safe to run multiple times).
+
+-- Bare Spotify artist ID on the artists table
+alter table artists add column if not exists spotify_id text;
+
+-- Bare Spotify track ID on songs (distinct from the full URL in dsp_links)
+alter table songs add column if not exists spotify_track_id text;
+
+-- Audio-feature enrichment blob (tempo, key, energy, etc.)
+alter table songs add column if not exists spotify_audio_features jsonb;
+
+-- Point-in-time follower / popularity snapshots for SUMG artists on Spotify
+create table if not exists artist_spotify_snapshots (
+  id          text primary key,
+  artist_slug text not null,
+  spotify_id  text not null,
+  followers   integer not null,
+  popularity  integer not null default 0,
+  snapshot_at timestamptz not null default now()
+);
+
+alter table artist_spotify_snapshots enable row level security;
+create policy if not exists "public read artist snapshots"
+  on artist_spotify_snapshots for select using (true);
+create policy if not exists "auth write artist snapshots"
+  on artist_spotify_snapshots for all using (auth.role() = 'authenticated');
+-- Additive: site-wide settings persisted via /admin/settings
+ALTER TABLE homepage_config
+  ADD COLUMN IF NOT EXISTS site_settings jsonb NOT NULL DEFAULT '{}'::jsonb;
+
