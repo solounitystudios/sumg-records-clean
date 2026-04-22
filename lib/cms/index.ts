@@ -286,6 +286,12 @@ function parseDurationToMs(s: string): number | null {
  */
 export async function enrichSongFromMusicBrainz(songId: string): Promise<{
   enriched: boolean;
+  /** Song already had a MBID — nothing was written. */
+  skipped?: boolean;
+  /** A high-confidence match was found but rejected due to a safety guard (e.g. duration mismatch). */
+  rejected?: boolean;
+  /** Human-readable reason for a `rejected` outcome. */
+  rejectedReason?: string;
   ambiguous?: boolean;
   candidates?: MusicBrainzRecording[];
   mbid?: string;
@@ -305,8 +311,8 @@ export async function enrichSongFromMusicBrainz(songId: string): Promise<{
   if (fetchErr) throw new Error(fetchErr.message);
   if (!row) return { enriched: false, error: "Song not found" };
 
-  // Skip if we already have a MBID (already enriched — no external fetch needed)
-  if (row.musicbrainz_id) return { enriched: false };
+  // Skip if we already have a MBID — idempotent, return distinct "skipped" signal.
+  if (row.musicbrainz_id) return { enriched: false, skipped: true, mbid: row.musicbrainz_id };
 
   const { lookupByISRC, lookupByArtistTitle } = await import(
     "@/lib/integrations/musicbrainz"
@@ -355,7 +361,11 @@ export async function enrichSongFromMusicBrainz(songId: string): Promise<{
         `[musicbrainz] enrichSong(${songId}): duration mismatch ` +
           `(existing ${row.duration}, MB ${recording.duration ?? recording.durationMs + "ms"})`
       );
-      return { enriched: false, error: "duration mismatch" };
+      return {
+        enriched: false,
+        rejected: true,
+        rejectedReason: `duration mismatch (song: ${row.duration}, MusicBrainz: ${recording.duration ?? Math.round((recording.durationMs ?? 0) / 1000) + "s"})`,
+      };
     }
   }
 

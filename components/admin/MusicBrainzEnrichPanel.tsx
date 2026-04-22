@@ -4,12 +4,14 @@
  * MusicBrainzEnrichPanel
  *
  * Admin panel component that lets a CMS user trigger on-demand MusicBrainz
- * enrichment for a single song and displays one of four outcome states:
+ * enrichment for a single song and displays one of six outcome states:
  *
  *   enriched  — MBID (and optionally duration) written to Supabase
+ *   skipped   — song already had a MBID; nothing was written
  *   ambiguous — multiple plausible matches; candidates shown for review
+ *   rejected  — match found but blocked by a safety guard (e.g. duration mismatch)
  *   miss      — no match found in MusicBrainz
- *   error     — network / logic failure; message shown
+ *   error     — network / Supabase failure; message shown
  *
  * The component calls POST /api/musicbrainz/enrich and is self-contained.
  * It does not use the Zustand CMS store — the page should reload after a
@@ -23,7 +25,9 @@ import type { MusicBrainzRecording } from "@/lib/integrations/musicbrainz";
 
 type EnrichResponse =
   | { status: "enriched"; mbid: string; durationWritten: string | null }
+  | { status: "skipped"; mbid: string }
   | { status: "ambiguous"; reason: string; candidates: MusicBrainzRecording[] }
+  | { status: "rejected"; reason: string }
   | { status: "miss" }
   | { status: "error"; error: string };
 
@@ -153,6 +157,19 @@ export function MusicBrainzEnrichPanel({
             </div>
           )}
 
+          {/* ── Skipped ────────────────────────────────────────────────────── */}
+          {result.status === "skipped" && (
+            <div className="space-y-1">
+              <p className="text-[10px] tracking-[0.2em] uppercase text-white/40">
+                ◎ Already enriched
+              </p>
+              <p className="font-mono text-[11px] text-white/30">{result.mbid}</p>
+              <p className="text-[10px] text-white/20">
+                This song already has a MusicBrainz ID. No changes were made.
+              </p>
+            </div>
+          )}
+
           {/* ── Ambiguous ──────────────────────────────────────────────────── */}
           {result.status === "ambiguous" && (
             <div className="space-y-3">
@@ -171,6 +188,20 @@ export function MusicBrainzEnrichPanel({
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── Rejected ───────────────────────────────────────────────────── */}
+          {result.status === "rejected" && (
+            <div className="space-y-1">
+              <p className="text-[10px] tracking-[0.2em] uppercase text-orange-400/70">
+                ⊘ Unsafe match — not written
+              </p>
+              <p className="text-[11px] text-white/40">{result.reason}</p>
+              <p className="text-[10px] text-white/20">
+                A match was found but failed a safety check. Verify the song
+                metadata manually before accepting.
+              </p>
             </div>
           )}
 

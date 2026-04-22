@@ -10,17 +10,27 @@
  *
  * Response shapes:
  *
- *   Enriched  (HTTP 200):
+ *   Enriched        (HTTP 200):
  *     { "status": "enriched",  "mbid": "...", "durationWritten": "3:42" | null }
  *
- *   Ambiguous (HTTP 200):
+ *   Skipped         (HTTP 200):
+ *     { "status": "skipped", "mbid": "..." }
+ *     — Song already had a MBID; nothing was written.
+ *
+ *   Ambiguous       (HTTP 200):
  *     { "status": "ambiguous", "reason": "...", "candidates": [ MusicBrainzRecording, … ] }
  *
- *   Miss      (HTTP 200):
+ *   Rejected        (HTTP 200):
+ *     { "status": "rejected", "reason": "..." }
+ *     — A high-confidence match was found but rejected by a safety guard
+ *       (e.g. duration mismatch). Nothing was written.
+ *
+ *   Miss            (HTTP 200):
  *     { "status": "miss" }
  *
- *   Error     (HTTP 500):
+ *   Error           (HTTP 500):
  *     { "status": "error", "error": "..." }
+ *     — Network failure, invalid ISRC, Supabase write failure, etc.
  *
  *   Auth / validation errors:
  *     HTTP 401  { "error": "Unauthorized" }
@@ -114,6 +124,11 @@ export async function POST(request: NextRequest) {
 
   // ── 4. Map enrichment result to API response shape ───────────────────────────
 
+  // Already enriched — MBID was already set; nothing was written.
+  if (result.skipped) {
+    return NextResponse.json({ status: "skipped", mbid: result.mbid });
+  }
+
   // Ambiguous — surface candidates for human review; nothing was written.
   if (result.ambiguous) {
     return NextResponse.json({
@@ -123,7 +138,15 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Hard error (e.g. duration mismatch, invalid ISRC, network failure).
+  // Rejected — a safety guard blocked the write (e.g. duration mismatch).
+  if (result.rejected) {
+    return NextResponse.json({
+      status: "rejected",
+      reason: result.rejectedReason ?? "Match rejected by safety guard",
+    });
+  }
+
+  // Hard error (network failure, invalid ISRC, Supabase write error, etc.).
   if (!result.enriched && result.error) {
     return NextResponse.json(
       { status: "error", error: result.error },
