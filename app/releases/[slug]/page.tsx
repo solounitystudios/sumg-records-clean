@@ -1,176 +1,320 @@
-import { notFound } from "next/navigation"
-import Link from "next/link"
-import { getReleases, getReleaseBySlug } from "@/lib/db/releases"
-import { getArtistReleases } from "@/lib/db/releases"
-import { formatStreams } from "@/lib/data"
+import { notFound } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
+import { Navbar } from "@/components/site/Navbar";
+import { Footer } from "@/components/site/Footer";
+import { getPublishedReleases, getReleaseBySlug, getSongsForRelease, getAllProducers, getArtistBySlug } from "@/lib/cms";
+import { DSPButtonGroup } from "@/components/admin/DSPLinksPanel";
+import { SpotifyReleasePanel } from "@/components/SpotifyReleasePanel";
+import { AudioPlayButton } from "@/components/AudioPlayButton";
+import { EmailCapture } from "@/components/site/EmailCapture";
+
+interface Props { params: Promise<{ slug: string }> }
 
 export async function generateStaticParams() {
-  const releases = await getReleases()
-  return releases.map((r) => ({ slug: r.slug }))
+  return (await getPublishedReleases()).map((r) => ({ slug: r.slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
-  const release = await getReleaseBySlug(slug)
-  if (!release) return { title: "Release Not Found — SUMG Records" }
-  return { title: `${release.title} — SUMG Records` }
+export async function generateMetadata({ params }: Props) {
+  const { slug } = await params;
+  const release = await getReleaseBySlug(slug);
+  if (!release) return { title: "Release Not Found" };
+  const rawDesc = release.description
+    ? release.description
+    : `${release.title} by ${release.artistName} — available on SUMG Records.`;
+  const desc = rawDesc.length > 160 ? `${rawDesc.slice(0, 160)}…` : rawDesc;
+  return {
+    title: release.title,
+    description: desc,
+    openGraph: {
+      title: `${release.title} — SUMG Records`,
+      description: desc,
+      ...(release.coverArtUrl ? { images: [{ url: release.coverArtUrl }] } : {}),
+    },
+    twitter: {
+      card: "summary_large_image",
+      ...(release.coverArtUrl ? { images: [release.coverArtUrl] } : {}),
+    },
+  };
 }
 
-const statusStyle: Record<string, string> = {
-  live: "bg-emerald-500/15 text-emerald-400",
-  scheduled: "bg-amber-500/15 text-amber-400",
-  draft: "bg-white/8 text-white/35",
-  archived: "bg-white/5 text-white/25",
-}
+export default async function ReleasePage({ params }: Props) {
+  const { slug } = await params;
+  const release = await getReleaseBySlug(slug);
+  if (!release) notFound();
 
-export default async function ReleasePage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
-  const release = await getReleaseBySlug(slug)
-  if (!release) notFound()
-
-  const allArtistReleases = await getArtistReleases(release.artistSlug)
-  const otherReleases = allArtistReleases.filter((r) => r.slug !== slug)
+  const linkedSongs = await getSongsForRelease(slug);
+  const allProducers = await getAllProducers();
+  const producerCredits = (release.producerSlugs ?? []).map((pSlug) => ({
+    slug: pSlug,
+    name: allProducers.find((p) => p.slug === pSlug)?.name ?? pSlug,
+  }));
+  const artist = await getArtistBySlug(release.artistSlug);
 
   return (
-    <main className="min-h-screen bg-[#06070a] text-white">
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">
-        <Link
-          href="/releases"
-          className="mb-10 inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-white/40 hover:text-white transition"
-        >
-          ← All Releases
-        </Link>
+    <>
+      <Navbar />
+      <main>
+        {/* Hero */}
+        <section className="relative min-h-[60vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
+          {release.coverArtUrl ? (
+            <Image
+              src={release.coverArtUrl}
+              alt={release.title}
+              fill
+              sizes="100vw"
+              className="absolute inset-0 object-cover opacity-25"
+              priority
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
+              <span className="text-[30vw] font-black text-white/[0.025] tracking-tighter leading-none">
+                {release.title.charAt(0)}
+              </span>
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
 
-        <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
-          <div>
-            <div className="flex items-center gap-3 mb-4 flex-wrap">
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full ${statusStyle[release.status]}`}
+          {release.coverArtUrl && (
+            <div className="absolute right-8 bottom-8 w-36 h-36 md:w-56 md:h-56 border border-white/10 overflow-hidden hidden md:block shadow-2xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={release.coverArtUrl}
+                alt={`${release.title} cover art`}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
+          <div className="absolute top-24 left-0 right-0 z-10">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <Link href="/releases" className="text-[10px] tracking-[0.25em] uppercase text-white/25 hover:text-white/60 transition-colors duration-300">
+                ← Releases
+              </Link>
+            </div>
+          </div>
+
+          <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-24 pt-44">
+            <p className="text-[10px] tracking-[0.35em] uppercase text-white/30 mb-2">
+              <Link href={`/artists/${release.artistSlug}`} className="hover:text-white/60 transition-colors">
+                {release.artistName}
+              </Link>
+              {" "}· {release.type} · {release.genre}
+            </p>
+            <h1 className="text-6xl md:text-8xl font-black tracking-tight text-white leading-none mb-6">
+              {release.title}
+            </h1>
+            <p className="text-base text-white/40 max-w-xl">{release.description}</p>
+            {release.releaseDate && (
+              <p className="text-[10px] tracking-[0.2em] uppercase text-white/20 mt-4">
+                {new Date(release.releaseDate).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+            )}
+          </div>
+        </section>
+
+        {/* Cover art — full display on mobile */}
+        {release.coverArtUrl && (
+          <section className="py-12 border-b border-white/5 md:hidden">
+            <div className="max-w-7xl mx-auto px-6">
+              <div className="relative w-48 h-48 border border-white/10 overflow-hidden">
+                <Image
+                  src={release.coverArtUrl}
+                  alt={`${release.title} cover art`}
+                  fill
+                  sizes="192px"
+                  className="object-cover"
+                />
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Linked songs from songs table */}
+        {linkedSongs.length > 0 && (
+          <section className="py-20 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-8">Tracklist</p>
+              <div className="space-y-0 max-w-2xl">
+                {linkedSongs.map((song, i) => (
+                  <Link
+                    key={song.id}
+                    href={`/songs/${song.slug}`}
+                    className="flex items-center gap-5 py-4 border-b border-white/[0.05] group hover:bg-white/[0.025] hover:border-white/[0.08] px-3 transition-all duration-200"
+                  >
+                    <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
+                      {String(song.trackNumber ?? i + 1).padStart(2, "0")}
+                    </span>
+                    <AudioPlayButton audioUrl={song.audioUrl} />
+                    <span className="flex-1 text-sm text-white/70 group-hover:text-white transition-colors">
+                      {song.title}
+                      {song.isExplicit && (
+                        <span className="ml-2 text-[9px] border border-white/15 text-white/20 px-1.5 py-0.5">E</span>
+                      )}
+                    </span>
+                    {song.duration && (
+                      <span className="text-[11px] font-mono text-white/20">{song.duration}</span>
+                    )}
+                    <span className="text-white/15 group-hover:text-white/50 transition-colors duration-200 text-xs">→</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Fallback: inline tracklist when songs table is empty */}
+        {linkedSongs.length === 0 && release.tracklist && release.tracklist.length > 0 && (
+          <section className="py-20 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-8">Tracklist</p>
+              <div className="space-y-0 max-w-2xl">
+                {release.tracklist.map((track, i) => (
+                  <div key={track.id} className="flex items-center gap-5 py-4 border-b border-white/5 group hover:bg-white/[0.02] px-2 transition-colors">
+                    <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
+                      {String(track.trackNumber ?? i + 1).padStart(2, "0")}
+                    </span>
+                    <AudioPlayButton audioUrl={track.audioUrl} />
+                    <span className="text-sm text-white/70 group-hover:text-white transition-colors">{track.title}</span>
+                    {track.duration && (
+                      <span className="ml-auto text-[11px] font-mono text-white/20">{track.duration}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Producer credits */}
+        {producerCredits.length > 0 && (
+          <section className="py-12 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">Produced By</p>
+              <div className="flex flex-wrap gap-3">
+                {producerCredits.map(({ slug: pSlug, name }) => (
+                  <Link
+                    key={pSlug}
+                    href={`/producers/${pSlug}`}
+                    className="border border-white/10 px-4 py-2 text-[10px] tracking-[0.2em] uppercase text-white/35 hover:border-white/25 hover:text-white transition-colors"
+                  >
+                    {name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Featured artists */}
+        {(release.featuredArtistSlugs ?? []).length > 0 && (
+          <section className="py-12 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">Featuring</p>
+              <div className="flex flex-wrap gap-3">
+                {(release.featuredArtistSlugs ?? []).map((aSlug) => (
+                  <Link
+                    key={aSlug}
+                    href={`/artists/${aSlug}`}
+                    className="border border-white/10 px-4 py-2 text-[10px] tracking-[0.2em] uppercase text-white/35 hover:border-white/25 hover:text-white transition-colors"
+                  >
+                    {aSlug}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* DSP streaming links */}
+        {release.dspLinks && Object.values(release.dspLinks).some(Boolean) && (
+          <section className="py-12 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">Listen On</p>
+              <DSPButtonGroup links={release.dspLinks} />
+            </div>
+          </section>
+        )}
+
+        {/* Spotify enrichment — album art, tracklist, metadata */}
+        {release.dspLinks?.spotify && (
+          <SpotifyReleasePanel
+            spotifyUrl={release.dspLinks.spotify}
+            hasCoverArt={!!release.coverArtUrl}
+          />
+        )}
+
+        {/* Merch CTA */}
+        <section className="py-12 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-6 lg:px-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 border border-white/[0.06] px-6 py-6 hover:border-white/10 transition-colors">
+              <div>
+                <p className="text-[9px] tracking-[0.35em] uppercase text-white/20 mb-1">Official Merch</p>
+                <p className="text-sm text-white/60">
+                  Shop apparel, accessories, and limited editions from the SUMG brand worlds.
+                </p>
+              </div>
+              <Link
+                href="/brands"
+                className="bg-white text-black text-[10px] tracking-[0.25em] uppercase px-6 py-3 hover:bg-white/90 transition-colors shrink-0"
               >
-                {release.status}
-              </span>
-              <span className="text-xs uppercase tracking-[0.2em] text-white/35">
-                {release.type}
-              </span>
+                Shop Now →
+              </Link>
             </div>
+          </div>
+        </section>
 
-            <h1 className="text-5xl font-semibold md:text-7xl leading-tight">{release.title}</h1>
-            <Link
-              href={`/artists/${release.artistSlug}`}
-              className="mt-3 inline-block text-lg text-white/60 hover:text-white transition"
-            >
-              {release.artistName}
-            </Link>
-
-            <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[
-                { label: "Release Date", value: release.releaseDate },
-                { label: "Type", value: release.type.toUpperCase() },
-                { label: "Streams", value: release.status === "live" ? formatStreams(release.streams) : "—" },
-                { label: "Tracks", value: release.tracks.length.toString() },
-              ].map(({ label, value }) => (
-                <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                  <div className="text-xs uppercase tracking-[0.2em] text-white/35 mb-2">{label}</div>
-                  <div className="text-lg font-semibold">{value}</div>
-                </div>
-              ))}
-            </div>
-
-            {release.tracks.length > 0 && (
-              <div className="mt-10">
-                <h2 className="text-xs uppercase tracking-[0.3em] text-white/40 mb-5">Track Listing</h2>
-                <div className="rounded-2xl border border-white/10 bg-[#0d1016] overflow-hidden">
-                  <div className="divide-y divide-white/5">
-                    {release.tracks.map((track) => (
-                      <div
-                        key={track.number}
-                        className="flex items-center gap-4 px-5 py-4"
-                      >
-                        <span className="text-white/25 text-sm w-5 text-right shrink-0">
-                          {String(track.number).padStart(2, "0")}
-                        </span>
-                        <span className="flex-1 text-sm font-medium text-white/80">
-                          {track.title}
-                        </span>
-                        <span className="text-xs text-white/35 shrink-0">{track.duration}</span>
-                        {release.status === "live" && (
-                          <span className="text-xs text-white/40 shrink-0 w-14 text-right tabular-nums">
-                            {formatStreams(track.streams)}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+        {/* Artist CTA */}
+        {artist && (
+          <section className="py-12 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <Link
+                href={`/artists/${release.artistSlug}`}
+                className="flex items-center justify-between group border border-white/[0.06] px-6 py-5 hover:border-white/15 transition-colors"
+              >
+                <div className="flex items-center gap-5">
+                  {artist.profileImageUrl && (
+                    <Image
+                      src={artist.profileImageUrl}
+                      alt={artist.name}
+                      width={48}
+                      height={48}
+                      className="object-cover rounded-full border border-white/10"
+                    />
+                  )}
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-white/25 mb-0.5">Artist</p>
+                    <p className="text-base font-semibold text-white/70 group-hover:text-white transition-colors">
+                      {artist.name}
+                    </p>
+                    {artist.genre && (
+                      <p className="text-[10px] text-white/25">{artist.genre}</p>
+                    )}
                   </div>
                 </div>
-              </div>
-            )}
-
-            {release.platforms.length > 0 && (
-              <div className="mt-8">
-                <h2 className="text-xs uppercase tracking-[0.3em] text-white/40 mb-4">Platforms</h2>
-                <div className="flex flex-wrap gap-2">
-                  {release.platforms.map((p) => (
-                    <span
-                      key={p}
-                      className="rounded-full border border-white/15 px-4 py-2 text-xs uppercase tracking-[0.15em] text-white/50"
-                    >
-                      {p}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-5">
-            <div
-              className="rounded-3xl aspect-square flex items-center justify-center"
-              style={{
-                background: `radial-gradient(circle at top, ${release.accentColor}33, ${release.accentColor}08), linear-gradient(180deg, #11151c, #090b10)`,
-                border: `1px solid ${release.accentColor}33`,
-              }}
-            >
-              <div className="text-center px-6">
-                <p className="text-3xl font-semibold mb-2 leading-tight">{release.title}</p>
-                <p className="text-sm text-white/40">{release.artistName}</p>
-              </div>
+                <span className="text-white/20 group-hover:text-white transition-colors text-xl">→</span>
+              </Link>
             </div>
+          </section>
+        )}
 
-            {otherReleases.length > 0 && (
-              <div className="rounded-2xl border border-white/10 bg-[#0d1016] p-5">
-                <h3 className="text-xs uppercase tracking-[0.2em] text-white/40 mb-4">
-                  More from {release.artistName}
-                </h3>
-                <div className="space-y-3">
-                  {otherReleases.slice(0, 4).map((r) => (
-                    <Link
-                      key={r.id}
-                      href={`/releases/${r.slug}`}
-                      className="flex items-center gap-3 group"
-                    >
-                      <div
-                        className="shrink-0 w-9 h-9 rounded-lg"
-                        style={{
-                          background: `${r.accentColor}22`,
-                          border: `1px solid ${r.accentColor}44`,
-                        }}
-                      />
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium group-hover:text-white/90 transition truncate">
-                          {r.title}
-                        </div>
-                        <div className="text-xs text-white/40">
-                          {r.type.toUpperCase()} · {r.releaseDate.slice(0, 4)}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
+        {/* Email capture */}
+        <section className="py-16 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-6 lg:px-10 max-w-xl">
+            <EmailCapture
+              source="release"
+              variant="inline"
+              heading="Stay in the loop"
+              subtext="New releases, merch drops, and label dispatches. No spam."
+            />
           </div>
-        </div>
-      </section>
-    </main>
-  )
+        </section>
+      </main>
+      <Footer />
+    </>
+  );
 }

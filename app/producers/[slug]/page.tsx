@@ -1,107 +1,106 @@
-import { notFound } from "next/navigation"
-import Link from "next/link"
-import { getProducers, getProducerBySlug } from "@/lib/db/producers"
-import { getReleases } from "@/lib/db/releases"
-import { formatStreams } from "@/lib/data"
+import { notFound } from "next/navigation";
+import { Navbar } from "@/components/site/Navbar";
+import { Footer } from "@/components/site/Footer";
+import { getAllProducers, getProducerBySlug } from "@/lib/cms";
+
+interface Props { params: Promise<{ slug: string }> }
 
 export async function generateStaticParams() {
-  const producers = await getProducers()
-  return producers.map((p) => ({ slug: p.slug }))
+  return (await getAllProducers()).map((p) => ({ slug: p.slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
-  const producer = await getProducerBySlug(slug)
-  if (!producer) return { title: "Producer Not Found — SUMG Records" }
-  return { title: `${producer.name} — SUMG Records` }
+export async function generateMetadata({ params }: Props) {
+  const { slug } = await params;
+  const producer = await getProducerBySlug(slug);
+  if (!producer) return { title: "Producer Not Found" };
+  const bioDesc = producer.bio
+    ? producer.bio.length > 160
+      ? `${producer.bio.slice(0, 160)}…`
+      : producer.bio
+    : `${producer.name} — producer at SUMG Records. Specialty: ${producer.specialty}.`;
+  return {
+    title: producer.name,
+    description: bioDesc,
+    openGraph: {
+      title: `${producer.name} — SUMG Records`,
+      description: bioDesc,
+    },
+  };
 }
 
-export default async function ProducerPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
-  const producer = await getProducerBySlug(slug)
-  if (!producer) notFound()
-
-  const allReleases = await getReleases()
-  const liveReleases = allReleases.filter((r) => r.status === "live")
-  const totalStreams = liveReleases.reduce((s, r) => s + r.streams, 0)
+export default async function ProducerPage({ params }: Props) {
+  const { slug } = await params;
+  const producer = await getProducerBySlug(slug);
+  if (!producer) notFound();
 
   return (
-    <main className="min-h-screen bg-[#06070a] text-white">
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">
-        <Link
-          href="/producers"
-          className="mb-10 inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-white/40 hover:text-white transition"
-        >
-          ← Producer Network
-        </Link>
+    <>
+      <Navbar />
+      <main>
+        {/* Hero */}
+        <section className="relative min-h-[55vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
+          <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
+            <span className="text-[30vw] font-black text-white/[0.025] tracking-tighter leading-none">
+              {producer.name.charAt(0)}
+            </span>
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
 
-        <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-white/40 mb-3">Sound Architect</p>
-            <h1 className="text-5xl font-semibold md:text-7xl">{producer.name}</h1>
-
-            <p className="mt-8 text-base leading-8 text-white/65 max-w-2xl">{producer.bio}</p>
-
-            <div className="mt-8 flex flex-wrap gap-2">
-              {producer.specialties.map((spec) => (
-                <span
-                  key={spec}
-                  className="rounded-full border border-white/15 px-3 py-1 text-xs uppercase tracking-[0.15em] text-white/50"
-                >
-                  {spec}
-                </span>
-              ))}
-            </div>
-
-            <div className="mt-10 grid grid-cols-2 gap-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <div className="text-2xl font-semibold">{producer.credits}</div>
-                <div className="mt-1 text-xs uppercase tracking-[0.2em] text-white/40">Production Credits</div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <div className="text-2xl font-semibold">{producer.specialties.length}</div>
-                <div className="mt-1 text-xs uppercase tracking-[0.2em] text-white/40">Specialties</div>
-              </div>
+          {/* Breadcrumb */}
+          <div className="absolute top-24 left-0 right-0 z-10">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <a href="/producers" className="text-[10px] tracking-[0.25em] uppercase text-white/25 hover:text-white/60 transition-colors duration-300">
+                ← Producers
+              </a>
             </div>
           </div>
 
-          <div className="space-y-5">
-            <div className="rounded-2xl border border-white/10 bg-[#0d1016] p-5">
-              <h3 className="text-xs uppercase tracking-[0.2em] text-white/40 mb-4">Catalog Context</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/50">Total Roster Streams</span>
-                  <span className="font-medium">{formatStreams(totalStreams)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/50">Live Releases</span>
-                  <span className="font-medium">{liveReleases.length}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-white/50">House</span>
-                  <span className="font-medium text-white/80">SUMG Records</span>
-                </div>
+          <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-24 pt-44">
+            <p className="text-[10px] tracking-[0.35em] uppercase text-white/30 mb-3">{producer.specialty}</p>
+            <h1 className="text-6xl md:text-8xl font-black tracking-tight text-white leading-none mb-6">{producer.name}</h1>
+            <p className="text-sm text-white/30 tracking-widest max-w-sm">Credits: {producer.credits}</p>
+          </div>
+        </section>
+
+        {producer.bio && (
+          <section className="py-20 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <div className="max-w-2xl">
+                <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">Profile</p>
+                <p className="text-base text-white/50 leading-loose">{producer.bio}</p>
               </div>
             </div>
+          </section>
+        )}
 
-            <Link
+        <section className="py-20 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-6 lg:px-10">
+            <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">Signature Sound</p>
+            <blockquote className="border-l-2 border-white/10 pl-6">
+              <p className="text-xl md:text-2xl text-white/55 italic leading-relaxed max-w-xl">&ldquo;{producer.signature}&rdquo;</p>
+            </blockquote>
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section className="py-16">
+          <div className="max-w-7xl mx-auto px-6 lg:px-10 flex items-center justify-between">
+            <a
               href="/producers"
-              className="block rounded-2xl border border-white/10 bg-[#0d1016] p-5 hover:border-white/20 transition"
+              className="text-[10px] tracking-[0.25em] uppercase text-white/25 hover:text-white transition-colors duration-300"
             >
-              <p className="text-xs uppercase tracking-[0.2em] text-white/35 mb-2">Network</p>
-              <p className="text-sm font-medium">View all producers →</p>
-            </Link>
-
-            <Link
+              ← All Producers
+            </a>
+            <a
               href="/releases"
-              className="block rounded-2xl border border-white/10 bg-[#0d1016] p-5 hover:border-white/20 transition"
+              className="text-[10px] tracking-[0.25em] uppercase text-white/25 hover:text-white transition-colors duration-300"
             >
-              <p className="text-xs uppercase tracking-[0.2em] text-white/35 mb-2">Catalog</p>
-              <p className="text-sm font-medium">Browse releases →</p>
-            </Link>
+              See Releases →
+            </a>
           </div>
-        </div>
-      </section>
-    </main>
-  )
+        </section>
+      </main>
+      <Footer />
+    </>
+  );
 }

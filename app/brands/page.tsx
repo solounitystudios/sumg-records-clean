@@ -1,45 +1,45 @@
-import Link from "next/link"
-import { getBrands } from "@/lib/db/brands"
+import { Navbar } from "@/components/site/Navbar";
+import { Footer } from "@/components/site/Footer";
+import { BrandCard } from "@/components/cards/BrandCard";
+import { getAllBrands } from "@/lib/cms";
 
-export const metadata = { title: "Brands — SUMG Records" }
+export const metadata = {
+  title: "Brand Worlds",
+  description:
+    "Discover the five brand worlds of SUMG Records — spanning fashion, lifestyle, sound, visual arts, and publishing.",
+  openGraph: {
+    title: "Brand Worlds — SUMG Records",
+    description:
+      "Discover the five brand worlds of SUMG Records — spanning fashion, lifestyle, sound, visual arts, and publishing.",
+  },
+};
 
 export default async function BrandsPage() {
-  const brands = await getBrands()
-
+  const brands = await getAllBrands();
   return (
-    <main className="min-h-screen bg-[#06070a] text-white">
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">
-        <div className="mb-14">
-          <p className="text-xs uppercase tracking-[0.35em] text-white/40 mb-3">Brand System</p>
-          <h1 className="text-4xl font-semibold md:text-6xl">Fashion and identity</h1>
-          <p className="mt-5 max-w-2xl text-base text-white/60 leading-7">
-            Five distinct fashion brands operating under the SUMG umbrella. Each has its
-            own identity, aesthetic, and cultural position — unified by the same standard
-            of intentionality.
-          </p>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {brands.map((brand) => (
-            <Link
-              key={brand.slug}
-              href={`/brands/${brand.slug}`}
-              className="group block rounded-3xl border border-white/10 bg-[#0d1016] overflow-hidden transition hover:border-white/20 hover:bg-[#11151d]"
-            >
-              <div className="aspect-[16/9] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_50%),linear-gradient(180deg,#11151c,#090b10)] flex items-end p-6">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-white/35 mb-1">{brand.category}</p>
-                  <h2 className="text-xl font-semibold group-hover:text-white/90 transition">{brand.name}</h2>
-                </div>
-              </div>
-              <div className="p-6 border-t border-white/8">
-                <p className="text-sm italic text-white/50 mb-3">&ldquo;{brand.tagline}&rdquo;</p>
-                <p className="text-sm text-white/50 leading-6 line-clamp-2">{brand.description}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-    </main>
-  )
+    <>
+      <Navbar />
+      <main>
+        <section className="pt-32 pb-16 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-6 lg:px-10">
+            <p className="text-[10px] tracking-[0.35em] uppercase text-white/25 mb-3">The Ecosystem</p>
+            <h1 className="text-5xl md:text-7xl font-black tracking-tight text-white leading-none">Brand Worlds</h1>
+          </div>
+        </section>
+        <section className="py-20 max-w-7xl mx-auto px-6 lg:px-10">
+          {brands.length === 0 && (
+            <p className="text-white/20 italic text-sm">No brands yet.</p>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-white/5">
+            {brands.map((brand) => (
+              <a key={brand.id} href={`/brands/${brand.slug}`} className="block bg-black">
+                <BrandCard brand={brand} />
+              </a>
+            ))}
+          </div>
+        </section>
+      </main>
+      <Footer />
+    </>
+  );
 }

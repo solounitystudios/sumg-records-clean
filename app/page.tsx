@@ -1,221 +1,158 @@
-import Link from "next/link"
-import { getArtists } from "@/lib/db/artists"
-import { getProducers } from "@/lib/db/producers"
-import { getBrands } from "@/lib/db/brands"
+import type { Metadata } from "next";
+import { Navbar } from "@/components/site/Navbar";
+import { Footer } from "@/components/site/Footer";
+import { FeaturedArtists } from "@/components/home/FeaturedArtists";
+import { ProducerNetwork } from "@/components/home/ProducerNetwork";
+import { BrandWorlds } from "@/components/home/BrandWorlds";
+import { LatestReleases } from "@/components/home/LatestReleases";
+import { VisionSection } from "@/components/home/VisionSection";
+import { getAllArtists, getPublishedReleases, getAllProducers, getAllBrands } from "@/lib/cms";
 
-export default async function HomePage() {
-  const [artists, producers, brands] = await Promise.all([
-    getArtists(),
-    getProducers(),
-    getBrands(),
-  ])
+export const metadata: Metadata = {
+  title: {
+    absolute:
+      "SUMG Records — Modern Music Label, Creator Platform & Artist Ecosystem",
+  },
+  description:
+    "SUMG Records is a modern music label, creator platform, artist ecosystem, and commerce brand built for the future of entertainment.",
+  openGraph: {
+    title:
+      "SUMG Records — Modern Music Label, Creator Platform & Artist Ecosystem",
+    description:
+      "SUMG Records is a modern music label, creator platform, artist ecosystem, and commerce brand built for the future of entertainment.",
+    url: "/",
+  },
+};
 
+export default async function Home() {
+  const [artists, releases, producers, brands] = await Promise.all([
+    getAllArtists(),
+    getPublishedReleases(),
+    getAllProducers(),
+    getAllBrands(),
+  ]);
   return (
-    <main className="min-h-screen bg-[#06070a] text-white">
-      <section className="relative overflow-hidden border-b border-white/10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.10),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(120,120,255,0.10),transparent_30%)]" />
-        <div className="relative mx-auto max-w-7xl px-6 py-24 md:px-10 md:py-32">
-          <p className="mb-4 text-xs uppercase tracking-[0.35em] text-white/50">
-            SUMG Records
-          </p>
+    <>
+      <Navbar />
 
-          <h1 className="max-w-4xl text-5xl font-semibold leading-[0.95] tracking-tight md:text-7xl">
-            Built different.
-            <span className="mt-2 block text-white/70">
-              Music, brands, media, and artist worldbuilding under one house.
-            </span>
-          </h1>
+      {/* ─── Hero ─── */}
+      <section className="relative min-h-screen flex flex-col justify-end overflow-hidden bg-black">
+        {/* Deep gradient background */}
+        <div
+          className="absolute inset-0 z-0"
+          style={{
+            background:
+              "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,255,255,0.04) 0%, transparent 60%), linear-gradient(180deg, #0a0a0a 0%, #000000 100%)",
+          }}
+        />
 
-          <p className="mt-8 max-w-2xl text-base leading-7 text-white/65 md:text-lg">
-            SUMG is not just a label. It is a connected ecosystem for artists,
-            producers, fashion brands, releases, visuals, and the culture around
-            them.
-          </p>
+        {/* Subtle horizontal line grid */}
+        <div
+          className="absolute inset-0 z-0 opacity-[0.015]"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(0deg, transparent, transparent 79px, rgba(255,255,255,1) 79px, rgba(255,255,255,1) 80px)",
+          }}
+        />
 
-          <div className="mt-10 flex flex-wrap gap-4">
-            <Link
-              href="/artists"
-              className="rounded-full border border-white bg-white px-6 py-3 text-sm font-medium text-black transition hover:bg-white/90"
+        {/* Large background wordmark */}
+        <div className="absolute inset-0 flex items-center justify-center z-0 select-none pointer-events-none overflow-hidden">
+          <span
+            className="font-black text-white leading-none tracking-tighter"
+            style={{
+              fontSize: "clamp(8rem, 28vw, 28rem)",
+              opacity: 0.025,
+              letterSpacing: "-0.04em",
+            }}
+          >
+            SUMG
+          </span>
+        </div>
+
+        {/* Top decorative lines */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+        {/* Hero content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-28 pt-40">
+          <div className="max-w-3xl">
+            {/* Label tag */}
+            <div className="flex items-center gap-3 mb-8 animate-fade-in">
+              <div className="w-8 h-px bg-white/30" />
+              <p className="text-[10px] tracking-[0.4em] uppercase text-white/40">
+                Premium Independent Label
+              </p>
+            </div>
+
+            {/* Headline */}
+            <h1
+              className="font-black text-white leading-[0.92] tracking-tighter mb-8"
+              style={{ fontSize: "clamp(3.5rem, 9vw, 8rem)" }}
             >
-              Explore Artists
-            </Link>
-            <Link
-              href="/brands"
-              className="rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white transition hover:border-white/40 hover:bg-white/5"
-            >
-              Enter Brand World
-            </Link>
+              <span className="block animate-fade-in-up delay-100">Sound.</span>
+              <span className="block text-white/35 animate-fade-in-up delay-200">Vision.</span>
+              <span className="block animate-fade-in-up delay-300">Culture.</span>
+            </h1>
+
+            {/* Sub-copy */}
+            <p className="text-sm md:text-base text-white/35 max-w-lg leading-relaxed mb-12 animate-fade-in-up delay-400">
+              SUMG Records is an independent label building artists and sound
+              worlds with precision. Seven artists. Five producers. One
+              ecosystem.
+            </p>
+
+            {/* CTAs */}
+            <div className="flex flex-wrap items-center gap-4 animate-fade-in-up delay-500">
+              <a
+                href="/artists"
+                className="inline-flex items-center gap-3 bg-white text-black text-[11px] tracking-[0.25em] uppercase px-8 py-4 font-semibold hover:bg-white/90 transition-colors duration-300"
+              >
+                Meet the Artists
+              </a>
+              <a
+                href="/releases"
+                className="inline-flex items-center gap-3 border border-white/15 text-white text-[11px] tracking-[0.25em] uppercase px-8 py-4 hover:border-white/35 hover:bg-white/[0.03] transition-all duration-300"
+              >
+                Latest Releases
+              </a>
+            </div>
           </div>
 
-          <div className="mt-16 grid gap-4 md:grid-cols-3">
+          {/* Stats row */}
+          <div className="mt-20 pt-10 border-t border-white/5 grid grid-cols-3 gap-8 max-w-md animate-fade-in-up delay-600">
             {[
-              [artists.length.toString(), "Artists"],
-              [producers.length.toString(), "Producers"],
-              [brands.length.toString(), "Brands"],
-            ].map(([value, label]) => (
-              <div
-                key={label}
-                className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur"
-              >
-                <div className="text-3xl font-semibold">{value}</div>
-                <div className="mt-2 text-sm uppercase tracking-[0.25em] text-white/45">
-                  {label}
-                </div>
+              { value: "7", label: "Artists" },
+              { value: "5", label: "Producers" },
+              { value: "5", label: "Brand Worlds" },
+            ].map((stat) => (
+              <div key={stat.label}>
+                <p className="text-3xl font-black text-white tracking-tight leading-none">
+                  {stat.value}
+                </p>
+                <p className="text-[10px] tracking-[0.2em] uppercase text-white/25 mt-1">
+                  {stat.label}
+                </p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">
-        <div className="mb-10 flex items-end justify-between gap-6">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-white/40">
-              Featured Roster
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold md:text-4xl">
-              The SUMG artists
-            </h2>
-          </div>
-          <Link
-            href="/artists"
-            className="text-sm text-white/70 transition hover:text-white"
-          >
-            View full roster →
-          </Link>
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-          {artists.map((artist, index) => (
-            <Link
-              key={artist.slug}
-              href={`/artists/${artist.slug}`}
-              className="group overflow-hidden rounded-3xl border border-white/10 bg-[#0d1016] transition hover:border-white/20 hover:bg-[#11151d]"
-            >
-              <div className="flex aspect-[4/5] items-end justify-start bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.08))] p-6">
-                <div>
-                  <div className="mb-3 text-xs uppercase tracking-[0.3em] text-white/35">
-                    {String(index + 1).padStart(2, "0")}
-                  </div>
-                  <h3 className="text-2xl font-semibold leading-tight">
-                    {artist.name}
-                  </h3>
-                  <p className="mt-2 text-sm text-white/55">{artist.role}</p>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="border-y border-white/10 bg-[#090b10]">
-        <div className="mx-auto max-w-7xl px-6 py-20 md:px-10">
-          <div className="mb-10 flex items-end justify-between gap-6">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-white/40">
-                Producer Network
-              </p>
-              <h2 className="mt-3 text-3xl font-semibold md:text-4xl">
-                Sound architects
-              </h2>
-            </div>
-            <Link
-              href="/producers"
-              className="text-sm text-white/70 transition hover:text-white"
-            >
-              View producers →
-            </Link>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-5">
-            {producers.map((producer) => (
-              <div
-                key={producer.slug}
-                className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-lg font-medium transition hover:border-white/20 hover:bg-white/8"
-              >
-                {producer.name}
-              </div>
-            ))}
+          {/* Scroll cue */}
+          <div className="mt-16 hidden md:flex items-center gap-3 animate-fade-in delay-700">
+            <div className="w-px h-8 bg-white/15 animate-pulse-slow" />
+            <p className="text-[9px] tracking-[0.3em] uppercase text-white/20">Scroll</p>
           </div>
         </div>
+
+        {/* Bottom fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black to-transparent z-10" />
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">
-        <div className="mb-10 flex items-end justify-between gap-6">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-white/40">
-              Brand System
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold md:text-4xl">
-              Fashion and identity
-            </h2>
-          </div>
-          <Link
-            href="/brands"
-            className="text-sm text-white/70 transition hover:text-white"
-          >
-            Enter storefronts →
-          </Link>
-        </div>
-
-        <div className="grid gap-5 md:grid-cols-3 xl:grid-cols-5">
-          {brands.map((brand) => (
-            <Link
-              key={brand.slug}
-              href={`/brands/${brand.slug}`}
-              className="group rounded-3xl border border-white/10 bg-[#0d1016] p-6 transition hover:border-white/20 hover:bg-[#11151d]"
-            >
-              <div className="mb-10 aspect-square rounded-2xl bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_45%),linear-gradient(180deg,#11151c,#090b10)]" />
-              <h3 className="text-lg font-semibold">{brand.name}</h3>
-              <p className="mt-2 text-sm text-white/55">
-                {brand.tagline || "A distinct visual language inside the SUMG universe."}
-              </p>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="border-t border-white/10 bg-[#08090d]">
-        <div className="mx-auto max-w-7xl px-6 py-20 md:px-10">
-          <div className="grid gap-8 lg:grid-cols-[1.3fr_0.7fr]">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-8 md:p-10">
-              <p className="text-xs uppercase tracking-[0.3em] text-white/40">
-                Media + Releases
-              </p>
-              <h2 className="mt-4 max-w-2xl text-3xl font-semibold md:text-5xl">
-                Built for rollout, storytelling, and long-term worldbuilding.
-              </h2>
-              <p className="mt-5 max-w-2xl text-white/60">
-                Release campaigns, visuals, editorial pages, news drops, and
-                storefront experiences all belong to one connected system.
-              </p>
-            </div>
-
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-8 md:p-10">
-              <p className="text-xs uppercase tracking-[0.3em] text-white/40">
-                Catalog
-              </p>
-              <h3 className="mt-4 text-2xl font-semibold">
-                Explore the full SUMG universe.
-              </h3>
-              <div className="mt-8 flex flex-col gap-3">
-                <Link
-                  href="/news"
-                  className="rounded-full border border-white/15 px-5 py-3 text-sm transition hover:border-white/30 hover:bg-white/5"
-                >
-                  View News
-                </Link>
-                <Link
-                  href="/releases"
-                  className="rounded-full border border-white/15 px-5 py-3 text-sm transition hover:border-white/30 hover:bg-white/5"
-                >
-                  View Releases
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </main>
-  )
+      {/* ─── Sections ─── */}
+      <FeaturedArtists artists={artists} />
+      <ProducerNetwork producers={producers} />
+      <BrandWorlds brands={brands} />
+      <LatestReleases releases={releases} />
+      <VisionSection />
+      <Footer />
+    </>
+  );
 }

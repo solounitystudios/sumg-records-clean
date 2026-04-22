@@ -1,115 +1,245 @@
-import { notFound } from "next/navigation"
-import Link from "next/link"
-import { getArtists, getArtistBySlug } from "@/lib/db/artists"
-import { getArtistReleases } from "@/lib/db/releases"
-import { formatStreams } from "@/lib/data"
+import { notFound } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
+import { Navbar } from "@/components/site/Navbar";
+import { Footer } from "@/components/site/Footer";
+import { ReleaseCard } from "@/components/cards/ReleaseCard";
+import { SpotifyArtistCard } from "@/components/SpotifyArtistCard";
+import { ArtistCard } from "@/components/cards/ArtistCard";
+import { getAllArtists, getArtistBySlug, getArtistReleases, getSongsForArtist } from "@/lib/cms";
+import { AudioPlayButton } from "@/components/AudioPlayButton";
+import { EmailSignup } from "@/components/site/EmailSignup";
+import type { SocialLinks } from "@/lib/types";
+
+interface Props { params: Promise<{ slug: string }> }
+
+const SOCIAL_META: { key: keyof SocialLinks; label: string }[] = [
+  { key: "spotify",    label: "Spotify" },
+  { key: "instagram",  label: "Instagram" },
+  { key: "youtube",    label: "YouTube" },
+  { key: "twitter",    label: "X / Twitter" },
+  { key: "soundcloud", label: "SoundCloud" },
+];
 
 export async function generateStaticParams() {
-  const artists = await getArtists()
-  return artists.map((a) => ({ slug: a.slug }))
+  return (await getAllArtists()).map((a) => ({ slug: a.slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
-  const artist = await getArtistBySlug(slug)
-  if (!artist) return { title: "Artist Not Found — SUMG Records" }
-  return { title: `${artist.name} — SUMG Records` }
+export async function generateMetadata({ params }: Props) {
+  const { slug } = await params;
+  const artist = await getArtistBySlug(slug);
+  if (!artist) return { title: "Artist Not Found" };
+  const imageUrl = artist.heroImageUrl ?? artist.profileImageUrl;
+  const bioDesc = artist.bio
+    ? artist.bio.length > 160
+      ? `${artist.bio.slice(0, 160)}…`
+      : artist.bio
+    : `${artist.name} — Artist on SUMG Records.`;
+  return {
+    title: artist.name,
+    description: bioDesc,
+    openGraph: {
+      title: `${artist.name} — SUMG Records`,
+      description: bioDesc,
+      ...(imageUrl && { images: [{ url: imageUrl }] }),
+    },
+    twitter: {
+      card: "summary_large_image",
+      ...(imageUrl && { images: [imageUrl] }),
+    },
+  };
 }
 
-export default async function ArtistPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
-  const artist = await getArtistBySlug(slug)
-  if (!artist) notFound()
+export default async function ArtistPage({ params }: Props) {
+  const { slug } = await params;
+  const artist = await getArtistBySlug(slug);
+  if (!artist) notFound();
 
-  const artistReleases = await getArtistReleases(artist.slug)
+  const releases = await getArtistReleases(artist.slug);
+  const songs = await getSongsForArtist(artist.slug);
+  const allArtists = await getAllArtists();
+  const otherArtists = allArtists.filter((a) => a.slug !== artist.slug).slice(0, 3);
 
   return (
-    <main className="min-h-screen bg-[#06070a] text-white">
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">
-        <Link
-          href="/artists"
-          className="mb-10 inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-white/40 hover:text-white transition"
-        >
-          ← All Artists
-        </Link>
-
-        <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
-          <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-white/40 mb-3">{artist.role}</p>
-            <h1 className="text-5xl font-semibold md:text-7xl">{artist.name}</h1>
-            <p className="mt-2 text-sm uppercase tracking-[0.2em] text-white/40">{artist.genre}</p>
-
-            <p className="mt-8 text-base leading-8 text-white/65 max-w-2xl">{artist.bio}</p>
-
-            <div className="mt-8 flex flex-wrap gap-2">
-              {artist.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full border border-white/15 px-3 py-1 text-xs uppercase tracking-[0.15em] text-white/50"
-                >
-                  {tag}
-                </span>
-              ))}
+    <>
+      <Navbar />
+      <main>
+        {/* Hero — with optional hero image */}
+        <section className="relative min-h-[65vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
+          {artist.heroImageUrl ? (
+            <Image
+              src={artist.heroImageUrl}
+              alt={artist.name}
+              fill
+              sizes="100vw"
+              className="absolute inset-0 object-cover opacity-30"
+              priority
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
+              <span className="text-[30vw] font-black text-white/[0.025] tracking-tighter leading-none">
+                {artist.name.charAt(0)}
+              </span>
             </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
 
-            <div className="mt-10 grid grid-cols-3 gap-4">
-              {[
-                { value: formatStreams(artist.monthlyListeners), label: "Monthly Listeners" },
-                { value: formatStreams(artist.totalStreams), label: "Total Streams" },
-                { value: artist.releaseCount.toString(), label: "Releases" },
-              ].map(({ value, label }) => (
-                <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                  <div className="text-2xl font-semibold">{value}</div>
-                  <div className="mt-1 text-xs uppercase tracking-[0.2em] text-white/40">{label}</div>
-                </div>
-              ))}
+          <div className="absolute top-24 left-0 right-0 z-10">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <a href="/artists" className="text-[10px] tracking-[0.25em] uppercase text-white/25 hover:text-white/60 transition-colors duration-300">
+                ← Artists
+              </a>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-[#0d1016] p-6 self-start">
-            <h2 className="text-xs uppercase tracking-[0.25em] text-white/40 mb-5">Releases</h2>
-            {artistReleases.length === 0 ? (
-              <p className="text-sm text-white/35">No releases yet.</p>
-            ) : (
-              <div className="space-y-4">
-                {artistReleases.map((release) => (
-                  <Link
-                    key={release.id}
-                    href={`/releases/${release.slug}`}
-                    className="flex items-start gap-4 group"
+          <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10 pb-24 pt-44">
+            <p className="text-[10px] tracking-[0.35em] uppercase text-white/30 mb-3">{artist.genre}</p>
+            <h1 className="text-6xl md:text-8xl font-black tracking-tight text-white leading-none mb-6">
+              {artist.name}
+            </h1>
+            <p className="text-base text-white/60 max-w-xl leading-relaxed">{artist.bio}</p>
+
+            {artist.socialLinks && (
+              <div className="flex flex-wrap gap-2 mt-6">
+                {SOCIAL_META.filter(({ key }) => artist.socialLinks?.[key]).map(({ key, label }) => (
+                  <a
+                    key={key}
+                    href={artist.socialLinks?.[key]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="border border-white/15 px-3.5 py-1.5 text-[10px] tracking-[0.2em] uppercase text-white/40 hover:border-white/35 hover:text-white/80 transition-all duration-300"
                   >
-                    <div
-                      className="shrink-0 w-10 h-10 rounded-lg"
-                      style={{ background: `${release.accentColor}22`, border: `1px solid ${release.accentColor}44` }}
-                    />
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium group-hover:text-white/90 transition truncate">
-                        {release.title}
-                      </div>
-                      <div className="text-xs text-white/40 mt-0.5">
-                        {release.type.toUpperCase()} · {release.releaseDate.slice(0, 4)}
-                      </div>
-                      <div className="mt-1">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            release.status === "live"
-                              ? "bg-emerald-500/15 text-emerald-400"
-                              : release.status === "scheduled"
-                                ? "bg-amber-500/15 text-amber-400"
-                                : "bg-white/8 text-white/35"
-                          }`}
-                        >
-                          {release.status}
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
+                    {label}
+                  </a>
                 ))}
               </div>
             )}
           </div>
-        </div>
-      </section>
-    </main>
-  )
+        </section>
+
+        {artist.longBio && (
+          <section className="py-20 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <div className="max-w-2xl">
+                <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-6">About</p>
+                <p className="text-base text-white/65 leading-loose">{artist.longBio}</p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {songs.length > 0 && (
+          <section className="py-20 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <div className="flex items-center justify-between mb-8">
+                <p className="text-[10px] tracking-[0.3em] uppercase text-white/25">Songs</p>
+                <Link
+                  href="/songs"
+                  className="text-[10px] tracking-[0.2em] uppercase text-white/20 hover:text-white transition-colors"
+                >
+                  All Songs →
+                </Link>
+              </div>
+              <div className="space-y-0 max-w-2xl">
+                {songs.map((song, i) => (
+                  <Link
+                    key={song.id}
+                    href={`/songs/${song.slug}`}
+                    className="flex items-center gap-5 py-4 border-b border-white/[0.04] group hover:bg-white/[0.025] hover:border-white/[0.08] px-3 transition-all duration-200"
+                  >
+                    <span className="text-[11px] font-mono text-white/20 min-w-[2rem]">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <AudioPlayButton audioUrl={song.audioUrl} />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-white/70 group-hover:text-white transition-colors duration-200 font-medium">
+                        {song.title}
+                        {song.isExplicit && (
+                          <span className="ml-2 text-[9px] border border-white/15 text-white/20 px-1.5 py-0.5">E</span>
+                        )}
+                      </span>
+                      {song.releaseName && (
+                        <p className="text-[10px] text-white/20 mt-0.5">{song.releaseName}</p>
+                      )}
+                    </div>
+                    {song.duration && (
+                      <span className="text-[11px] font-mono text-white/20">{song.duration}</span>
+                    )}
+                    <span className="text-white/10 group-hover:text-white/50 transition-colors duration-200 text-xs">→</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {releases.length > 0 && (
+          <section className="py-20 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-8">Discography</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {releases.map((r) => (
+                  <Link key={r.id} href={`/releases/${r.slug}`}>
+                    <ReleaseCard release={r} />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {artist.socialLinks?.spotify && (
+          <SpotifyArtistCard spotifyUrl={artist.socialLinks.spotify} />
+        )}
+
+        <section className="py-14 border-b border-white/5">
+          <div className="max-w-7xl mx-auto px-6 lg:px-10">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 border border-white/[0.06] px-6 py-6 hover:border-white/12 transition-colors">
+              <div>
+                <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-1.5">Merchandise</p>
+                <p className="text-base font-semibold text-white/80">
+                  {artist.shopUrl ? `Shop ${artist.name}` : "Shop SUMG"}
+                </p>
+                <p className="text-xs text-white/35 mt-1">Apparel, accessories &amp; exclusive drops.</p>
+              </div>
+              <a
+                href={artist.shopUrl ?? "/brands"}
+                target={artist.shopUrl ? "_blank" : undefined}
+                rel={artist.shopUrl ? "noopener noreferrer" : undefined}
+                className="flex-shrink-0 inline-flex items-center gap-3 text-[10px] tracking-[0.25em] uppercase text-black bg-white hover:bg-white/90 px-6 py-3 transition-all duration-300"
+              >
+                Shop Now <span className="text-black/40">→</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        {otherArtists.length > 0 && (
+          <section className="py-20 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <div className="flex items-center justify-between mb-8">
+                <p className="text-[10px] tracking-[0.3em] uppercase text-white/25">More from SUMG</p>
+                <Link
+                  href="/artists"
+                  className="text-[10px] tracking-[0.2em] uppercase text-white/20 hover:text-white transition-colors"
+                >
+                  All Artists →
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {otherArtists.map((a) => (
+                  <Link key={a.id} href={`/artists/${a.slug}`}>
+                    <ArtistCard artist={a} size="small" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        <EmailSignup />
+      </main>
+      <Footer />
+    </>
+  );
 }

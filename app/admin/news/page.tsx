@@ -74,9 +74,6 @@ export default async function NewsAdminPage() {
                     <button
                       type="submit"
                       className="text-xs text-red-400/50 hover:text-red-400 transition"
-                      onClick={(e) => {
-                        if (!confirm("Delete this news item?")) e.preventDefault()
-                      }}
                     >
                       Delete
                     </button>

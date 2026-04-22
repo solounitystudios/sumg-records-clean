@@ -1,21 +1,38 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Nav from "@/app/components/nav";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "SUMG Records",
-  description: "Music, brands, media, and artist worldbuilding under one house.",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://sumgrecords.com"
+  ),
+  title: {
+    template: "%s — SUMG Records",
+    default: "SUMG Records — Modern Music Label & Creator Platform",
+  },
+  description:
+    "SUMG Records is a modern music label, creator platform, artist ecosystem, and commerce brand built for the future of entertainment.",
+  openGraph: {
+    siteName: "SUMG Records",
+    type: "website",
+    locale: "en_US",
+    images: [
+      {
+        url: "/og-image.svg",
+        width: 1200,
+        height: 630,
+        alt: "SUMG Records — Sound. Vision. Culture.",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@sumgrecords",
+    images: ["/og-image.svg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
@@ -24,14 +41,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-[#06070a] text-white">
-        <Nav />
-        {children}
-      </body>
+    <html lang="en" className="scroll-smooth">
+      <body className="bg-black text-white antialiased">{children}</body>
     </html>
   );
 }

@@ -1,59 +1,63 @@
-import Link from "next/link"
-import { getProducers } from "@/lib/db/producers"
+import { Navbar } from "@/components/site/Navbar";
+import { Footer } from "@/components/site/Footer";
+import { ProducerCard } from "@/components/cards/ProducerCard";
+import { getAllProducers } from "@/lib/cms";
 
-export const metadata = { title: "Producers — SUMG Records" }
+export const metadata = {
+  title: "Producers",
+  description:
+    "Meet the producer network behind SUMG Records — five architects of sound building environments for the artists they serve.",
+  openGraph: {
+    title: "Producers — SUMG Records",
+    description:
+      "Meet the producer network behind SUMG Records — five architects of sound building environments for the artists they serve.",
+  },
+};
 
 export default async function ProducersPage() {
-  const producers = await getProducers()
-
+  const producers = await getAllProducers();
   return (
-    <main className="min-h-screen bg-[#06070a] text-white">
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">
-        <div className="mb-14">
-          <p className="text-xs uppercase tracking-[0.35em] text-white/40 mb-3">Sound Architects</p>
-          <h1 className="text-4xl font-semibold md:text-6xl">Producer Network</h1>
-          <p className="mt-5 max-w-2xl text-base text-white/60 leading-7">
-            The producers behind SUMG&apos;s sonic identity. Each brings a distinct approach
-            to production — together they shape the sound of the label.
-          </p>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {producers.map((producer, index) => (
-            <Link
-              key={producer.slug}
-              href={`/producers/${producer.slug}`}
-              className="group block rounded-3xl border border-white/10 bg-[#0d1016] p-8 hover:border-white/20 transition"
-            >
-              <div className="flex items-start justify-between gap-4 mb-6">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.3em] text-white/35 mb-2">
-                    {String(index + 1).padStart(2, "0")}
-                  </div>
-                  <h2 className="text-2xl font-semibold group-hover:text-white/90 transition">{producer.name}</h2>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-semibold">{producer.credits}</div>
-                  <div className="text-xs uppercase tracking-[0.15em] text-white/35">Credits</div>
-                </div>
+    <>
+      <Navbar />
+      <main>
+        {/* Page hero */}
+        <section className="relative pt-36 pb-20 border-b border-white/5 overflow-hidden">
+          <div className="absolute inset-0 flex items-center justify-end pr-10 select-none pointer-events-none overflow-hidden">
+            <span className="text-[15vw] font-black text-white/[0.018] tracking-tighter leading-none">
+              PRODUCERS
+            </span>
+          </div>
+          <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-[10px] tracking-[0.35em] uppercase text-white/25 mb-3">
+                  Behind the Sound
+                </p>
+                <h1 className="text-5xl md:text-7xl font-black tracking-tight text-white leading-none">
+                  Producers
+                </h1>
               </div>
+              <p className="hidden md:block text-xs text-white/25 max-w-[200px] text-right leading-relaxed">
+                The architects of the SUMG sound.
+              </p>
+            </div>
+          </div>
+        </section>
 
-              <p className="text-sm text-white/55 leading-7 mb-6">{producer.bio}</p>
-
-              <div className="flex flex-wrap gap-2">
-                {producer.specialties.map((spec) => (
-                  <span
-                    key={spec}
-                    className="rounded-full border border-white/15 px-3 py-1 text-xs uppercase tracking-[0.12em] text-white/45"
-                  >
-                    {spec}
-                  </span>
-                ))}
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-    </main>
-  )
+        <section className="py-20 max-w-7xl mx-auto px-6 lg:px-10">
+          {producers.length === 0 && (
+            <p className="text-white/20 italic text-sm">No producers yet.</p>
+          )}
+          <div className="border-t border-white/5 max-w-3xl">
+            {producers.map((producer, i) => (
+              <a key={producer.id} href={`/producers/${producer.slug}`} className="block">
+                <ProducerCard producer={producer} index={i} />
+              </a>
+            ))}
+          </div>
+        </section>
+      </main>
+      <Footer />
+    </>
+  );
 }

@@ -1,110 +1,63 @@
-import { getReleases } from "@/lib/db/releases"
-import { formatStreams } from "@/lib/data"
+import { Navbar } from "@/components/site/Navbar";
+import { Footer } from "@/components/site/Footer";
+import { ReleaseCard } from "@/components/cards/ReleaseCard";
+import { getPublishedReleases } from "@/lib/cms";
 
-export const metadata = { title: "Releases — SUMG Records" }
-
-const statusStyle: Record<string, string> = {
-  live: "bg-emerald-500/15 text-emerald-400",
-  scheduled: "bg-amber-500/15 text-amber-400",
-  draft: "bg-white/8 text-white/35",
-  archived: "bg-white/5 text-white/25",
-}
+export const metadata = {
+  title: "Releases",
+  description:
+    "Browse the full SUMG Records catalogue — singles, EPs, albums, and projects from our independent artist roster.",
+  openGraph: {
+    title: "Releases — SUMG Records",
+    description:
+      "Browse the full SUMG Records catalogue — singles, EPs, albums, and projects from our independent artist roster.",
+  },
+};
 
 export default async function ReleasesPage() {
-  const releases = await getReleases()
-  const liveReleases = releases.filter((r) => r.status === "live")
-  const upcoming = releases.filter((r) => r.status === "scheduled" || r.status === "draft")
-
+  const releases = await getPublishedReleases();
   return (
-    <main className="min-h-screen bg-[#06070a] text-white">
-      <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">
-        <div className="mb-14">
-          <p className="text-xs uppercase tracking-[0.35em] text-white/40 mb-3">Discography</p>
-          <h1 className="text-4xl font-semibold md:text-6xl">Releases</h1>
-          <p className="mt-5 max-w-2xl text-base text-white/60 leading-7">
-            The full SUMG catalog — singles, EPs, and albums across all artists.
-          </p>
-        </div>
-
-        {liveReleases.length > 0 && (
-          <div className="mb-14">
-            <h2 className="text-xs uppercase tracking-[0.3em] text-white/40 mb-6">Live</h2>
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {liveReleases.map((release) => (
-                <div
-                  key={release.id}
-                  className="rounded-3xl border border-white/10 bg-[#0d1016] overflow-hidden"
-                >
-                  <div
-                    className="aspect-square flex items-end p-6"
-                    style={{
-                      background: `radial-gradient(circle at top, ${release.accentColor}22, transparent 60%), linear-gradient(180deg, #11151c, #090b10)`,
-                    }}
-                  >
-                    <div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full mb-3 inline-block ${statusStyle[release.status]}`}>
-                        {release.status}
-                      </span>
-                      <h3 className="text-xl font-semibold">{release.title}</h3>
-                      <p className="mt-1 text-sm text-white/55">{release.artistName}</p>
-                    </div>
-                  </div>
-                  <div className="px-6 py-5 border-t border-white/8">
-                    <div className="flex items-center justify-between text-sm mb-3">
-                      <span className="text-xs uppercase tracking-[0.15em] text-white/35">{release.type}</span>
-                      <span className="text-white/50">{release.releaseDate.slice(0, 7)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-medium">{formatStreams(release.streams)}</div>
-                        <div className="text-xs text-white/35 uppercase tracking-[0.12em]">Total Streams</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium">{release.tracks.length}</div>
-                        <div className="text-xs text-white/35 uppercase tracking-[0.12em]">Tracks</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+    <>
+      <Navbar />
+      <main>
+        {/* Page hero */}
+        <section className="relative pt-36 pb-20 border-b border-white/5 overflow-hidden">
+          <div className="absolute inset-0 flex items-center justify-end pr-10 select-none pointer-events-none overflow-hidden">
+            <span className="text-[18vw] font-black text-white/[0.018] tracking-tighter leading-none">
+              CATALOGUE
+            </span>
+          </div>
+          <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-10">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-[10px] tracking-[0.35em] uppercase text-white/25 mb-3">
+                  Catalogue
+                </p>
+                <h1 className="text-5xl md:text-7xl font-black tracking-tight text-white leading-none">
+                  Releases
+                </h1>
+              </div>
+              <p className="hidden md:block text-xs text-white/25 max-w-[200px] text-right leading-relaxed">
+                Every release is built with intention.
+              </p>
             </div>
           </div>
-        )}
+        </section>
 
-        {upcoming.length > 0 && (
-          <div>
-            <h2 className="text-xs uppercase tracking-[0.3em] text-white/40 mb-6">Upcoming</h2>
-            <div className="space-y-3">
-              {upcoming.map((release) => (
-                <div
-                  key={release.id}
-                  className="flex items-center justify-between gap-6 rounded-2xl border border-white/10 bg-[#0d1016] px-6 py-5"
-                >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div
-                      className="shrink-0 w-10 h-10 rounded-xl"
-                      style={{
-                        background: `${release.accentColor}22`,
-                        border: `1px solid ${release.accentColor}44`,
-                      }}
-                    />
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{release.title}</div>
-                      <div className="text-xs text-white/40 mt-0.5">{release.artistName}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 shrink-0">
-                    <span className="text-xs text-white/40">{release.releaseDate}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle[release.status]}`}>
-                      {release.status}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+        <section className="py-20 max-w-7xl mx-auto px-6 lg:px-10">
+          {releases.length === 0 && (
+            <p className="text-white/20 italic text-sm">No releases yet.</p>
+          )}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {releases.map((release) => (
+              <a key={release.id} href={`/releases/${release.slug}`} className="block">
+                <ReleaseCard release={release} />
+              </a>
+            ))}
           </div>
-        )}
-      </section>
-    </main>
-  )
+        </section>
+      </main>
+      <Footer />
+    </>
+  );
 }
