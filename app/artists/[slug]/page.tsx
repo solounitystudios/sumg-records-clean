@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { ReleaseCard } from "@/components/cards/ReleaseCard";
@@ -31,6 +32,13 @@ export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const artist = await getArtistBySlug(slug);
   if (!artist) return { title: "Artist Not Found" };
+  const imageUrl = artist.heroImageUrl ?? artist.profileImageUrl;
+  return {
+    title: `${artist.name} — SUMG Records`,
+    ...(imageUrl && {
+      openGraph: { images: [{ url: imageUrl }] },
+      twitter: { card: "summary_large_image", images: [imageUrl] },
+    }),
   const bioDesc = artist.bio
     ? artist.bio.length > 160
       ? `${artist.bio.slice(0, 160)}…`
@@ -64,11 +72,13 @@ export default async function ArtistPage({ params }: Props) {
         <section className="relative min-h-[65vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
           {/* Background: hero image or giant letter */}
           {artist.heroImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={artist.heroImageUrl}
               alt={artist.name}
-              className="absolute inset-0 w-full h-full object-cover opacity-35"
+              fill
+              sizes="100vw"
+              className="absolute inset-0 object-cover opacity-30"
+              priority
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
@@ -181,9 +191,9 @@ export default async function ArtistPage({ params }: Props) {
               <p className="text-[10px] tracking-[0.3em] uppercase text-white/25 mb-8">Discography</p>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {releases.map((r) => (
-                  <a key={r.id} href={`/releases/${r.slug}`}>
+                  <Link key={r.id} href={`/releases/${r.slug}`}>
                     <ReleaseCard release={r} />
-                  </a>
+                  </Link>
                 ))}
               </div>
             </div>

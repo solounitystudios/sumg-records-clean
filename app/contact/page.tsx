@@ -1,5 +1,10 @@
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
+import { ContactForm } from "@/components/contact/ContactForm";
+
+export const metadata = {
+  title: "Contact — SUMG Records",
+};
 import { ContactForm } from "@/components/site/ContactForm";
 
 export const metadata = {
@@ -159,6 +164,8 @@ export default async function ContactPage({ searchParams }: Props) {
                 ))}
               </div>
 
+              {/* Message form — client component to preserve metadata export */}
+              <ContactForm />
               {/* Live contact form */}
               <ContactForm defaultSubject={subject} />
             </div>
@@ -169,3 +176,4 @@ export default async function ContactPage({ searchParams }: Props) {
     </>
   );
 }
+

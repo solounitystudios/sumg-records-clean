@@ -62,7 +62,7 @@ export function VisionSection() {
           {pillars.map((pillar) => (
             <div
               key={pillar.number}
-              className="group bg-black p-8 hover:bg-white/[0.03] transition-colors duration-500 cursor-default relative overflow-hidden"
+              className="group bg-black p-8 hover:bg-white/[0.02] transition-colors duration-300 cursor-pointer"
             >
               {/* Hover top accent line */}
               <div className="absolute top-0 left-0 w-0 h-px bg-white/25 group-hover:w-full transition-all duration-500" />
@@ -81,6 +81,8 @@ export function VisionSection() {
 
         {/* Bottom statement */}
         <div className="mt-20 text-center">
+          <div className="inline-block border border-white/10 px-10 py-6 hover:border-white/20 transition-colors duration-300">
+            <p className="text-[10px] tracking-[0.4em] uppercase text-white/25 mb-2">
           <a
             href="/about"
             className="inline-flex flex-col items-center gap-2 border border-white/10 px-10 py-7 hover:border-white/25 hover:bg-white/[0.02] transition-all duration-400 group"

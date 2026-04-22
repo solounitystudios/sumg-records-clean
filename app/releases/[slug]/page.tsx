@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { getPublishedReleases, getReleaseBySlug, getSongsForRelease, getAllProducers, getArtistBySlug } from "@/lib/cms";
@@ -17,6 +18,12 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const release = await getReleaseBySlug(slug);
+  return {
+    title: release ? `${release.title} — SUMG Records` : "Release Not Found",
+    ...(release?.coverArtUrl && {
+      openGraph: { images: [{ url: release.coverArtUrl }] },
+      twitter: { card: "summary_large_image", images: [release.coverArtUrl] },
+    }),
   if (!release) return { title: "Release Not Found" };
   const rawDesc = release.description
     ? release.description
@@ -58,10 +65,13 @@ export default async function ReleasePage({ params }: Props) {
         {/* Hero — with cover art or giant letter */}
         <section className="relative min-h-[60vh] flex flex-col justify-end bg-black border-b border-white/5 overflow-hidden">
           {release.coverArtUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={release.coverArtUrl}
               alt={release.title}
+              fill
+              sizes="100vw"
+              className="absolute inset-0 object-cover opacity-25"
+              priority
               className="absolute inset-0 w-full h-full object-cover opacity-20"
             />
           ) : (
@@ -75,12 +85,16 @@ export default async function ReleasePage({ params }: Props) {
 
           {/* Cover art thumbnail in corner */}
           {release.coverArtUrl && (
+            <div className="absolute right-8 bottom-8 w-32 h-32 md:w-48 md:h-48 border border-white/10 overflow-hidden hidden md:block">
+              <Image
             <div className="absolute right-8 bottom-8 w-36 h-36 md:w-56 md:h-56 border border-white/10 overflow-hidden hidden md:block shadow-2xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={release.coverArtUrl}
                 alt={`${release.title} cover art`}
-                className="w-full h-full object-cover"
+                fill
+                sizes="(max-width: 768px) 128px, 192px"
+                className="object-cover"
               />
             </div>
           )}
@@ -121,12 +135,15 @@ export default async function ReleasePage({ params }: Props) {
         {release.coverArtUrl && (
           <section className="py-12 border-b border-white/5 md:hidden">
             <div className="max-w-7xl mx-auto px-6">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={release.coverArtUrl}
-                alt={`${release.title} cover art`}
-                className="w-48 h-48 object-cover border border-white/10"
-              />
+              <div className="relative w-48 h-48 border border-white/10 overflow-hidden">
+                <Image
+                  src={release.coverArtUrl}
+                  alt={`${release.title} cover art`}
+                  fill
+                  sizes="192px"
+                  className="object-cover"
+                />
+              </div>
             </div>
           </section>
         )}
@@ -284,11 +301,12 @@ export default async function ReleasePage({ params }: Props) {
               >
                 <div className="flex items-center gap-5">
                   {artist.profileImageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={artist.profileImageUrl}
                       alt={artist.name}
-                      className="w-12 h-12 object-cover rounded-full border border-white/10"
+                      width={48}
+                      height={48}
+                      className="object-cover rounded-full border border-white/10"
                     />
                   )}
                   <div>
