@@ -502,7 +502,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               provider_config: u.providerConfig ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
-          orig ? () => setArtists((prev) => prev.map((a) => (a.id === id ? orig! : a))) : undefined
+          orig ? () => setArtists((prev) => prev.map((a) => (a.id === id ? orig : a))) : undefined
         );
         if (!ok) throw new Error("Failed to update artist.");
       }
@@ -603,7 +603,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               social_links: u.socialLinks ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
-          orig ? () => setProducers((prev) => prev.map((p) => (p.id === id ? orig! : p))) : undefined
+          orig ? () => setProducers((prev) => prev.map((p) => (p.id === id ? orig : p))) : undefined
         );
         if (!ok) throw new Error("Failed to update producer.");
       }
@@ -722,7 +722,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               sort_order: u.sortOrder ?? 0,
               updated_at: u.updatedAt,
             }).eq("id", id),
-          orig ? () => setBrands((prev) => prev.map((b) => (b.id === id ? orig! : b))) : undefined
+          orig ? () => setBrands((prev) => prev.map((b) => (b.id === id ? orig : b))) : undefined
         );
         if (!ok) throw new Error("Failed to update brand.");
       }
@@ -846,7 +846,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               data_source: u.dataSource ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
-          orig ? () => setReleases((prev) => prev.map((r) => (r.id === id ? orig! : r))) : undefined
+          orig ? () => setReleases((prev) => prev.map((r) => (r.id === id ? orig : r))) : undefined
         );
         if (!ok) throw new Error("Failed to update release.");
       }
@@ -1058,7 +1058,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               data_source: u.dataSource ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
-          orig ? () => setSongs((prev) => prev.map((s) => (s.id === id ? orig! : s))) : undefined
+          orig ? () => setSongs((prev) => prev.map((s) => (s.id === id ? orig : s))) : undefined
         );
         if (!ok) throw new Error("Failed to update song.");
       }
