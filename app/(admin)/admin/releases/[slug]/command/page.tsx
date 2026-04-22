@@ -124,9 +124,8 @@ function SongRow({ song, producers }: { song: CMSSong; producers: CMSProducer[] 
     .map((s) => producers.find((p) => p.slug === s)?.name ?? s)
     .join(", ");
 
-  const rightsStatus = song.rightsMetadata?.compositionStatus ?? "—";
+  const compositionStatus = song.rightsMetadata?.compositionStatus ?? "—";
   const hasAudio = Boolean(song.audioUrl);
-  const isrc = song.isrc ?? song.rightsMetadata?.source;
 
   return (
     <div className="grid grid-cols-12 gap-2 py-2.5 border-b border-white/[0.03] last:border-0 items-start">
@@ -163,14 +162,14 @@ function SongRow({ song, producers }: { song: CMSSong; producers: CMSProducer[] 
       <div className="col-span-2">
         <span
           className={`text-[9px] tracking-[0.1em] uppercase border px-1.5 py-0.5 ${
-            rightsStatus === "registered"
+            compositionStatus === "registered"
               ? "border-green-800/40 text-green-400/60"
-              : rightsStatus === "pending"
+              : compositionStatus === "pending"
               ? "border-yellow-800/40 text-yellow-400/60"
               : "border-white/10 text-white/25"
           }`}
         >
-          {rightsStatus === "—" ? "Rights —" : rightsStatus}
+          {compositionStatus === "—" ? "Rights —" : compositionStatus}
         </span>
       </div>
       <div className="col-span-2">
