@@ -13,6 +13,8 @@
  *   • Returns the resolved role + derived permission flags immediately
  *     (optimistic default = "admin") so components don't need to wait for
  *     the async resolution before rendering.
+ *   • Also resolves `artistSlug` from `app_metadata.artist_slug` for
+ *     users with the `artist` role.
  */
 
 import { useEffect, useState } from "react";
@@ -24,6 +26,8 @@ import {
   canUploadMedia,
   canEditContent,
   canChangeSettings,
+  isCmsRole,
+  isArtistRole,
   roleLabel,
 } from "@/lib/auth/permissions";
 
@@ -35,10 +39,16 @@ export interface RoleContext {
   canUploadMedia: boolean;
   canEditContent: boolean;
   canChangeSettings: boolean;
+  isCmsRole: boolean;
+  isArtistRole: boolean;
   roleLabel: string;
+  /** Set for users with the `artist` role — the CMSArtist slug they are bound to. */
+  artistSlug: string | null;
 }
 
-function buildContext(role: UserRole, loading: boolean): RoleContext {
+const ALL_ROLES: UserRole[] = ["admin", "editor", "media_manager", "release_manager", "artist"];
+
+function buildContext(role: UserRole, loading: boolean, artistSlug: string | null = null): RoleContext {
   return {
     role,
     loading,
@@ -47,7 +57,10 @@ function buildContext(role: UserRole, loading: boolean): RoleContext {
     canUploadMedia: canUploadMedia(role),
     canEditContent: canEditContent(role),
     canChangeSettings: canChangeSettings(role),
+    isCmsRole: isCmsRole(role),
+    isArtistRole: isArtistRole(role),
     roleLabel: roleLabel(role),
+    artistSlug,
   };
 }
 
@@ -76,12 +89,12 @@ export function useRole(): RoleContext {
             (data.user.app_metadata?.role as string | undefined) ??
             (data.user.user_metadata?.role as string | undefined) ??
             "editor";
-          const role = (
-            ["admin", "editor", "media_manager", "release_manager"].includes(raw)
-              ? raw
-              : "editor"
-          ) as UserRole;
-          setCtx(buildContext(role, false));
+          const role = (ALL_ROLES.includes(raw as UserRole) ? raw : "editor") as UserRole;
+          const artistSlug =
+            role === "artist"
+              ? ((data.user.app_metadata?.artist_slug as string | undefined) ?? null)
+              : null;
+          setCtx(buildContext(role, false, artistSlug));
         } else {
           setCtx(buildContext("editor", false));
         }
