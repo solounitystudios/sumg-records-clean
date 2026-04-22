@@ -1,9 +1,11 @@
 import Link from "next/link"
-import { royalties, artists, formatStreams, formatRevenue } from "@/lib/data"
+import { royalties, formatStreams, formatRevenue } from "@/lib/data"
+import { getArtists } from "@/lib/db/artists"
 
 export const metadata = { title: "Royalties — Artist Dashboard" }
 
-export default function DashboardRoyaltiesPage() {
+export default async function DashboardRoyaltiesPage() {
+  const artists = await getArtists()
   const periods = ["2026-Q1", "2025-Q4"]
 
   return (

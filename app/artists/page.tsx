@@ -1,9 +1,11 @@
 import Link from "next/link"
-import { artists, formatStreams } from "@/lib/data"
+import { getArtists } from "@/lib/db/artists"
+import { formatStreams } from "@/lib/data"
 
 export const metadata = { title: "Artists — SUMG Records" }
 
-export default function ArtistsPage() {
+export default async function ArtistsPage() {
+  const artists = await getArtists()
   return (
     <main className="min-h-screen bg-[#06070a] text-white">
       <section className="mx-auto max-w-7xl px-6 py-20 md:px-10">

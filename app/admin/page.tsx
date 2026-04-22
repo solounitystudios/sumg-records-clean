@@ -1,9 +1,11 @@
 import Link from "next/link"
-import { artists, releases, royalties, formatStreams, formatRevenue } from "@/lib/data"
+import { releases, royalties, formatStreams, formatRevenue } from "@/lib/data"
+import { getArtists } from "@/lib/db/artists"
 
 export const metadata = { title: "Admin Dashboard — SUMG Records" }
 
-export default function AdminPage() {
+export default async function AdminPage() {
+  const artists = await getArtists()
   const totalStreams = artists.reduce((s, a) => s + a.totalStreams, 0)
   const liveReleases = releases.filter((r) => r.status === "live").length
   const draftReleases = releases.filter((r) => r.status === "draft").length

@@ -1,21 +1,23 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { artists, getArtist, getArtistReleases, formatStreams } from "@/lib/data"
+import { getArtists, getArtistBySlug } from "@/lib/db/artists"
+import { getArtistReleases, formatStreams } from "@/lib/data"
 
 export async function generateStaticParams() {
+  const artists = await getArtists()
   return artists.map((a) => ({ slug: a.slug }))
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const artist = getArtist(slug)
+  const artist = await getArtistBySlug(slug)
   if (!artist) return { title: "Artist Not Found — SUMG Records" }
   return { title: `${artist.name} — SUMG Records` }
 }
 
 export default async function ArtistPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const artist = getArtist(slug)
+  const artist = await getArtistBySlug(slug)
   if (!artist) notFound()
 
   const artistReleases = getArtistReleases(artist.slug)

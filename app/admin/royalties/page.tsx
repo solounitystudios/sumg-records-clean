@@ -1,10 +1,12 @@
-import { royalties, artists, formatStreams, formatRevenue } from "@/lib/data"
+import { royalties, formatStreams, formatRevenue } from "@/lib/data"
+import { getArtists } from "@/lib/db/artists"
 
 export const metadata = { title: "Royalty Platform — SUMG Admin" }
 
 const periods = ["2026-Q1", "2025-Q4"]
 
-export default function RoyaltiesAdminPage() {
+export default async function RoyaltiesAdminPage() {
+  const artists = await getArtists()
   const q1Data = royalties.filter((r) => r.period === "2026-Q1")
   const q4Data = royalties.filter((r) => r.period === "2025-Q4")
 
