@@ -364,36 +364,134 @@ CREATE TABLE IF NOT EXISTS shopify_campaigns (
 -- Remove deprecated song coupling from brands (safe — columns may not exist)
 ALTER TABLE brands DROP COLUMN IF EXISTS featured_song_slugs;
 
--- ─── Spotify Enrichment migration ────────────────────────────────────────────
--- Adds persistent Spotify IDs to artists and songs, plus audio-feature storage
--- and a point-in-time follower snapshot table.
--- All statements are idempotent (IF NOT EXISTS / safe to run multiple times).
 
--- Bare Spotify artist ID on the artists table
-alter table artists add column if not exists spotify_id text;
+-- ============================================================
+-- Phase Security-1 — Role-based RLS write policies
+--
+-- Replaces the authenticated-wide write policies ("auth.role() = 'authenticated'")
+-- with app_metadata.role-based enforcement so that only users who have been
+-- explicitly provisioned with a CMS role can write to any table.
+--
+-- Valid CMS roles: admin | editor | media_manager | release_manager
+--
+-- Run this migration after all previous migrations.
+-- All statements are idempotent: drop-if-exists then create.
+-- ============================================================
 
--- Bare Spotify track ID on songs (distinct from the full URL in dsp_links)
-alter table songs add column if not exists spotify_track_id text;
+-- ─── Drop old authenticated-wide write policies ───────────────────────────────
+drop policy if exists "auth write artists"   on artists;
+drop policy if exists "auth write producers" on producers;
+drop policy if exists "auth write brands"    on brands;
+drop policy if exists "auth write releases"  on releases;
+drop policy if exists "auth write songs"     on songs;
+drop policy if exists "auth write assets"    on assets;
+drop policy if exists "auth write homepage"  on homepage_config;
+drop policy if exists "auth write timeline"  on artist_timeline_items;
 
--- Audio-feature enrichment blob (tempo, key, energy, etc.)
-alter table songs add column if not exists spotify_audio_features jsonb;
+-- ─── Helper: is the calling user an explicitly-provisioned CMS operator? ─────
+-- Centralises the role list so future role additions require one change here.
+-- Uses SECURITY DEFINER so the function runs with the permissions of its owner
+-- and can safely call auth.jwt() within RLS policies.
+create or replace function is_cms_role() returns boolean
+  language sql security definer stable
+  as $$
+    select (auth.jwt() -> 'app_metadata' ->> 'role')
+             in ('admin','editor','media_manager','release_manager')
+  $$;
 
--- Point-in-time follower / popularity snapshots for SUMG artists on Spotify
-create table if not exists artist_spotify_snapshots (
-  id          text primary key,
-  artist_slug text not null,
-  spotify_id  text not null,
-  followers   integer not null,
-  popularity  integer not null default 0,
-  snapshot_at timestamptz not null default now()
-);
+-- ─── Role-based write policies (INSERT / UPDATE / DELETE) ────────────────────
+-- Any user with a recognised CMS role in app_metadata may write.
+-- Users who are authenticated but have no app_metadata.role are rejected.
 
-alter table artist_spotify_snapshots enable row level security;
-create policy if not exists "public read artist snapshots"
-  on artist_spotify_snapshots for select using (true);
-create policy if not exists "auth write artist snapshots"
-  on artist_spotify_snapshots for all using (auth.role() = 'authenticated');
--- Additive: site-wide settings persisted via /admin/settings
-ALTER TABLE homepage_config
-  ADD COLUMN IF NOT EXISTS site_settings jsonb NOT NULL DEFAULT '{}'::jsonb;
+create policy "role write artists"
+  on artists for all
+  using  (is_cms_role())
+  with check (is_cms_role());
+
+create policy "role write producers"
+  on producers for all
+  using  (is_cms_role())
+  with check (is_cms_role());
+
+create policy "role write brands"
+  on brands for all
+  using  (is_cms_role())
+  with check (is_cms_role());
+
+create policy "role write releases"
+  on releases for all
+  using  (is_cms_role())
+  with check (is_cms_role());
+
+create policy "role write songs"
+  on songs for all
+  using  (is_cms_role())
+  with check (is_cms_role());
+
+create policy "role write assets"
+  on assets for all
+  using  (is_cms_role())
+  with check (is_cms_role());
+
+create policy "role write homepage"
+  on homepage_config for all
+  using  (is_cms_role())
+  with check (is_cms_role());
+
+create policy "role write timeline"
+  on artist_timeline_items for all
+  using  (is_cms_role())
+  with check (is_cms_role());
+
+-- ─── Admin read policies — draft / non-visible content ───────────────────────
+-- The public read policies only expose published + visible rows.
+-- These supplemental policies allow role-bearing users to SELECT all rows
+-- (including drafts) so the admin UI can display unpublished content.
+
+create policy "role read all releases"
+  on releases for select
+  using (is_cms_role());
+
+create policy "role read all songs"
+  on songs for select
+  using (is_cms_role());
+
+-- ─── Storage object RLS policies — "media" bucket ────────────────────────────
+-- Supabase Storage uses RLS on the storage.objects system table.
+-- These policies apply after the "media" bucket has been created.
+--
+-- Public read: any user (anon or authenticated) can read stored files.
+--   This preserves existing public-URL behaviour for published assets.
+-- Role-gated write: only role-bearing users can upload, update, or delete.
+--
+-- NOTE: To restrict unreleased content from public access, change the
+-- bucket to "Private" in the Supabase Dashboard (Storage → media → Edit)
+-- and use signed URLs (sb.storage.createSignedUrl) for display.  That
+-- change requires broader app-level updates and is tracked for Phase 2.
+
+drop policy if exists "allow public read media"  on storage.objects;
+drop policy if exists "role insert media"         on storage.objects;
+drop policy if exists "role update media"         on storage.objects;
+drop policy if exists "role delete media"         on storage.objects;
+
+create policy "allow public read media"
+  on storage.objects for select
+  to anon, authenticated
+  using (bucket_id = 'media');
+
+create policy "role insert media"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'media' and is_cms_role());
+
+create policy "role update media"
+  on storage.objects for update
+  to authenticated
+  using  (bucket_id = 'media' and is_cms_role())
+  with check (bucket_id = 'media' and is_cms_role());
+
+create policy "role delete media"
+  on storage.objects for delete
+  to authenticated
+  using (bucket_id = 'media' and is_cms_role());
 

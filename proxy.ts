@@ -52,6 +52,28 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // ── Role check ───────────────────────────────────────────────────────────
+  // Only users explicitly provisioned with a CMS role in app_metadata are
+  // allowed into the admin.  An authenticated Supabase account with no role
+  // set is treated as an unprivileged user and redirected to login.
+  const VALID_ADMIN_ROLES = new Set([
+    "admin",
+    "editor",
+    "media_manager",
+    "release_manager",
+  ]);
+  const role = (user.app_metadata?.role as string | undefined) ?? "";
+  if (!VALID_ADMIN_ROLES.has(role)) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirect", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Settings pages are restricted to the admin role only.
+  if (pathname.startsWith("/admin/settings") && role !== "admin") {
+    return NextResponse.redirect(new URL("/admin", request.url));
+  }
+
   return response;
 }
 

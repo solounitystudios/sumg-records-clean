@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import {
@@ -117,10 +117,13 @@ export default function EditArtistPage() {
   const [providerConfig, setProviderConfig] = useState<ProviderConfig>({});
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const formInitialized = useRef(false);
 
-  // Seed form from artist
+  // Seed form from artist once — a rollback that changes `artist` in the store
+  // must NOT re-seed, or the user's in-progress edits would be silently wiped.
   useEffect(() => {
-    if (!artist) return;
+    if (!artist || formInitialized.current) return;
+    formInitialized.current = true;
     setForm({
       name: artist.name,
       slug: artist.slug,
@@ -165,35 +168,37 @@ export default function EditArtistPage() {
     return errs;
   }
 
-  function handleSave() {
+  async function handleSave() {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     if (!artist || !form) return;
     setSaving(true);
-
-    updateArtist(artist.id, {
-      name: form.name,
-      slug: form.slug,
-      genre: form.genre,
-      role: form.role,
-      bio: form.bio,
-      longBio: form.longBio || undefined,
-      featured: form.featured,
-      featuredOnHomepage: form.featuredOnHomepage,
-      tier: form.tier,
-      status: form.status,
-      heroImageUrl: form.heroImageUrl || undefined,
-      profileImageUrl: form.profileImageUrl || undefined,
-      socialLinks: {
-        instagram: form["socialLinks.instagram"] || undefined,
-        spotify: form["socialLinks.spotify"] || undefined,
-        soundcloud: form["socialLinks.soundcloud"] || undefined,
-      },
-      providerConfig: Object.keys(providerConfig).length ? providerConfig : undefined,
-    });
-
-    notify("success", `Artist "${form.name}" saved.`);
-    setSaving(false);
+    try {
+      await updateArtist(artist.id, {
+        name: form.name,
+        genre: form.genre,
+        role: form.role,
+        bio: form.bio,
+        longBio: form.longBio || undefined,
+        featured: form.featured,
+        featuredOnHomepage: form.featuredOnHomepage,
+        tier: form.tier,
+        status: form.status,
+        heroImageUrl: form.heroImageUrl || undefined,
+        profileImageUrl: form.profileImageUrl || undefined,
+        socialLinks: {
+          instagram: form["socialLinks.instagram"] || undefined,
+          spotify: form["socialLinks.spotify"] || undefined,
+          soundcloud: form["socialLinks.soundcloud"] || undefined,
+        },
+        providerConfig: Object.keys(providerConfig).length ? providerConfig : undefined,
+      });
+      notify("success", `Artist "${form.name}" saved.`);
+    } catch {
+      // bgSync already surfaced an error toast; keep form edits intact.
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleDelete() {
@@ -233,9 +238,21 @@ export default function EditArtistPage() {
         <FormSection title="Identity">
           <FormField type="text" label="Name" required value={form.name} error={errors.name}
             onChange={(v) => set("name", v)} />
-          <FormField type="text" label="Slug" required mono value={form.slug} error={errors.slug}
-            hint="Used in URLs: /artists/[slug]"
-            onChange={(v) => set("slug", v)} />
+          {/* Slug is immutable after creation — changing it would break public URLs */}
+          <div className="space-y-0">
+            <p className="block text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2">
+              Slug <span className="text-white/15 normal-case tracking-normal ml-1">(read-only)</span>
+            </p>
+            <input
+              type="text"
+              readOnly
+              value={form.slug}
+              className="w-full bg-white/[0.02] border border-white/5 px-4 py-2.5 text-sm text-white/40 font-mono text-xs cursor-not-allowed"
+            />
+            <p className="mt-1.5 text-[10px] text-white/20">
+              Used in URLs: /artists/[slug] — cannot be changed after creation.
+            </p>
+          </div>
           <FormField type="text" label="Genre / Style" value={form.genre} onChange={(v) => set("genre", v)} />
           <FormField type="text" label="Role" value={form.role} onChange={(v) => set("role", v)} />
         </FormSection>

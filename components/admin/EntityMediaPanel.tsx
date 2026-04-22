@@ -18,6 +18,7 @@ import { useRef, useState } from "react";
 import { CMSAsset, AssetAttachment, AssetType } from "@/lib/types";
 import { useCmsStore } from "@/lib/cms/store";
 import { uploadAsset, ACCEPTED_IMAGE_TYPES, ACCEPTED_VIDEO_TYPES, MAX_IMAGE_SIZE, MAX_VIDEO_SIZE } from "@/lib/media";
+import { getCurrentUploader } from "@/lib/auth";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -290,7 +291,11 @@ export function EntityMediaPanel({
       return;
     }
     setUploading(true);
-    const result = await uploadAsset(file, assetType, "admin");
+
+    // Resolve the actual user identity for the audit trail.
+    const uploadedBy = await getCurrentUploader();
+
+    const result = await uploadAsset(file, assetType, uploadedBy);
     setUploading(false);
 
     const attachment: AssetAttachment = { entityType, entityId, role };
@@ -305,7 +310,7 @@ export function EntityMediaPanel({
         filename: file.name,
         mimeType: file.type,
         sizeBytes: file.size,
-        uploadedBy: "admin",
+        uploadedBy,
         attachedTo: [attachment],
       });
       notify("success", `"${file.name}" uploaded (local — storage not configured).`);

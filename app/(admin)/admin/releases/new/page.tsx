@@ -48,30 +48,34 @@ export default function NewReleasePage() {
     return errs;
   }
 
-  function handleSave() {
+  async function handleSave() {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setSaving(true);
 
-    createRelease({
-      slug: form.slug,
-      title: form.title,
-      artistSlug: form.artistSlug,
-      artistName: form.artistName,
-      type: form.type,
-      genre: form.genre,
-      releaseDate: form.releaseDate,
-      publishAt: form.publishAt || undefined,
-      status: form.status,
-      isVisible: form.isVisible,
-      featuredOnHomepage: form.featuredOnHomepage,
-      description: form.description,
-      coverArtUrl: form.coverArtUrl || undefined,
-      tracklist: tracklist.length ? tracklist : undefined,
-    });
+    try {
+      await createRelease({
+        slug: form.slug,
+        title: form.title,
+        artistSlug: form.artistSlug,
+        artistName: form.artistName,
+        type: form.type,
+        genre: form.genre,
+        releaseDate: form.releaseDate,
+        publishAt: form.publishAt || undefined,
+        status: form.status,
+        isVisible: form.isVisible,
+        featuredOnHomepage: form.featuredOnHomepage,
+        description: form.description,
+        coverArtUrl: form.coverArtUrl || undefined,
+        tracklist: tracklist.length ? tracklist : undefined,
+      });
 
-    notify("success", `Release "${form.title}" created.`);
-    router.push(`/admin/releases/${form.slug}`);
+      notify("success", `Release "${form.title}" created.`);
+      router.push(`/admin/releases/${form.slug}`);
+    } catch {
+      setSaving(false);
+    }
   }
 
   return (

@@ -68,3 +68,27 @@ export function getAdminUrl(): string {
   return "/admin";
 }
 
+/**
+ * Resolves the current authenticated user's upload identity.
+ * Returns the user's email address when available, falling back to the user ID,
+ * and finally to "unknown" when Supabase is not configured or the session has lapsed.
+ *
+ * Call this client-side immediately before calling uploadAsset() so that the
+ * returned uploadedBy string is written to the asset record as the true actor.
+ */
+export async function getCurrentUploader(): Promise<string> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl?.startsWith("https://")) {
+    // Local dev / seed mode — no real auth session.
+    return "dev";
+  }
+  try {
+    const { createClient } = await import("@/lib/supabase/client");
+    const sb = createClient();
+    const { data: { user } } = await sb.auth.getUser();
+    return user?.email ?? user?.id ?? "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
