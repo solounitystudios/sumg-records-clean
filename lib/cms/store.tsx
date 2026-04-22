@@ -818,6 +818,8 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             rights_metadata: release.rightsMetadata ?? null,
             distribution_record: release.distributionRecord ?? null,
             data_source: release.dataSource ?? null,
+            campaign_notes: release.campaignNotes ?? null,
+            promo_deadlines: release.promoDeadlines ?? null,
           })
       );
       if (!ok) throw new Error("Failed to create release");
@@ -867,6 +869,8 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               rights_metadata: u.rightsMetadata ?? null,
               distribution_record: u.distributionRecord ?? null,
               data_source: u.dataSource ?? null,
+              campaign_notes: u.campaignNotes ?? null,
+              promo_deadlines: u.promoDeadlines ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
           orig ? () => setReleases((prev) => prev.map((r) => (r.id === id ? orig : r))) : undefined

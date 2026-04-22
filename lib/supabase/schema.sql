@@ -289,6 +289,13 @@ alter table releases  add column if not exists rights_metadata     jsonb;
 -- Distribution record (distributor, statuses, UPC, reference IDs)
 alter table releases  add column if not exists distribution_record jsonb;
 
+-- ─── Agent 6 migration — Release Command Center ──────────────────────────────
+-- Campaign notes and promo deadline list stored directly on each release.
+-- Safe to run multiple times (IF NOT EXISTS).
+
+alter table releases  add column if not exists campaign_notes   text;
+alter table releases  add column if not exists promo_deadlines  jsonb;
+
 
 -- ============================================================
 -- Phase 6 — Shopify Commerce Layer (additive migration)

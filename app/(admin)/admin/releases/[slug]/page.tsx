@@ -546,6 +546,12 @@ export default function EditReleasePage() {
           </a>
           <div className="flex items-center gap-3">
             <StatusBadge status={release.status} />
+            <a
+              href={`/admin/releases/${release.slug}/command`}
+              className="text-[10px] tracking-[0.15em] uppercase text-white/20 hover:text-white/60 transition-colors border border-white/[0.07] px-3 py-1"
+            >
+              ⌘ Command Center
+            </a>
             {release.isVisible && (
               <a href={`/releases/${release.slug}`} target="_blank" rel="noopener noreferrer"
                 className="text-[10px] font-mono text-white/25 hover:text-white transition-colors">

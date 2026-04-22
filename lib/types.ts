@@ -63,6 +63,20 @@ export interface RightsMetadata {
 }
 
 /**
+ * A single promo / campaign deadline item attached to a release.
+ * Deadline list is stored as a JSONB array on the release record.
+ */
+export interface PromoDeadline {
+  id: string;
+  label: string;
+  /** ISO date string — YYYY-MM-DD */
+  dueDate: string;
+  done: boolean;
+  /** Broad category for grouping / filtering in the command center. */
+  category?: "asset" | "distribution" | "promo" | "rights" | "other";
+}
+
+/**
  * Distribution tracking record — attached to a release.
  * DistroKid and similar services do not provide a real-time public API.
  * Store reference IDs and status manually; link back to distributor dashboard.
@@ -295,6 +309,10 @@ export interface CMSRelease {
   distributionRecord?: DistributionRecord;
   /** Where this record's data originated (manual entry, import, etc.). */
   dataSource?: DataOriginSource;
+  /** Free-form campaign / rollout notes visible only in the admin command center. */
+  campaignNotes?: string;
+  /** Ordered list of promo deadlines for this release's rollout. */
+  promoDeadlines?: PromoDeadline[];
   createdAt: string;
   updatedAt: string;
 }

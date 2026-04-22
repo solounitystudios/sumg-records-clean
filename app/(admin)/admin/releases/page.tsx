@@ -138,6 +138,19 @@ export default function AdminReleases() {
                   <span className="text-[10px] text-white/15">Live</span>
                 ),
             },
+            {
+              key: "slug",
+              label: "Ops",
+              render: (row) => (
+                <Link
+                  href={`/admin/releases/${row.slug}/command`}
+                  className="text-[10px] tracking-[0.1em] uppercase text-white/20 hover:text-white/60 transition-colors"
+                  title="Command Center"
+                >
+                  ⌘
+                </Link>
+              ),
+            },
           ]}
           onEdit={(id) => {
             const r = releases.find((x) => x.id === id);

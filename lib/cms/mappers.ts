@@ -99,6 +99,8 @@ export function rowToRelease(r: any): CMSRelease {
     rightsMetadata: r.rights_metadata ?? undefined,
     distributionRecord: r.distribution_record ?? undefined,
     dataSource: r.data_source ?? undefined,
+    campaignNotes: r.campaign_notes ?? undefined,
+    promoDeadlines: r.promo_deadlines ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
