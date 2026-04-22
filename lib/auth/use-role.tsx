@@ -47,8 +47,6 @@ export interface RoleContext {
   artistSlug: string | null;
 }
 
-const ALL_ROLES: UserRole[] = ["admin", "editor", "media_manager", "release_manager", "artist"];
-
 function buildContext(role: UserRole, loading: boolean, artistSlug: string | null = null): RoleContext {
   return {
     role,
