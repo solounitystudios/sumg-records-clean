@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
   if (result.ambiguous) {
     return NextResponse.json({
       status: "ambiguous",
-      reason: result.error ?? "Multiple plausible matches — human review required",
+      reason: result.ambiguousReason ?? "Multiple plausible matches — human review required",
       candidates: result.candidates ?? [],
     });
   }

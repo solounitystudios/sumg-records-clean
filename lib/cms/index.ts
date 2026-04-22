@@ -278,9 +278,12 @@ function parseDurationToMs(s: string): number | null {
  * already set.  Returns null when Supabase is not configured.
  *
  * Failure paths:
- *   - MusicBrainz returns no result  → no-op, `{ enriched: false }`
- *   - Ambiguous / low-confidence     → no write, `{ enriched: false, ambiguous: true, candidates }`
- *   - Duration mismatch > 10 s       → no write, `{ enriched: false, error: "duration mismatch" }`
+ *   - Song not found                 → `{ enriched: false, error: "Song not found" }`
+ *   - Song already has MBID          → `{ enriched: false, skipped: true, mbid }`
+ *   - Ambiguous / low-confidence     → no write, `{ enriched: false, ambiguous: true, ambiguousReason, candidates }`
+ *   - Duration mismatch > 10 s       → no write, `{ enriched: false, rejected: true, rejectedReason }`
+ *   - Unparsable existing duration   → no write, `{ enriched: false, rejected: true, rejectedReason }`
+ *   - MusicBrainz returns no result  → `{ enriched: false }`
  *   - MusicBrainz network error      → logs, `{ enriched: false, error }`
  *   - Supabase write error           → throws
  */
@@ -293,6 +296,8 @@ export async function enrichSongFromMusicBrainz(songId: string): Promise<{
   /** Human-readable reason for a `rejected` outcome. */
   rejectedReason?: string;
   ambiguous?: boolean;
+  /** Human-readable reason for an `ambiguous` outcome. */
+  ambiguousReason?: string;
   candidates?: MusicBrainzRecording[];
   mbid?: string;
   durationWritten?: string;
@@ -336,7 +341,7 @@ export async function enrichSongFromMusicBrainz(songId: string): Promise<{
       `[musicbrainz] enrichSong(${songId}): ambiguous —`,
       result.reason
     );
-    return { enriched: false, ambiguous: true, candidates: result.candidates };
+    return { enriched: false, ambiguous: true, ambiguousReason: result.reason, candidates: result.candidates };
   }
 
   if (!result.found) {
@@ -351,12 +356,26 @@ export async function enrichSongFromMusicBrainz(songId: string): Promise<{
 
   // Duration mismatch guard: if the song already has a duration, reject any
   // MusicBrainz recording whose duration differs by more than 10 seconds.
+  //
+  // If the stored duration is non-empty but cannot be parsed into milliseconds
+  // (i.e. it is in an unrecognised format), and MusicBrainz has a duration for
+  // the candidate recording, we must also reject — silently proceeding would
+  // bypass the guard entirely and risk writing a wrong MBID.
   if (row.duration && recording.durationMs !== undefined) {
     const existingMs = parseDurationToMs(row.duration);
-    if (
-      existingMs !== null &&
-      Math.abs(recording.durationMs - existingMs) > 10_000
-    ) {
+    if (existingMs === null) {
+      // Unparsable format — cannot safely compare; reject rather than skip guard.
+      console.warn(
+        `[musicbrainz] enrichSong(${songId}): cannot parse existing duration ` +
+          `"${row.duration}" — rejecting to avoid bypassing the duration guard`
+      );
+      return {
+        enriched: false,
+        rejected: true,
+        rejectedReason: `existing duration "${row.duration}" is in an unrecognised format — verify and correct it before enriching`,
+      };
+    }
+    if (Math.abs(recording.durationMs - existingMs) > 10_000) {
       console.warn(
         `[musicbrainz] enrichSong(${songId}): duration mismatch ` +
           `(existing ${row.duration}, MB ${recording.duration ?? recording.durationMs + "ms"})`
