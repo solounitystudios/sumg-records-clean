@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { AuthSession, CMSUser, UserRole } from "@/lib/types";
-
-const ALL_ROLES: UserRole[] = ["admin", "editor", "media_manager", "release_manager", "artist"];
+import { ALL_ROLES } from "@/lib/auth/roles";
 
 /**
  * Resolves the current Supabase auth session on the server.

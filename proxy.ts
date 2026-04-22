@@ -1,30 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { CMS_ROLES, ACCESS_ROLES } from "@/lib/auth/roles";
+import { UserRole } from "@/lib/types";
 
 // ── Route classification ─────────────────────────────────────────────────────
-
-/** Sub-paths of /access that require authentication. */
-const ACCESS_PROTECTED_PREFIXES = [
-  "/access/dashboard",
-  "/access/artist",
-  "/access/staff",
-  "/access/notifications",
-  "/access/settings",
-  "/access/support",
-] as const;
-
-/** CMS roles allowed on /admin/* and all /access/* protected routes. */
-const CMS_ROLES = ["admin", "editor", "media_manager", "release_manager"] as const;
-
-/** Roles allowed on /access/* protected routes (artist + all CMS roles). */
-const ACCESS_ROLES = [...CMS_ROLES, "artist"] as const;
 
 function isAdminRoute(pathname: string): boolean {
   return pathname.startsWith("/admin");
 }
 
 function isAccessProtectedRoute(pathname: string): boolean {
-  return ACCESS_PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  return (
+    pathname.startsWith("/access/dashboard") ||
+    pathname.startsWith("/access/artist") ||
+    pathname.startsWith("/access/staff") ||
+    pathname.startsWith("/access/notifications") ||
+    pathname.startsWith("/access/settings") ||
+    pathname.startsWith("/access/support")
+  );
 }
 
 function isStaffOnlyAccessRoute(pathname: string): boolean {
@@ -82,11 +75,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const role = (user.app_metadata?.role as string | undefined) ?? "";
+  const role = (user.app_metadata?.role as UserRole | undefined) ?? ("" as UserRole);
 
   // ── /admin/* — CMS role gate ───────────────────────────────────────────────
   if (isAdminRoute(pathname)) {
-    if (!CMS_ROLES.includes(role as (typeof CMS_ROLES)[number])) {
+    if (!CMS_ROLES.includes(role)) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("error", "no_role");
       return NextResponse.redirect(loginUrl);
@@ -102,7 +95,7 @@ export async function proxy(request: NextRequest) {
 
   // ── /access/* protected routes ────────────────────────────────────────────
   if (isAccessProtectedRoute(pathname)) {
-    if (!ACCESS_ROLES.includes(role as (typeof ACCESS_ROLES)[number])) {
+    if (!ACCESS_ROLES.includes(role)) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("error", "no_role");
       return NextResponse.redirect(loginUrl);
@@ -119,7 +112,20 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
+// Matcher covers /admin/* and all protected /access/* sub-paths.
 export const config = {
-  matcher: ["/admin/:path*", "/access/dashboard", "/access/dashboard/:path*", "/access/artist/:path*", "/access/staff/:path*", "/access/notifications", "/access/notifications/:path*", "/access/settings", "/access/settings/:path*", "/access/support", "/access/support/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/access/dashboard/:path*",
+    "/access/dashboard",
+    "/access/artist/:path*",
+    "/access/staff/:path*",
+    "/access/notifications/:path*",
+    "/access/notifications",
+    "/access/settings/:path*",
+    "/access/settings",
+    "/access/support/:path*",
+    "/access/support",
+  ],
 };
 

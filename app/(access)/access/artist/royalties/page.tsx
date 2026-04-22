@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { AccessShell } from "@/components/access/AccessShell";
 import { useAccessUser } from "@/lib/auth/use-access-user";
 import { useCmsStore } from "@/lib/cms/store";
