@@ -74,6 +74,7 @@ export default function NewReleasePage() {
       notify("success", `Release "${form.title}" created.`);
       router.push(`/admin/releases/${form.slug}`);
     } catch {
+      // Error toast already shown by store
       setSaving(false);
     }
   }

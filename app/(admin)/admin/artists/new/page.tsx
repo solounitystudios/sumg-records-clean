@@ -78,6 +78,7 @@ export default function NewArtistPage() {
       notify("success", `Artist "${form.name}" created.`);
       router.push(`/admin/artists/${form.slug}`);
     } catch {
+      // Error toast already shown by store
       // bgSync already showed an error toast; just re-enable the button.
       setSaving(false);
     }

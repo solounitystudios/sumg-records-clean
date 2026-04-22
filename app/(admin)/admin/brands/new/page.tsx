@@ -72,6 +72,7 @@ export default function NewBrandPage() {
       notify("success", `Brand "${form.name}" created.`);
       router.push(`/admin/brands/${form.slug}`);
     } catch {
+      // Error toast already shown by store
       setSaving(false);
     }
   }

@@ -222,6 +222,7 @@ interface CmsStoreActions {
   getArtistById: (id: string) => CMSArtist | undefined;
   getArtistBySlug: (slug: string) => CMSArtist | undefined;
   createArtist: (data: Omit<CMSArtist, "id" | "createdAt" | "updatedAt">) => Promise<CMSArtist>;
+  updateArtist: (id: string, data: Partial<CMSArtist>) => CMSArtist | undefined;
   updateArtist: (id: string, data: Partial<CMSArtist>) => Promise<CMSArtist | undefined>;
   deleteArtist: (id: string) => void;
 
@@ -229,6 +230,7 @@ interface CmsStoreActions {
   getProducerById: (id: string) => CMSProducer | undefined;
   getProducerBySlug: (slug: string) => CMSProducer | undefined;
   createProducer: (data: Omit<CMSProducer, "id" | "createdAt" | "updatedAt">) => Promise<CMSProducer>;
+  updateProducer: (id: string, data: Partial<CMSProducer>) => CMSProducer | undefined;
   updateProducer: (id: string, data: Partial<CMSProducer>) => Promise<CMSProducer | undefined>;
   deleteProducer: (id: string) => void;
 
@@ -236,6 +238,7 @@ interface CmsStoreActions {
   getBrandById: (id: string) => CMSBrand | undefined;
   getBrandBySlug: (slug: string) => CMSBrand | undefined;
   createBrand: (data: Omit<CMSBrand, "id" | "createdAt" | "updatedAt">) => Promise<CMSBrand>;
+  updateBrand: (id: string, data: Partial<CMSBrand>) => CMSBrand | undefined;
   updateBrand: (id: string, data: Partial<CMSBrand>) => Promise<CMSBrand | undefined>;
   deleteBrand: (id: string) => void;
 
@@ -244,6 +247,7 @@ interface CmsStoreActions {
   getReleaseBySlug: (slug: string) => CMSRelease | undefined;
   getPublicReleases: () => CMSRelease[];
   createRelease: (data: Omit<CMSRelease, "id" | "createdAt" | "updatedAt">) => Promise<CMSRelease>;
+  updateRelease: (id: string, data: Partial<CMSRelease>) => CMSRelease | undefined;
   updateRelease: (id: string, data: Partial<CMSRelease>) => Promise<CMSRelease | undefined>;
   /**
    * Publishes a release and automatically publishes all non-archived songs
@@ -262,6 +266,7 @@ interface CmsStoreActions {
   getSongsForRelease: (releaseSlug: string) => CMSSong[];
   getSongsForArtist: (artistSlug: string) => CMSSong[];
   createSong: (data: Omit<CMSSong, "id" | "createdAt" | "updatedAt">) => Promise<CMSSong>;
+  updateSong: (id: string, data: Partial<CMSSong>) => CMSSong | undefined;
   updateSong: (id: string, data: Partial<CMSSong>) => Promise<CMSSong | undefined>;
   deleteSong: (id: string) => void;
 
@@ -470,9 +475,10 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             social_links: artist.socialLinks ?? null,
             associated_brands: artist.associatedBrands ?? null,
             provider_config: artist.providerConfig ?? null,
-          }),
-        () => setArtists((prev) => prev.filter((a) => a.id !== artist.id))
+          })
       );
+      if (!ok) throw new Error("Failed to create artist");
+      setArtists((prev) => [...prev, artist]);
       if (!ok) throw new Error("Failed to save artist to database.");
       return artist;
     },
@@ -576,9 +582,10 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             profile_image_url: producer.profileImageUrl ?? null,
             hero_image_url: producer.heroImageUrl ?? null,
             social_links: producer.socialLinks ?? null,
-          }),
-        () => setProducers((prev) => prev.filter((p) => p.id !== producer.id))
+          })
       );
+      if (!ok) throw new Error("Failed to create producer");
+      setProducers((prev) => [...prev, producer]);
       if (!ok) throw new Error("Failed to save producer to database.");
       return producer;
     },
@@ -686,9 +693,10 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             is_active: brand.isActive,
             featured_on_homepage: brand.featuredOnHomepage ?? false,
             sort_order: brand.sortOrder ?? 0,
-          }),
-        () => setBrands((prev) => prev.filter((b) => b.id !== brand.id))
+          })
       );
+      if (!ok) throw new Error("Failed to create brand");
+      setBrands((prev) => [...prev, brand]);
       if (!ok) throw new Error("Failed to save brand to database.");
       return brand;
     },
@@ -810,9 +818,10 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             rights_metadata: release.rightsMetadata ?? null,
             distribution_record: release.distributionRecord ?? null,
             data_source: release.dataSource ?? null,
-          }),
-        () => setReleases((prev) => prev.filter((r) => r.id !== release.id))
+          })
       );
+      if (!ok) throw new Error("Failed to create release");
+      setReleases((prev) => [...prev, release]);
       if (!ok) throw new Error("Failed to save release to database.");
       return release;
     },
@@ -1067,9 +1076,10 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             isrc: song.isrc ?? null,
             rights_metadata: song.rightsMetadata ?? null,
             data_source: song.dataSource ?? null,
-          }),
-        () => setSongs((prev) => prev.filter((s) => s.id !== song.id))
+          })
       );
+      if (!ok) throw new Error("Failed to create song");
+      setSongs((prev) => [...prev, song]);
       if (!ok) throw new Error("Failed to save song to database.");
       return song;
     },
@@ -1185,10 +1195,10 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
             tags: item.tags ?? null,
             importance: item.importance,
             lyric_engine_eligible: item.lyricEngineEligible,
-          }),
-        () =>
-          setTimelineItems((prev) => prev.filter((t) => t.id !== item.id))
+          })
       );
+      if (!ok) throw new Error("Failed to create timeline item");
+      setTimelineItems((prev) => [...prev, item]);
       if (!ok) throw new Error("Failed to save timeline item to database.");
       return item;
     },

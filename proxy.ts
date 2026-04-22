@@ -52,26 +52,24 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // ── Role check ───────────────────────────────────────────────────────────
-  // Only users explicitly provisioned with a CMS role in app_metadata are
-  // allowed into the admin.  An authenticated Supabase account with no role
-  // set is treated as an unprivileged user and redirected to login.
-  const VALID_ADMIN_ROLES = new Set([
-    "admin",
-    "editor",
-    "media_manager",
-    "release_manager",
-  ]);
+  // ── CMS role gate ────────────────────────────────────────────────────────
+  // Every authenticated user must carry a CMS role in app_metadata to access
+  // any admin route. Users with no role (e.g. plain Supabase auth accounts)
+  // are redirected to login with an explanatory query param.
+  const CMS_ROLES = ["admin", "editor", "media_manager", "release_manager"] as const;
   const role = (user.app_metadata?.role as string | undefined) ?? "";
-  if (!VALID_ADMIN_ROLES.has(role)) {
+
+  if (!CMS_ROLES.includes(role as (typeof CMS_ROLES)[number])) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
+    loginUrl.searchParams.set("error", "no_role");
     return NextResponse.redirect(loginUrl);
   }
 
-  // Settings pages are restricted to the admin role only.
+  // ── Settings restricted to admin only ────────────────────────────────────
   if (pathname.startsWith("/admin/settings") && role !== "admin") {
-    return NextResponse.redirect(new URL("/admin", request.url));
+    const adminUrl = new URL("/admin", request.url);
+    adminUrl.searchParams.set("error", "settings_admin_only");
+    return NextResponse.redirect(adminUrl);
   }
 
   return response;

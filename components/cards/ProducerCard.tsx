@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { CMSProducer } from "@/lib/types";
 
 interface ProducerCardProps {
@@ -37,7 +36,5 @@ export function ProducerCard({ producer, index }: ProducerCardProps) {
       {/* Hover left accent */}
       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0 h-0 group-hover:w-px group-hover:h-10 bg-white/25 transition-all duration-300" />
     </div>
-      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0 h-0 group-hover:w-px group-hover:h-8 bg-white/20 transition-all duration-300" />
-    </Link>
   );
 }

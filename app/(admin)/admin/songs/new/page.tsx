@@ -16,7 +16,7 @@ function slugify(s: string) {
 
 export default function NewSongPage() {
   const router = useRouter();
-  const { createSong, notify, artists, releases, producers } = useCmsStore();
+  const { createSong, notify, artists, releases } = useCmsStore();
 
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -38,7 +38,7 @@ export default function NewSongPage() {
     setSlugManual(true);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!title.trim()) { notify("error", "Title is required."); return; }
     if (!slug.trim()) { notify("error", "Slug is required."); return; }
     if (!artistSlug) { notify("error", "Artist is required."); return; }
@@ -46,22 +46,26 @@ export default function NewSongPage() {
     const artist = artists.find((a) => a.slug === artistSlug);
     const release = releases.find((r) => r.slug === releaseSlug);
     const producerSlugs: string[] = [];
-    createSong({
-      slug: slug.trim(),
-      title: title.trim(),
-      artistSlug,
-      artistName: artist?.name ?? artistSlug,
-      releaseSlug: releaseSlug || undefined,
-      releaseName: release?.title ?? undefined,
-      producerSlugs: producerSlugs.length ? producerSlugs : undefined,
-      genre: genre || undefined,
-      duration: duration || undefined,
-      status,
-      isVisible: status === "published",
-    });
-    notify("success", `Song "${title}" created.`);
-    setSaving(false);
-    router.push(`/admin/songs/${slug.trim()}`);
+    try {
+      await createSong({
+        slug: slug.trim(),
+        title: title.trim(),
+        artistSlug,
+        artistName: artist?.name ?? artistSlug,
+        releaseSlug: releaseSlug || undefined,
+        releaseName: release?.title ?? undefined,
+        producerSlugs: producerSlugs.length ? producerSlugs : undefined,
+        genre: genre || undefined,
+        duration: duration || undefined,
+        status,
+        isVisible: status === "published",
+      });
+      notify("success", `Song "${title}" created.`);
+      router.push(`/admin/songs/${slug.trim()}`);
+    } catch {
+      // Error toast already shown by store
+      setSaving(false);
+    }
   }
 
   return (
