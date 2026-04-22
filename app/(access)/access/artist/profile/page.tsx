@@ -94,7 +94,7 @@ export default function ArtistProfilePage() {
             <div>
               <p className="text-[9px] tracking-[0.3em] uppercase text-white/25 mb-3">Social Links</p>
               <div className="space-y-2">
-                {(["instagram", "twitter", "spotify", "soundcloud", "youtube"] as const).map((platform) => {
+                {(["instagram", "twitter", "spotify", "soundcloud", "youtube"] as (keyof typeof artist.socialLinks)[]).map((platform) => {
                   const val = artist.socialLinks?.[platform];
                   return (
                     <div key={platform} className="flex items-center justify-between border-b border-white/[0.04] pb-2">
