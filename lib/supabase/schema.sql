@@ -153,7 +153,30 @@ insert into homepage_config (id) values ('homepage') on conflict (id) do nothing
 
 -- ─── Row-Level Security ──────────────────────────────────────────────────────
 -- Public read (anon) for artists, producers, brands, releases, homepage_config.
--- All writes require authenticated admin session (service role bypasses RLS).
+-- All writes require a CMS role in the JWT app_metadata claim.
+-- Service-role key bypasses RLS entirely (used only by server-side admin ops).
+--
+-- CMS roles: admin | editor | media_manager | release_manager
+-- Role is provisioned via:
+--   supabase.auth.admin.updateUserById(id, { app_metadata: { role: 'admin' } })
+--
+-- /admin/settings* is further restricted to admin only at the middleware layer
+-- (proxy.ts) — there is no separate DB policy for settings.
+
+-- ── is_cms_role() helper ──────────────────────────────────────────────────────
+-- Returns true when the authenticated JWT carries a recognised CMS role.
+-- Used as the WITH CHECK / USING predicate on all write policies below.
+create or replace function is_cms_role()
+  returns boolean
+  language sql
+  security definer
+  stable
+as $$
+  select coalesce(
+    auth.jwt() -> 'app_metadata' ->> 'role',
+    ''
+  ) = any(array['admin', 'editor', 'media_manager', 'release_manager'])
+$$;
 
 alter table artists enable row level security;
 alter table producers enable row level security;
@@ -167,23 +190,23 @@ alter table homepage_config enable row level security;
 create policy "public read artists"     on artists         for select using (true);
 create policy "public read producers"   on producers       for select using (true);
 create policy "public read brands"      on brands          for select using (true);
--- Only published, visible, and past-their-publish-date releases are publicly readable.
--- Authenticated users (admin) can read all releases via the write policy below.
+-- Only published, visible releases are publicly readable.
+-- CMS users can read all releases via the write policy below.
 create policy "public read releases"    on releases        for select using (is_visible = true and status = 'published');
 -- Only published, visible songs are publicly readable.
--- Authenticated users (admin) can read all songs via the write policy below.
+-- CMS users can read all songs via the write policy below.
 create policy "public read songs"       on songs           for select using (is_visible = true and status = 'published');
 create policy "public read homepage"    on homepage_config for select using (true);
 create policy "public read assets"      on assets          for select using (true);
 
--- Authenticated write policies (admin users only)
-create policy "auth write artists"     on artists         for all using (auth.role() = 'authenticated');
-create policy "auth write producers"   on producers       for all using (auth.role() = 'authenticated');
-create policy "auth write brands"      on brands          for all using (auth.role() = 'authenticated');
-create policy "auth write releases"    on releases        for all using (auth.role() = 'authenticated');
-create policy "auth write songs"       on songs           for all using (auth.role() = 'authenticated');
-create policy "auth write assets"      on assets          for all using (auth.role() = 'authenticated');
-create policy "auth write homepage"    on homepage_config for all using (auth.role() = 'authenticated');
+-- CMS write policies — require a valid CMS role in JWT app_metadata
+create policy "cms write artists"     on artists         for all using (is_cms_role()) with check (is_cms_role());
+create policy "cms write producers"   on producers       for all using (is_cms_role()) with check (is_cms_role());
+create policy "cms write brands"      on brands          for all using (is_cms_role()) with check (is_cms_role());
+create policy "cms write releases"    on releases        for all using (is_cms_role()) with check (is_cms_role());
+create policy "cms write songs"       on songs           for all using (is_cms_role()) with check (is_cms_role());
+create policy "cms write assets"      on assets          for all using (is_cms_role()) with check (is_cms_role());
+create policy "cms write homepage"    on homepage_config for all using (is_cms_role()) with check (is_cms_role());
 
 -- ─── Storage Buckets ────────────────────────────────────────────────────────
 -- Run in Supabase Dashboard → Storage → New Bucket:
@@ -237,7 +260,7 @@ create table if not exists artist_timeline_items (
 
 alter table artist_timeline_items enable row level security;
 create policy "public read timeline"  on artist_timeline_items for select using (true);
-create policy "auth write timeline"   on artist_timeline_items for all    using (auth.role() = 'authenticated');
+create policy "cms write timeline"    on artist_timeline_items for all    using (is_cms_role()) with check (is_cms_role());
 
 -- ─── Phase A+C migration — Music Operations Layer + Data Integrity ─────────────
 -- Additive only — all statements are safe to run multiple times (IF NOT EXISTS).
@@ -391,8 +414,8 @@ create table if not exists artist_spotify_snapshots (
 alter table artist_spotify_snapshots enable row level security;
 create policy if not exists "public read artist snapshots"
   on artist_spotify_snapshots for select using (true);
-create policy if not exists "auth write artist snapshots"
-  on artist_spotify_snapshots for all using (auth.role() = 'authenticated');
+create policy if not exists "cms write artist snapshots"
+  on artist_spotify_snapshots for all using (is_cms_role()) with check (is_cms_role());
 -- Additive: site-wide settings persisted via /admin/settings
 ALTER TABLE homepage_config
   ADD COLUMN IF NOT EXISTS site_settings jsonb NOT NULL DEFAULT '{}'::jsonb;

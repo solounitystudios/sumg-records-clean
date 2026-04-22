@@ -16,7 +16,7 @@ function slugify(s: string) {
 
 export default function NewSongPage() {
   const router = useRouter();
-  const { createSong, notify, artists, releases, producers } = useCmsStore();
+  const { createSong, notify, artists, releases } = useCmsStore();
 
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
