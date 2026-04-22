@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import {
@@ -33,9 +33,13 @@ export default function EditProducerPage() {
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const formInitialized = useRef(false);
 
+  // Seed form from producer once — rollback-triggered store changes must NOT
+  // re-seed or the user's in-progress edits would be silently wiped.
   useEffect(() => {
-    if (!producer) return;
+    if (!producer || formInitialized.current) return;
+    formInitialized.current = true;
     setForm({
       name: producer.name,
       slug: producer.slug,
@@ -74,30 +78,32 @@ export default function EditProducerPage() {
     return errs;
   }
 
-  function handleSave() {
+  async function handleSave() {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     if (!producer || !form) return;
     setSaving(true);
-
-    updateProducer(producer.id, {
-      name: form!.name,
-      slug: form!.slug,
-      specialty: form!.specialty,
-      credits: form!.credits,
-      signature: form!.signature,
-      bio: form!.bio || undefined,
-      heroImageUrl: form!.heroImageUrl || undefined,
-      profileImageUrl: form!.profileImageUrl || undefined,
-      socialLinks: {
-        instagram: form!["socialLinks.instagram"] || undefined,
-        spotify: form!["socialLinks.spotify"] || undefined,
-        soundcloud: form!["socialLinks.soundcloud"] || undefined,
-      },
-    });
-
-    notify("success", `Producer "${form!.name}" saved.`);
-    setSaving(false);
+    try {
+      await updateProducer(producer.id, {
+        name: form!.name,
+        specialty: form!.specialty,
+        credits: form!.credits,
+        signature: form!.signature,
+        bio: form!.bio || undefined,
+        heroImageUrl: form!.heroImageUrl || undefined,
+        profileImageUrl: form!.profileImageUrl || undefined,
+        socialLinks: {
+          instagram: form!["socialLinks.instagram"] || undefined,
+          spotify: form!["socialLinks.spotify"] || undefined,
+          soundcloud: form!["socialLinks.soundcloud"] || undefined,
+        },
+      });
+      notify("success", `Producer "${form!.name}" saved.`);
+    } catch {
+      // bgSync already surfaced an error toast; keep form edits intact.
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleDelete() {
@@ -125,8 +131,21 @@ export default function EditProducerPage() {
         <FormSection title="Identity">
           <FormField type="text" label="Name" required value={form.name} error={errors.name}
             onChange={(v) => set("name", v)} />
-          <FormField type="text" label="Slug" required mono value={form.slug} error={errors.slug}
-            hint="/producers/[slug]" onChange={(v) => set("slug", v)} />
+          {/* Slug is immutable after creation — changing it would break public URLs */}
+          <div className="space-y-0">
+            <p className="block text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2">
+              Slug <span className="text-white/15 normal-case tracking-normal ml-1">(read-only)</span>
+            </p>
+            <input
+              type="text"
+              readOnly
+              value={form.slug}
+              className="w-full bg-white/[0.02] border border-white/5 px-4 py-2.5 text-sm text-white/40 font-mono text-xs cursor-not-allowed"
+            />
+            <p className="mt-1.5 text-[10px] text-white/20">
+              Used in URLs: /producers/[slug] — cannot be changed after creation.
+            </p>
+          </div>
           <FormField type="text" label="Specialty" value={form.specialty} onChange={(v) => set("specialty", v)} />
           <FormField type="text" label="Credits" value={form.credits} onChange={(v) => set("credits", v)} />
           <FormField type="text" label="Signature Sound" value={form.signature} onChange={(v) => set("signature", v)} />

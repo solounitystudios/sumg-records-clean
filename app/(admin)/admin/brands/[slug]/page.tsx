@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import {
@@ -148,9 +148,13 @@ export default function EditBrandPage() {
   } | null>(null);
   const [featuredReleaseSlugs, setFeaturedReleaseSlugs] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const formInitialized = useRef(false);
 
+  // Seed form from brand once — rollback-triggered store changes must NOT
+  // re-seed or the user's in-progress edits would be silently wiped.
   useEffect(() => {
-    if (!brand) return;
+    if (!brand || formInitialized.current) return;
+    formInitialized.current = true;
     setForm({
       name: brand.name,
       slug: brand.slug,
@@ -190,32 +194,36 @@ export default function EditBrandPage() {
     setForm((prev) => prev ? { ...prev, [key]: value } : prev);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!brand || !form) return;
     setSaving(true);
-    updateBrand(brand.id, {
-      name: form.name,
-      slug: form.slug,
-      category: form.category,
-      tagline: form.tagline,
-      descriptor: form.descriptor,
-      longDescription: form.longDescription || undefined,
-      manifesto: form.manifesto || undefined,
-      heroCopy: form.heroCopy || undefined,
-      heroHeadline: form.heroHeadline || undefined,
-      heroSubcopy: form.heroSubcopy || undefined,
-      heroImageUrl: form.heroImageUrl || undefined,
-      logoUrl: form.logoUrl || undefined,
-      accentColor: form.accentColor || undefined,
-      heroStyle: form.heroStyle,
-      campaignStatus: form.campaignStatus,
-      collectionName: form.collectionName || undefined,
-      featuredReleaseSlugs: featuredReleaseSlugs.length ? featuredReleaseSlugs : undefined,
-      isActive: form.isActive,
-      featuredOnHomepage: form.featuredOnHomepage,
-    });
-    notify("success", `Brand "${form.name}" saved.`);
-    setSaving(false);
+    try {
+      await updateBrand(brand.id, {
+        name: form.name,
+        category: form.category,
+        tagline: form.tagline,
+        descriptor: form.descriptor,
+        longDescription: form.longDescription || undefined,
+        manifesto: form.manifesto || undefined,
+        heroCopy: form.heroCopy || undefined,
+        heroHeadline: form.heroHeadline || undefined,
+        heroSubcopy: form.heroSubcopy || undefined,
+        heroImageUrl: form.heroImageUrl || undefined,
+        logoUrl: form.logoUrl || undefined,
+        accentColor: form.accentColor || undefined,
+        heroStyle: form.heroStyle,
+        campaignStatus: form.campaignStatus,
+        collectionName: form.collectionName || undefined,
+        featuredReleaseSlugs: featuredReleaseSlugs.length ? featuredReleaseSlugs : undefined,
+        isActive: form.isActive,
+        featuredOnHomepage: form.featuredOnHomepage,
+      });
+      notify("success", `Brand "${form.name}" saved.`);
+    } catch {
+      // bgSync already surfaced an error toast; keep form edits intact.
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleDelete() {
@@ -254,8 +262,21 @@ export default function EditBrandPage() {
         {/* Identity */}
         <FormSection title="Identity">
           <FormField type="text" label="Brand Name" required value={form.name} onChange={(v) => set("name", v)} />
-          <FormField type="text" label="Slug" required mono value={form.slug}
-            hint="/brands/[slug]" onChange={(v) => set("slug", v)} />
+          {/* Slug is immutable after creation — changing it would break public URLs */}
+          <div className="space-y-0">
+            <p className="block text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2">
+              Slug <span className="text-white/15 normal-case tracking-normal ml-1">(read-only)</span>
+            </p>
+            <input
+              type="text"
+              readOnly
+              value={form.slug}
+              className="w-full bg-white/[0.02] border border-white/5 px-4 py-2.5 text-sm text-white/40 font-mono text-xs cursor-not-allowed"
+            />
+            <p className="mt-1.5 text-[10px] text-white/20">
+              Used in URLs: /brands/[slug] — cannot be changed after creation.
+            </p>
+          </div>
           <FormField type="text" label="Category" value={form.category} onChange={(v) => set("category", v)} />
           <FormField type="text" label="Tagline" value={form.tagline} onChange={(v) => set("tagline", v)} />
           <FormField type="text" label="Descriptor" value={form.descriptor} onChange={(v) => set("descriptor", v)} />

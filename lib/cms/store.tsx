@@ -211,21 +211,21 @@ interface CmsStoreActions {
   getArtistById: (id: string) => CMSArtist | undefined;
   getArtistBySlug: (slug: string) => CMSArtist | undefined;
   createArtist: (data: Omit<CMSArtist, "id" | "createdAt" | "updatedAt">) => Promise<CMSArtist>;
-  updateArtist: (id: string, data: Partial<CMSArtist>) => CMSArtist | undefined;
+  updateArtist: (id: string, data: Partial<CMSArtist>) => Promise<CMSArtist | undefined>;
   deleteArtist: (id: string) => void;
 
   // Producers
   getProducerById: (id: string) => CMSProducer | undefined;
   getProducerBySlug: (slug: string) => CMSProducer | undefined;
   createProducer: (data: Omit<CMSProducer, "id" | "createdAt" | "updatedAt">) => Promise<CMSProducer>;
-  updateProducer: (id: string, data: Partial<CMSProducer>) => CMSProducer | undefined;
+  updateProducer: (id: string, data: Partial<CMSProducer>) => Promise<CMSProducer | undefined>;
   deleteProducer: (id: string) => void;
 
   // Brands
   getBrandById: (id: string) => CMSBrand | undefined;
   getBrandBySlug: (slug: string) => CMSBrand | undefined;
   createBrand: (data: Omit<CMSBrand, "id" | "createdAt" | "updatedAt">) => Promise<CMSBrand>;
-  updateBrand: (id: string, data: Partial<CMSBrand>) => CMSBrand | undefined;
+  updateBrand: (id: string, data: Partial<CMSBrand>) => Promise<CMSBrand | undefined>;
   deleteBrand: (id: string) => void;
 
   // Releases
@@ -233,12 +233,12 @@ interface CmsStoreActions {
   getReleaseBySlug: (slug: string) => CMSRelease | undefined;
   getPublicReleases: () => CMSRelease[];
   createRelease: (data: Omit<CMSRelease, "id" | "createdAt" | "updatedAt">) => Promise<CMSRelease>;
-  updateRelease: (id: string, data: Partial<CMSRelease>) => CMSRelease | undefined;
+  updateRelease: (id: string, data: Partial<CMSRelease>) => Promise<CMSRelease | undefined>;
   /**
    * Publishes a release and automatically publishes all non-archived songs
    * linked to that release.
    */
-  publishRelease: (id: string) => CMSRelease | undefined;
+  publishRelease: (id: string) => Promise<CMSRelease | undefined>;
   deleteRelease: (id: string) => void;
   updateTracklist: (releaseId: string, tracklist: CMSSong[]) => void;
 
@@ -249,7 +249,7 @@ interface CmsStoreActions {
   getSongsForRelease: (releaseSlug: string) => CMSSong[];
   getSongsForArtist: (artistSlug: string) => CMSSong[];
   createSong: (data: Omit<CMSSong, "id" | "createdAt" | "updatedAt">) => Promise<CMSSong>;
-  updateSong: (id: string, data: Partial<CMSSong>) => CMSSong | undefined;
+  updateSong: (id: string, data: Partial<CMSSong>) => Promise<CMSSong | undefined>;
   deleteSong: (id: string) => void;
 
   // Timeline
@@ -260,7 +260,7 @@ interface CmsStoreActions {
   updateTimelineItem: (
     id: string,
     data: Partial<ArtistTimelineItem>
-  ) => ArtistTimelineItem | undefined;
+  ) => Promise<ArtistTimelineItem | undefined>;
   deleteTimelineItem: (id: string) => void;
 
   // Assets
@@ -468,7 +468,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const updateArtist = useCallback(
-    (id: string, data: Partial<CMSArtist>): CMSArtist | undefined => {
+    async (id: string, data: Partial<CMSArtist>): Promise<CMSArtist | undefined> => {
       let original: CMSArtist | undefined;
       let updated: CMSArtist | undefined;
       setArtists((prev) =>
@@ -482,7 +482,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
       if (updated) {
         const u = updated;
         const orig = original;
-        bgSync(
+        const ok = await bgSync(
           (sb) =>
             sb.from("artists").update({
               name: u.name,
@@ -502,8 +502,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               provider_config: u.providerConfig ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
-          orig ? () => setArtists((prev) => prev.map((a) => (a.id === id ? orig : a))) : undefined
+          orig ? () => setArtists((prev) => prev.map((a) => (a.id === id ? orig! : a))) : undefined
         );
+        if (!ok) throw new Error("Failed to update artist.");
       }
       return updated;
     },
@@ -572,7 +573,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const updateProducer = useCallback(
-    (id: string, data: Partial<CMSProducer>): CMSProducer | undefined => {
+    async (id: string, data: Partial<CMSProducer>): Promise<CMSProducer | undefined> => {
       let original: CMSProducer | undefined;
       let updated: CMSProducer | undefined;
       setProducers((prev) =>
@@ -586,7 +587,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
       if (updated) {
         const u = updated;
         const orig = original;
-        bgSync(
+        const ok = await bgSync(
           (sb) =>
             sb.from("producers").update({
               name: u.name,
@@ -602,8 +603,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               social_links: u.socialLinks ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
-          orig ? () => setProducers((prev) => prev.map((p) => (p.id === id ? orig : p))) : undefined
+          orig ? () => setProducers((prev) => prev.map((p) => (p.id === id ? orig! : p))) : undefined
         );
+        if (!ok) throw new Error("Failed to update producer.");
       }
       return updated;
     },
@@ -681,7 +683,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const updateBrand = useCallback(
-    (id: string, data: Partial<CMSBrand>): CMSBrand | undefined => {
+    async (id: string, data: Partial<CMSBrand>): Promise<CMSBrand | undefined> => {
       let original: CMSBrand | undefined;
       let updated: CMSBrand | undefined;
       setBrands((prev) =>
@@ -695,7 +697,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
       if (updated) {
         const u = updated;
         const orig = original;
-        bgSync(
+        const ok = await bgSync(
           (sb) =>
             sb.from("brands").update({
               name: u.name,
@@ -720,8 +722,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               sort_order: u.sortOrder ?? 0,
               updated_at: u.updatedAt,
             }).eq("id", id),
-          orig ? () => setBrands((prev) => prev.map((b) => (b.id === id ? orig : b))) : undefined
+          orig ? () => setBrands((prev) => prev.map((b) => (b.id === id ? orig! : b))) : undefined
         );
+        if (!ok) throw new Error("Failed to update brand.");
       }
       return updated;
     },
@@ -804,7 +807,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const updateRelease = useCallback(
-    (id: string, data: Partial<CMSRelease>): CMSRelease | undefined => {
+    async (id: string, data: Partial<CMSRelease>): Promise<CMSRelease | undefined> => {
       let original: CMSRelease | undefined;
       let updated: CMSRelease | undefined;
       setReleases((prev) =>
@@ -818,7 +821,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
       if (updated) {
         const u = updated;
         const orig = original;
-        bgSync(
+        const ok = await bgSync(
           (sb) =>
             sb.from("releases").update({
               title: u.title,
@@ -843,8 +846,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               data_source: u.dataSource ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
-          orig ? () => setReleases((prev) => prev.map((r) => (r.id === id ? orig : r))) : undefined
+          orig ? () => setReleases((prev) => prev.map((r) => (r.id === id ? orig! : r))) : undefined
         );
+        if (!ok) throw new Error("Failed to update release.");
       }
       return updated;
     },
@@ -860,9 +864,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
    * on the public artist and release pages.
    */
   const publishRelease = useCallback(
-    (id: string): CMSRelease | undefined => {
+    async (id: string): Promise<CMSRelease | undefined> => {
       const release = releases.find((r) => r.id === id);
-      const result = updateRelease(id, {
+      const result = await updateRelease(id, {
         status: "published",
         isVisible: true,
         publishAt: now(),
@@ -1014,7 +1018,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const updateSong = useCallback(
-    (id: string, data: Partial<CMSSong>): CMSSong | undefined => {
+    async (id: string, data: Partial<CMSSong>): Promise<CMSSong | undefined> => {
       let original: CMSSong | undefined;
       let updated: CMSSong | undefined;
       setSongs((prev) =>
@@ -1028,7 +1032,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
       if (updated) {
         const u = updated;
         const orig = original;
-        bgSync(
+        const ok = await bgSync(
           (sb) =>
             sb.from("songs").update({
               title: u.title,
@@ -1054,8 +1058,9 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
               data_source: u.dataSource ?? null,
               updated_at: u.updatedAt,
             }).eq("id", id),
-          orig ? () => setSongs((prev) => prev.map((s) => (s.id === id ? orig : s))) : undefined
+          orig ? () => setSongs((prev) => prev.map((s) => (s.id === id ? orig! : s))) : undefined
         );
+        if (!ok) throw new Error("Failed to update song.");
       }
       return updated;
     },
@@ -1130,10 +1135,10 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   );
 
   const updateTimelineItem = useCallback(
-    (
+    async (
       id: string,
       data: Partial<ArtistTimelineItem>
-    ): ArtistTimelineItem | undefined => {
+    ): Promise<ArtistTimelineItem | undefined> => {
       let original: ArtistTimelineItem | undefined;
       let updated: ArtistTimelineItem | undefined;
       setTimelineItems((prev) =>
@@ -1147,7 +1152,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
       if (updated) {
         const u = updated;
         const orig = original;
-        bgSync(
+        const ok = await bgSync(
           (sb) =>
             sb.from("artist_timeline_items").update({
               artist_slug: u.artistSlug,
@@ -1173,6 +1178,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
                 )
             : undefined
         );
+        if (!ok) throw new Error("Failed to update timeline item.");
       }
       return updated;
     },

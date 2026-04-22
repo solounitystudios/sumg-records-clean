@@ -604,6 +604,7 @@ export default function ArtistTimelinePage() {
     null
   );
   const [createSaving, setCreateSaving] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
 
   const filteredItems = useMemo(() => {
     let items = allItems;
@@ -647,13 +648,20 @@ export default function ArtistTimelinePage() {
     }
   }
 
-  function handleUpdate(
+  async function handleUpdate(
     data: Omit<ArtistTimelineItem, "id" | "createdAt" | "updatedAt">
   ) {
     if (!editingItem) return;
-    updateTimelineItem(editingItem.id, data);
-    notify("success", `"${data.title}" updated.`);
-    setEditingItem(null);
+    setEditSaving(true);
+    try {
+      await updateTimelineItem(editingItem.id, data);
+      notify("success", `"${data.title}" updated.`);
+      setEditingItem(null);
+    } catch {
+      // bgSync already surfaced an error toast; keep form open with edits.
+    } finally {
+      setEditSaving(false);
+    }
   }
 
   function handleDelete(id: string) {
@@ -758,6 +766,7 @@ export default function ArtistTimelinePage() {
             songs={artistSongs}
             onSave={handleUpdate}
             onCancel={() => setEditingItem(null)}
+            saving={editSaving}
           />
         )}
 
