@@ -53,10 +53,16 @@ export default async function ArtistsAdminPage() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Link
+                        href={`/admin/artists/${artist.slug}/edit`}
+                        className="text-xs text-white/40 hover:text-white transition"
+                      >
+                        Edit
+                      </Link>
+                      <Link
                         href={`/artists/${artist.slug}`}
                         className="text-xs text-white/40 hover:text-white transition"
                       >
-                        Public Profile →
+                        Public →
                       </Link>
                     </div>
                   </div>

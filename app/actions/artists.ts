@@ -1,5 +1,6 @@
 "use server"
 
+import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 import { supabase } from "@/lib/db/supabase"
 import { requireAdmin } from "@/lib/auth"
@@ -42,7 +43,6 @@ export async function uploadArtistPhoto(
 
   if (artistError) return { error: artistError.message }
 
-  // Best-effort asset registry — don't block on failure
   await supabase.from("assets").insert({
     type: "image",
     url,
@@ -55,4 +55,39 @@ export async function uploadArtistPhoto(
 
   revalidatePath("/admin/artists")
   return { url }
+}
+
+export async function updateArtist(slug: string, formData: FormData) {
+  await requireAdmin()
+
+  const name = formData.get("name")?.toString().trim() ?? ""
+  const role = formData.get("role")?.toString().trim() ?? ""
+  const genre = formData.get("genre")?.toString().trim() ?? ""
+  const bio = formData.get("bio")?.toString().trim() ?? ""
+  const tagsRaw = formData.get("tags")?.toString().trim() ?? ""
+  const tags = tagsRaw.split(",").map((t) => t.trim()).filter(Boolean)
+  const monthlyListeners = parseInt(formData.get("monthlyListeners")?.toString() ?? "0", 10)
+  const totalStreams = parseInt(formData.get("totalStreams")?.toString() ?? "0", 10)
+
+  if (!name) throw new Error("Name is required.")
+
+  const { error } = await supabase
+    .from("artists")
+    .update({
+      name,
+      role,
+      genre,
+      bio,
+      tags,
+      monthly_listeners: isNaN(monthlyListeners) ? 0 : monthlyListeners,
+      total_streams: isNaN(totalStreams) ? 0 : totalStreams,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("slug", slug)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath("/admin/artists")
+  revalidatePath(`/artists/${slug}`)
+  redirect("/admin/artists")
 }

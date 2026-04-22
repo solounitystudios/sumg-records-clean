@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { getProducers } from "@/lib/db/producers"
 
 export const metadata = { title: "Producers — SUMG Records" }
@@ -19,16 +20,17 @@ export default async function ProducersPage() {
 
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {producers.map((producer, index) => (
-            <div
+            <Link
               key={producer.slug}
-              className="rounded-3xl border border-white/10 bg-[#0d1016] p-8"
+              href={`/producers/${producer.slug}`}
+              className="group block rounded-3xl border border-white/10 bg-[#0d1016] p-8 hover:border-white/20 transition"
             >
               <div className="flex items-start justify-between gap-4 mb-6">
                 <div>
                   <div className="text-xs uppercase tracking-[0.3em] text-white/35 mb-2">
                     {String(index + 1).padStart(2, "0")}
                   </div>
-                  <h2 className="text-2xl font-semibold">{producer.name}</h2>
+                  <h2 className="text-2xl font-semibold group-hover:text-white/90 transition">{producer.name}</h2>
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-semibold">{producer.credits}</div>
@@ -48,7 +50,7 @@ export default async function ProducersPage() {
                   </span>
                 ))}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </section>

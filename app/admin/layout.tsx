@@ -7,6 +7,9 @@ const adminNav = [
   { href: "/admin/artists", label: "Artists" },
   { href: "/admin/releases", label: "Releases" },
   { href: "/admin/royalties", label: "Royalties" },
+  { href: "/admin/producers", label: "Producers" },
+  { href: "/admin/brands", label: "Brands" },
+  { href: "/admin/news", label: "News" },
   { href: "/admin/contributors", label: "Contributors" },
   { href: "/admin/lyrics", label: "Lyrics" },
 ]

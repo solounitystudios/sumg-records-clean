@@ -1,7 +1,8 @@
 import { supabase } from "./supabase"
 import type { Brand } from "@/lib/data"
 
-const SELECT = "id, slug, name, tagline, descriptor, category"
+const SELECT =
+  "id, slug, name, tagline, descriptor, category, accent_color, logo_url, hero_image_url, shopify_url, is_active, campaign_status, collection_name, manifesto"
 
 type BrandRow = {
   id: string
@@ -10,6 +11,14 @@ type BrandRow = {
   tagline: string
   descriptor: string
   category: string
+  accent_color: string | null
+  logo_url: string | null
+  hero_image_url: string | null
+  shopify_url: string | null
+  is_active: boolean
+  campaign_status: string | null
+  collection_name: string | null
+  manifesto: string | null
 }
 
 function toBrand(row: BrandRow): Brand {
@@ -20,6 +29,14 @@ function toBrand(row: BrandRow): Brand {
     tagline: row.tagline,
     description: row.descriptor,
     category: row.category,
+    accentColor: row.accent_color,
+    logoUrl: row.logo_url,
+    heroImageUrl: row.hero_image_url,
+    shopifyUrl: row.shopify_url,
+    isActive: row.is_active,
+    campaignStatus: row.campaign_status,
+    collectionName: row.collection_name,
+    manifesto: row.manifesto,
   }
 }
 

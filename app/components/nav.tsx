@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { getSession } from "@/lib/auth"
+import MobileNav from "./mobile-nav"
 
 const navLinks = [
   { href: "/artists", label: "Artists" },
@@ -15,7 +16,7 @@ export default async function Nav() {
   return (
     <nav className="border-b border-white/10 bg-[#06070a]/80 backdrop-blur sticky top-0 z-50">
       <div className="mx-auto max-w-7xl px-6 md:px-10 flex h-16 items-center justify-between gap-6">
-        <Link href="/" className="text-sm font-semibold tracking-[0.2em] uppercase text-white">
+        <Link href="/" className="text-sm font-semibold tracking-[0.2em] uppercase text-white shrink-0">
           SUMG
         </Link>
 
@@ -32,31 +33,38 @@ export default async function Nav() {
         </div>
 
         <div className="flex items-center gap-3">
-          {session ? (
-            <>
-              {session.role === "admin" && (
+          <div className="hidden md:flex items-center gap-3">
+            {session ? (
+              <>
+                {session.role === "admin" && (
+                  <Link
+                    href="/admin"
+                    className="text-xs uppercase tracking-[0.2em] text-white/50 hover:text-white transition"
+                  >
+                    Admin
+                  </Link>
+                )}
                 <Link
-                  href="/admin"
-                  className="text-xs uppercase tracking-[0.2em] text-white/50 hover:text-white transition"
+                  href="/dashboard"
+                  className="rounded-full border border-white/20 px-4 py-2 text-xs font-medium text-white transition hover:border-white/40 hover:bg-white/5"
                 >
-                  Admin
+                  Dashboard
                 </Link>
-              )}
+              </>
+            ) : (
               <Link
-                href="/dashboard"
+                href="/login"
                 className="rounded-full border border-white/20 px-4 py-2 text-xs font-medium text-white transition hover:border-white/40 hover:bg-white/5"
               >
-                Dashboard
+                Sign In
               </Link>
-            </>
-          ) : (
-            <Link
-              href="/login"
-              className="rounded-full border border-white/20 px-4 py-2 text-xs font-medium text-white transition hover:border-white/40 hover:bg-white/5"
-            >
-              Sign In
-            </Link>
-          )}
+            )}
+          </div>
+
+          <MobileNav
+            isLoggedIn={session !== null}
+            isAdmin={session?.role === "admin"}
+          />
         </div>
       </div>
     </nav>

@@ -2,11 +2,19 @@ import Link from "next/link"
 import { getRoyalties } from "@/lib/db/royalties"
 import { getArtists } from "@/lib/db/artists"
 import { formatStreams, formatRevenue } from "@/lib/data"
+import { getSession } from "@/lib/auth"
 
 export const metadata = { title: "Royalties — Artist Dashboard" }
 
 export default async function DashboardRoyaltiesPage() {
-  const [artists, royalties] = await Promise.all([getArtists(), getRoyalties()])
+  const session = await getSession()
+  const isAdmin = session?.role === "admin"
+
+  const [allArtists, allRoyalties] = await Promise.all([getArtists(), getRoyalties()])
+  const royalties = isAdmin
+    ? allRoyalties
+    : allRoyalties.filter((r) => r.artistSlug === session!.sub)
+
   const periods = ["2026-Q1", "2025-Q4"]
 
   return (
@@ -41,8 +49,8 @@ export default async function DashboardRoyaltiesPage() {
                 {periodData
                   .sort((a, b) => b.revenue - a.revenue)
                   .map((record) => {
-                    const artist = artists.find((a) => a.slug === record.artistSlug)
-                    const share = ((record.revenue / total) * 100).toFixed(1)
+                    const artist = allArtists.find((a) => a.slug === record.artistSlug)
+                    const share = total > 0 ? ((record.revenue / total) * 100).toFixed(1) : "0.0"
                     return (
                       <div key={record.artistSlug} className="px-6 py-5">
                         <div className="flex items-center justify-between gap-4 mb-3">
@@ -52,16 +60,18 @@ export default async function DashboardRoyaltiesPage() {
                           </div>
                           <div className="text-right">
                             <div className="text-sm font-medium text-emerald-400">{formatRevenue(record.revenue)}</div>
-                            <div className="text-xs text-white/35">{formatStreams(record.streams)} streams · {share}%</div>
+                            <div className="text-xs text-white/35">{formatStreams(record.streams)} streams{!isAdmin ? "" : ` · ${share}%`}</div>
                           </div>
                         </div>
 
-                        <div className="w-full bg-white/5 rounded-full h-1 mb-3">
-                          <div
-                            className="bg-emerald-500 h-1 rounded-full"
-                            style={{ width: `${share}%` }}
-                          />
-                        </div>
+                        {isAdmin && (
+                          <div className="w-full bg-white/5 rounded-full h-1 mb-3">
+                            <div
+                              className="bg-emerald-500 h-1 rounded-full"
+                              style={{ width: `${share}%` }}
+                            />
+                          </div>
+                        )}
 
                         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                           {record.platforms.map((p) => (
@@ -80,6 +90,12 @@ export default async function DashboardRoyaltiesPage() {
           </div>
         )
       })}
+
+      {royalties.length === 0 && (
+        <div className="rounded-2xl border border-white/10 bg-[#0d1016] p-10 text-center text-sm text-white/35">
+          No royalty data available yet.
+        </div>
+      )}
     </main>
   )
 }

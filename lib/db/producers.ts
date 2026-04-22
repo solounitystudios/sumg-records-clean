@@ -31,3 +31,16 @@ export async function getProducers(): Promise<Producer[]> {
   if (error) throw new Error(`getProducers: ${error.message}`)
   return (data as ProducerRow[]).map(toProducer)
 }
+
+export async function getProducerBySlug(slug: string): Promise<Producer | undefined> {
+  const { data, error } = await supabase
+    .from("producers")
+    .select(SELECT)
+    .eq("slug", slug)
+    .single()
+  if (error) {
+    if (error.code === "PGRST116") return undefined
+    throw new Error(`getProducerBySlug: ${error.message}`)
+  }
+  return toProducer(data as ProducerRow)
+}

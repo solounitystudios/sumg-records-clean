@@ -106,6 +106,9 @@ export default async function AdminPage() {
           { href: "/admin/royalties", label: "Royalty Platform", desc: "Revenue, streams, platform breakdown" },
           { href: "/admin/releases", label: "Release Command Center", desc: "Manage all releases and rollouts" },
           { href: "/admin/artists", label: "Artist Management", desc: "Roster, bios, and stats" },
+          { href: "/admin/producers", label: "Producer Network", desc: "Manage producers and credits" },
+          { href: "/admin/brands", label: "Brand System", desc: "Fashion brands and identity" },
+          { href: "/admin/news", label: "News", desc: "Label news and announcements" },
         ].map((item) => (
           <Link
             key={item.href}

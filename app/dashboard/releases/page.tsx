@@ -1,6 +1,7 @@
 import Link from "next/link"
-import { getReleases } from "@/lib/db/releases"
+import { getReleases, getArtistReleases } from "@/lib/db/releases"
 import { formatStreams } from "@/lib/data"
+import { getSession } from "@/lib/auth"
 
 export const metadata = { title: "Releases — Artist Dashboard" }
 
@@ -12,7 +13,13 @@ const statusStyle: Record<string, string> = {
 }
 
 export default async function DashboardReleasesPage() {
-  const releases = await getReleases()
+  const session = await getSession()
+  const isAdmin = session?.role === "admin"
+
+  const releases = isAdmin
+    ? await getReleases()
+    : await getArtistReleases(session!.sub)
+
   const sorted = [...releases].sort((a, b) => {
     const order = { live: 0, scheduled: 1, draft: 2, archived: 3 }
     return order[a.status] - order[b.status]
@@ -26,8 +33,16 @@ export default async function DashboardReleasesPage() {
         </Link>
         <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">Artist Portal</p>
         <h1 className="text-3xl font-semibold">Releases</h1>
-        <p className="mt-1 text-sm text-white/50">All SUMG releases and their current status.</p>
+        <p className="mt-1 text-sm text-white/50">
+          {isAdmin ? "All SUMG releases and their current status." : "Your releases and their current status."}
+        </p>
       </div>
+
+      {sorted.length === 0 && (
+        <div className="rounded-2xl border border-white/10 bg-[#0d1016] p-10 text-center text-sm text-white/35">
+          No releases yet.
+        </div>
+      )}
 
       <div className="space-y-4">
         {sorted.map((release) => (
@@ -51,9 +66,17 @@ export default async function DashboardReleasesPage() {
                       {release.artistName} · {release.type.toUpperCase()} · {release.releaseDate.slice(0, 7)}
                     </p>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full shrink-0 ${statusStyle[release.status]}`}>
-                    {release.status}
-                  </span>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className={`text-xs px-2 py-1 rounded-full ${statusStyle[release.status]}`}>
+                      {release.status}
+                    </span>
+                    <Link
+                      href={`/releases/${release.slug}`}
+                      className="text-xs text-white/40 hover:text-white transition"
+                    >
+                      View →
+                    </Link>
+                  </div>
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">

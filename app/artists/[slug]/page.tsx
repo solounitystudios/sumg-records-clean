@@ -75,7 +75,7 @@ export default async function ArtistPage({ params }: { params: Promise<{ slug: s
                 {artistReleases.map((release) => (
                   <Link
                     key={release.id}
-                    href={`/releases`}
+                    href={`/releases/${release.slug}`}
                     className="flex items-start gap-4 group"
                   >
                     <div
