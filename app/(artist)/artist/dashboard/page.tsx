@@ -41,6 +41,17 @@ function fmt(n: number): string {
   return String(n);
 }
 
+/** Returns `singular` or `plural` based on count. Defaults plural to `singular + "s"`. */
+function pluralize(count: number, singular: string, plural?: string): string {
+  return count === 1 ? singular : (plural ?? `${singular}s`);
+}
+
+/** Normalises an Instagram handle / URL into a full profile URL. */
+function instagramUrl(handle: string): string {
+  if (handle.startsWith("http://") || handle.startsWith("https://")) return handle;
+  return `https://instagram.com/${handle.replace(/^@/, "")}`;
+}
+
 function fmtCurrency(n: number): string {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -531,13 +542,13 @@ export default function ArtistDashboard() {
       (s) => s.status !== "archived" && !s.audioUrl && !s.mediaAssetId
     );
     if (songsWithoutAudio.length > 0)
-      list.push({ id: "t1", label: `Upload audio for ${songsWithoutAudio.length} song${songsWithoutAudio.length > 1 ? "s" : ""}`, done: false, href: "/artist/upload" });
+      list.push({ id: "t1", label: `Upload audio for ${songsWithoutAudio.length} ${pluralize(songsWithoutAudio.length, "song")}`, done: false, href: "/artist/upload" });
 
     const releasesWithoutCover = artistReleases.filter(
       (r) => r.status !== "archived" && !r.coverArtUrl
     );
     if (releasesWithoutCover.length > 0)
-      list.push({ id: "t2", label: `Add cover art to ${releasesWithoutCover.length} release${releasesWithoutCover.length > 1 ? "s" : ""}`, done: false, href: "/artist/releases" });
+      list.push({ id: "t2", label: `Add cover art to ${releasesWithoutCover.length} ${pluralize(releasesWithoutCover.length, "release")}`, done: false, href: "/artist/releases" });
 
     const hasBio = !!artist?.bio && artist.bio.length > 10;
     list.push({ id: "t3", label: "Complete artist bio", done: hasBio, href: "/artist/profile" });
@@ -561,15 +572,15 @@ export default function ArtistDashboard() {
     const list: { id: string; type: "info" | "warning" | "success"; message: string }[] = [];
 
     if (countdownDays !== null && countdownDays <= 7 && countdownDays >= 0)
-      list.push({ id: "a1", type: "warning", message: `"${nextRelease?.title}" drops in ${countdownDays} day${countdownDays !== 1 ? "s" : ""}. Confirm masters are approved.` });
+      list.push({ id: "a1", type: "warning", message: `"${nextRelease?.title}" drops in ${countdownDays} ${pluralize(countdownDays, "day")}. Confirm masters are approved.` });
 
     if (publishedReleases.length > 0)
-      list.push({ id: "a2", type: "success", message: `${publishedReleases.length} release${publishedReleases.length > 1 ? "s are" : " is"} live across all DSPs.` });
+      list.push({ id: "a2", type: "success", message: `${publishedReleases.length} ${publishedReleases.length > 1 ? "releases are" : "release is"} live across all DSPs.` });
 
     list.push({ id: "a3", type: "info", message: "SUMG royalty statements are processed on the 15th of each month." });
 
     if (tasks.filter((t) => !t.done).length > 0)
-      list.push({ id: "a4", type: "info", message: `You have ${tasks.filter((t) => !t.done).length} pending tasks. Complete them to maximize your release readiness.` });
+      list.push({ id: "a4", type: "info", message: `You have ${tasks.filter((t) => !t.done).length} pending ${pluralize(tasks.filter((t) => !t.done).length, "task")}. Complete them to maximize your release readiness.` });
 
     return list;
   }, [countdownDays, nextRelease, publishedReleases, tasks]);
@@ -717,7 +728,7 @@ export default function ArtistDashboard() {
                       {countdownDays < 0 ? "0" : countdownDays}
                     </span>
                     <span className="text-[11px] text-white/30 mb-2">
-                      {Math.abs(countdownDays) === 1 ? "day" : "days"}{" "}
+                      {pluralize(Math.abs(countdownDays), "day")}{" "}
                       {countdownDays < 0 ? "overdue" : "to go"}
                     </span>
                   </div>
@@ -950,7 +961,7 @@ export default function ArtistDashboard() {
                     )}
                     {artist.socialLinks.instagram && (
                       <a
-                        href={`https://instagram.com/${artist.socialLinks.instagram.replace("@", "")}`}
+                        href={instagramUrl(artist.socialLinks.instagram)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[9px] tracking-[0.15em] uppercase text-white/25 hover:text-white/50 border border-white/5 px-2 py-1 hover:border-white/15 transition-all"
