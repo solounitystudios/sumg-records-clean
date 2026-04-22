@@ -1,12 +1,13 @@
-import { royalties, formatStreams, formatRevenue } from "@/lib/data"
+import { getRoyalties } from "@/lib/db/royalties"
 import { getArtists } from "@/lib/db/artists"
+import { formatStreams, formatRevenue } from "@/lib/data"
 
 export const metadata = { title: "Royalty Platform — SUMG Admin" }
 
 const periods = ["2026-Q1", "2025-Q4"]
 
 export default async function RoyaltiesAdminPage() {
-  const artists = await getArtists()
+  const [artists, royalties] = await Promise.all([getArtists(), getRoyalties()])
   const q1Data = royalties.filter((r) => r.period === "2026-Q1")
   const q4Data = royalties.filter((r) => r.period === "2025-Q4")
 

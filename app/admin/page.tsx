@@ -1,12 +1,13 @@
 import Link from "next/link"
-import { royalties, formatStreams, formatRevenue } from "@/lib/data"
+import { formatStreams, formatRevenue } from "@/lib/data"
 import { getArtists } from "@/lib/db/artists"
 import { getReleases } from "@/lib/db/releases"
+import { getRoyalties } from "@/lib/db/royalties"
 
 export const metadata = { title: "Admin Dashboard — SUMG Records" }
 
 export default async function AdminPage() {
-  const [artists, releases] = await Promise.all([getArtists(), getReleases()])
+  const [artists, releases, royalties] = await Promise.all([getArtists(), getReleases(), getRoyalties()])
   const totalStreams = artists.reduce((s, a) => s + a.totalStreams, 0)
   const liveReleases = releases.filter((r) => r.status === "live").length
   const draftReleases = releases.filter((r) => r.status === "draft").length

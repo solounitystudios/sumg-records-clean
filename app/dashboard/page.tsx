@@ -1,12 +1,13 @@
 import Link from "next/link"
-import { royalties, formatStreams, formatRevenue } from "@/lib/data"
+import { formatStreams, formatRevenue } from "@/lib/data"
 import { getArtists } from "@/lib/db/artists"
 import { getReleases } from "@/lib/db/releases"
+import { getRoyalties } from "@/lib/db/royalties"
 
 export const metadata = { title: "Artist Dashboard — SUMG Records" }
 
 export default async function DashboardPage() {
-  const [artists, releases] = await Promise.all([getArtists(), getReleases()])
+  const [artists, releases, royalties] = await Promise.all([getArtists(), getReleases(), getRoyalties()])
   const q1Royalties = royalties.filter((r) => r.period === "2026-Q1")
   const totalQ1Revenue = q1Royalties.reduce((s, r) => s + r.revenue, 0)
   const totalQ1Streams = q1Royalties.reduce((s, r) => s + r.streams, 0)
