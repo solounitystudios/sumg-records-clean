@@ -62,15 +62,17 @@ export function VisionSection() {
           {pillars.map((pillar) => (
             <div
               key={pillar.number}
-              className="group bg-black p-8 hover:bg-white/[0.02] transition-colors duration-400 cursor-default"
+              className="group bg-black p-8 hover:bg-white/[0.02] transition-colors duration-300 cursor-pointer"
             >
+              {/* Hover top accent line */}
+              <div className="absolute top-0 left-0 w-0 h-px bg-white/25 group-hover:w-full transition-all duration-500" />
               <p className="text-[11px] font-mono text-white/15 mb-6 tracking-[0.15em]">
                 {pillar.number}
               </p>
-              <h3 className="text-lg font-bold tracking-tight text-white mb-4 group-hover:text-white/90">
+              <h3 className="text-lg font-bold tracking-tight text-white mb-4 group-hover:text-white transition-colors duration-300">
                 {pillar.title}
               </h3>
-              <p className="text-xs text-white/35 leading-relaxed">
+              <p className="text-xs text-white/35 leading-relaxed group-hover:text-white/50 transition-colors duration-300">
                 {pillar.description}
               </p>
             </div>
@@ -79,14 +81,22 @@ export function VisionSection() {
 
         {/* Bottom statement */}
         <div className="mt-20 text-center">
-          <div className="inline-block border border-white/10 px-10 py-6 hover:border-white/20 transition-colors duration-400">
+          <div className="inline-block border border-white/10 px-10 py-6 hover:border-white/20 transition-colors duration-300">
             <p className="text-[10px] tracking-[0.4em] uppercase text-white/25 mb-2">
+          <a
+            href="/about"
+            className="inline-flex flex-col items-center gap-2 border border-white/10 px-10 py-7 hover:border-white/25 hover:bg-white/[0.02] transition-all duration-400 group"
+          >
+            <p className="text-[10px] tracking-[0.4em] uppercase text-white/25 mb-1 group-hover:text-white/40 transition-colors duration-300">
               Est. Independent
             </p>
             <p className="text-2xl font-black tracking-tight text-white">
               Built to Last.
             </p>
-          </div>
+            <p className="text-[10px] tracking-[0.2em] uppercase text-white/20 mt-1 group-hover:text-white/40 transition-colors duration-300">
+              Our Story →
+            </p>
+          </a>
         </div>
       </div>
     </section>

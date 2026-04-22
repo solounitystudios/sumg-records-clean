@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sanitizeRedirect } from "@/lib/auth/sanitize-redirect";
 
 const ERROR_MESSAGES: Record<string, string> = {
   link_expired: "That recovery link has expired. Please request a new one below.",
@@ -14,7 +15,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") ?? "/admin";
+  const redirect = sanitizeRedirect(searchParams.get("redirect"), "/admin");
   const errorParam = searchParams.get("error");
 
   const [email, setEmail] = useState("");

@@ -22,24 +22,34 @@ export function FeaturedArtists({ artists }: Props) {
             <span className="text-white/40">Artists</span>
           </h2>
         </div>
-        <div className="hidden md:block">
-          <p className="text-xs text-white/25 max-w-[220px] text-right leading-relaxed">
+        <div className="flex flex-col items-end gap-4">
+          <p className="hidden md:block text-xs text-white/25 max-w-[220px] text-right leading-relaxed">
             Seven voices. One label. An ecosystem built on sound and vision.
           </p>
+          <a
+            href="/artists"
+            className="inline-flex items-center gap-2 text-[10px] tracking-[0.25em] uppercase text-white/30 hover:text-white border-b border-white/10 hover:border-white/40 pb-0.5 transition-all duration-300"
+          >
+            All Artists <span className="text-white/20">→</span>
+          </a>
         </div>
       </div>
 
       {/* Primary featured rail */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
         {featuredArtists.map((artist) => (
-          <ArtistCard key={artist.id} artist={artist} size="large" />
+          <a key={artist.id} href={`/artists/${artist.slug}`} className="block">
+            <ArtistCard artist={artist} size="large" />
+          </a>
         ))}
       </div>
 
       {/* Secondary row */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         {secondaryArtists.map((artist) => (
-          <ArtistCard key={artist.id} artist={artist} size="small" />
+          <a key={artist.id} href={`/artists/${artist.slug}`} className="block">
+            <ArtistCard artist={artist} size="small" />
+          </a>
         ))}
       </div>
     </section>

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import {
@@ -23,10 +24,26 @@ export async function generateStaticParams() {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const song = await getSongBySlug(slug);
+  if (!song) return { title: "Song Not Found" };
+  const release = song.releaseSlug ? await getReleaseBySlug(song.releaseSlug) : undefined;
+  const imageUrl = release?.coverArtUrl;
   return {
-    title: song
-      ? `${song.title} — ${song.artistName} — SUMG Records`
-      : "Song Not Found",
+    title: `${song.title} — ${song.artistName} — SUMG Records`,
+    ...(imageUrl && {
+      openGraph: { images: [{ url: imageUrl }] },
+      twitter: { card: "summary_large_image", images: [imageUrl] },
+    }),
+  const parts = [song.artistName, song.genre].filter(Boolean).join(" · ");
+  const desc = parts
+    ? `${song.title} by ${parts} — listen on SUMG Records.`
+    : `${song.title} — listen on SUMG Records.`;
+  return {
+    title: `${song.title} — ${song.artistName}`,
+    description: desc,
+    openGraph: {
+      title: `${song.title} — ${song.artistName} — SUMG Records`,
+      description: desc,
+    },
   };
 }
 
@@ -173,11 +190,12 @@ export default async function SongPage({ params }: Props) {
             <div className="max-w-7xl mx-auto px-6 lg:px-10 flex items-center justify-between gap-6">
               <div className="flex items-center gap-5">
                 {release.coverArtUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
                     src={release.coverArtUrl}
                     alt={release.title}
-                    className="w-16 h-16 object-cover border border-white/10 flex-shrink-0"
+                    width={64}
+                    height={64}
+                    className="object-cover border border-white/10 flex-shrink-0"
                   />
                 )}
                 <div>
