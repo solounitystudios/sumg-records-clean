@@ -18,6 +18,7 @@ import {
   ACCEPTED_AUDIO_TYPES,
   MAX_AUDIO_SIZE,
 } from "@/lib/media";
+import { getCurrentUploader } from "@/lib/auth";
 import { DSPLinksPanel } from "@/components/admin/DSPLinksPanel";
 
 // ─── Producer multi-picker ───────────────────────────────────────────────────
@@ -103,7 +104,11 @@ function AudioUploadPanel({
       return;
     }
     setUploading(true);
-    const result = await uploadAsset(file, "audio", "admin");
+
+    // Resolve the actual user identity for the audit trail.
+    const uploadedBy = await getCurrentUploader();
+
+    const result = await uploadAsset(file, "audio", uploadedBy);
     setUploading(false);
     if (!result.success || !result.asset) {
       // If Supabase is not configured, create a local-only asset with a blob URL
@@ -115,7 +120,7 @@ function AudioUploadPanel({
         filename: file.name,
         mimeType: file.type,
         sizeBytes: file.size,
-        uploadedBy: "admin",
+        uploadedBy,
         attachedTo: [{ entityType: "song", entityId: songId, role: "audio" }],
       });
       onUploaded(localUrl, asset.id);
@@ -293,9 +298,13 @@ export default function EditSongPage() {
   const [producerSlugs, setProducerSlugs] = useState<string[]>([]);
   const [dspLinks, setDspLinks] = useState<DSPLinks>({});
   const [saving, setSaving] = useState(false);
+  const formInitialized = useRef(false);
 
+  // Seed form from song once — rollback-triggered store changes must NOT
+  // re-seed or the user's in-progress edits would be silently wiped.
   useEffect(() => {
-    if (!song) return;
+    if (!song || formInitialized.current) return;
+    formInitialized.current = true;
     setForm({
       title: song.title,
       slug: song.slug,
@@ -346,34 +355,62 @@ export default function EditSongPage() {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!song || !form) return;
     setSaving(true);
     const artist = artists.find((a) => a.slug === form.artistSlug);
     const release = releases.find((r) => r.slug === form.releaseSlug);
-    updateSong(song.id, {
-      title: form.title,
-      slug: form.slug,
-      artistSlug: form.artistSlug,
-      artistName: artist?.name ?? song.artistName,
-      releaseSlug: form.releaseSlug || undefined,
-      releaseName: release?.title ?? song.releaseName,
-      producerSlugs: producerSlugs.length ? producerSlugs : undefined,
-      genre: form.genre || undefined,
-      duration: form.duration || undefined,
-      audioUrl: form.audioUrl || undefined,
-      lyrics: form.lyrics || undefined,
-      trackNumber: form.trackNumber ? parseInt(form.trackNumber) : undefined,
-      isExplicit: form.isExplicit,
-      status: form.status,
-      isVisible: form.isVisible,
-      publishAt: form.publishAt || undefined,
-      featuredOnHomepage: form.featuredOnHomepage,
-      mediaAssetId: form.mediaAssetId || undefined,
-      dspLinks: Object.keys(dspLinks).length ? dspLinks : undefined,
-    });
-    notify("success", `"${form.title}" saved.`);
-    setSaving(false);
+    try {
+      await updateSong(song.id, {
+        title: form.title,
+        artistSlug: form.artistSlug,
+        artistName: artist?.name ?? song.artistName,
+        releaseSlug: form.releaseSlug || undefined,
+        releaseName: release?.title ?? song.releaseName,
+        producerSlugs: producerSlugs.length ? producerSlugs : undefined,
+        genre: form.genre || undefined,
+        duration: form.duration || undefined,
+        audioUrl: form.audioUrl || undefined,
+        lyrics: form.lyrics || undefined,
+        trackNumber: form.trackNumber ? parseInt(form.trackNumber) : undefined,
+        isExplicit: form.isExplicit,
+        status: form.status,
+        isVisible: form.isVisible,
+        publishAt: form.publishAt || undefined,
+        featuredOnHomepage: form.featuredOnHomepage,
+        mediaAssetId: form.mediaAssetId || undefined,
+        dspLinks: Object.keys(dspLinks).length ? dspLinks : undefined,
+      });
+      notify("success", `"${form.title}" saved.`);
+    } catch {
+      // bgSync already surfaced an error toast; keep form edits intact.
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleAudioUploaded(url: string, assetId: string) {
+    set("audioUrl", url);
+    set("mediaAssetId", assetId);
+    if (song) {
+      try {
+        await updateSong(song.id, { audioUrl: url, mediaAssetId: assetId });
+      } catch {
+        // bgSync already surfaced an error toast.
+      }
+    }
+  }
+
+  async function handleAudioDeleted() {
+    set("audioUrl", "");
+    set("mediaAssetId", "");
+    if (song) {
+      try {
+        await updateSong(song.id, { audioUrl: undefined, mediaAssetId: undefined });
+      } catch {
+        // bgSync already surfaced an error toast.
+      }
+    }
   }
 
   function handleDelete() {
@@ -389,19 +426,6 @@ export default function EditSongPage() {
     setProducerSlugs((prev) =>
       prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]
     );
-  }
-
-  function handleAudioUploaded(url: string, assetId: string) {
-    set("audioUrl", url);
-    set("mediaAssetId", assetId);
-    // Auto-save audio URL to the song immediately
-    if (song) updateSong(song.id, { audioUrl: url, mediaAssetId: assetId });
-  }
-
-  function handleAudioDeleted() {
-    set("audioUrl", "");
-    set("mediaAssetId", "");
-    if (song) updateSong(song.id, { audioUrl: undefined, mediaAssetId: undefined });
   }
 
   const isLive = song.status === "published" && song.isVisible;
@@ -494,15 +518,21 @@ export default function EditSongPage() {
             value={form.title}
             onChange={(v) => set("title", v)}
           />
-          <FormField
-            type="text"
-            label="Slug"
-            required
-            mono
-            value={form.slug}
-            hint="/songs/[slug]"
-            onChange={(v) => set("slug", v)}
-          />
+          {/* Slug is immutable after creation — changing it would break public URLs */}
+          <div className="space-y-0">
+            <p className="block text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2">
+              Slug <span className="text-white/15 normal-case tracking-normal ml-1">(read-only)</span>
+            </p>
+            <input
+              type="text"
+              readOnly
+              value={form.slug}
+              className="w-full bg-white/[0.02] border border-white/5 px-4 py-2.5 text-sm text-white/40 font-mono text-xs cursor-not-allowed"
+            />
+            <p className="mt-1.5 text-[10px] text-white/20">
+              Used in URLs: /songs/[slug] — cannot be changed after creation.
+            </p>
+          </div>
 
           {/* Artist */}
           <div>

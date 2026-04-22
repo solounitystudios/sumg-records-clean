@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import {
@@ -402,9 +402,13 @@ export default function EditReleasePage() {
   const [providerConfig, setProviderConfig] = useState<ProviderConfig>({});
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const formInitialized = useRef(false);
 
+  // Seed form from release once — rollback-triggered store changes must NOT
+  // re-seed or the user's in-progress edits would be silently wiped.
   useEffect(() => {
-    if (!release) return;
+    if (!release || formInitialized.current) return;
+    formInitialized.current = true;
     setForm({
       title: release.title,
       slug: release.slug,
@@ -444,46 +448,55 @@ export default function EditReleasePage() {
     setForm((prev) => prev ? { ...prev, [key]: value } : prev);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!release || !form) return;
     setSaving(true);
-    updateRelease(release.id, {
-      title: form.title,
-      slug: form.slug,
-      artistSlug: form.artistSlug,
-      artistName: form.artistName,
-      type: form.type,
-      genre: form.genre,
-      releaseDate: form.releaseDate,
-      publishAt: form.publishAt || undefined,
-      status: form.status,
-      isVisible: form.isVisible,
-      featuredOnHomepage: form.featuredOnHomepage,
-      description: form.description,
-      coverArtUrl: form.coverArtUrl || undefined,
-      featuredArtistSlugs: featuredArtistSlugs.length ? featuredArtistSlugs : undefined,
-      producerSlugs: producerSlugs.length ? producerSlugs : undefined,
-      dspLinks: Object.keys(dspLinks).some((k) => dspLinks[k as keyof DSPLinks])
-        ? dspLinks
-        : undefined,
-      providerConfig: Object.keys(providerConfig).length
-        ? providerConfig
-        : undefined,
-    });
-    updateTracklist(release.id, tracklist);
-    notify("success", `Release "${form.title}" saved.`);
-    setSaving(false);
+    try {
+      await updateRelease(release.id, {
+        title: form.title,
+        artistSlug: form.artistSlug,
+        artistName: form.artistName,
+        type: form.type,
+        genre: form.genre,
+        releaseDate: form.releaseDate,
+        publishAt: form.publishAt || undefined,
+        status: form.status,
+        isVisible: form.isVisible,
+        featuredOnHomepage: form.featuredOnHomepage,
+        description: form.description,
+        coverArtUrl: form.coverArtUrl || undefined,
+        featuredArtistSlugs: featuredArtistSlugs.length ? featuredArtistSlugs : undefined,
+        producerSlugs: producerSlugs.length ? producerSlugs : undefined,
+        dspLinks: Object.keys(dspLinks).some((k) => dspLinks[k as keyof DSPLinks])
+          ? dspLinks
+          : undefined,
+        providerConfig: Object.keys(providerConfig).length
+          ? providerConfig
+          : undefined,
+      });
+      await updateTracklist(release.id, tracklist);
+      notify("success", `Release "${form.title}" saved.`);
+    } catch {
+      // bgSync already surfaced an error toast; keep form edits intact.
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handlePublishNow() {
+  async function handlePublishNow() {
     if (!release) return;
     if (!confirm(`Publish "${release.title}" now? It will go live immediately on the public site.`)) return;
     setPublishing(true);
-    publishRelease(release.id);
-    set("status", "published");
-    set("isVisible", true);
-    notify("success", `"${release.title}" is now live. It will appear on /releases and linked artist pages.`);
-    setPublishing(false);
+    try {
+      await publishRelease(release.id);
+      set("status", "published");
+      set("isVisible", true);
+      notify("success", `"${release.title}" is now live. It will appear on /releases and linked artist pages.`);
+    } catch {
+      // bgSync already surfaced an error toast.
+    } finally {
+      setPublishing(false);
+    }
   }
 
   function handleDelete() {
@@ -560,8 +573,21 @@ export default function EditReleasePage() {
         {/* Release info */}
         <FormSection title="Release Info">
           <FormField type="text" label="Title" required value={form.title} onChange={(v) => set("title", v)} />
-          <FormField type="text" label="Slug" required mono value={form.slug}
-            hint="/releases/[slug]" onChange={(v) => set("slug", v)} />
+          {/* Slug is immutable after creation — changing it would break public URLs */}
+          <div className="space-y-0">
+            <p className="block text-[10px] tracking-[0.2em] uppercase text-white/30 mb-2">
+              Slug <span className="text-white/15 normal-case tracking-normal ml-1">(read-only)</span>
+            </p>
+            <input
+              type="text"
+              readOnly
+              value={form.slug}
+              className="w-full bg-white/[0.02] border border-white/5 px-4 py-2.5 text-sm text-white/40 font-mono text-xs cursor-not-allowed"
+            />
+            <p className="mt-1.5 text-[10px] text-white/20">
+              Used in URLs: /releases/[slug] — cannot be changed after creation.
+            </p>
+          </div>
           <FormField type="text" label="Artist Name" required value={form.artistName} onChange={(v) => set("artistName", v)} />
           <FormField type="text" label="Artist Slug" mono value={form.artistSlug}
             hint="/artists/[slug]" onChange={(v) => set("artistSlug", v)} />

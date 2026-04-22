@@ -7,7 +7,7 @@ interface ProducerCardProps {
 
 export function ProducerCard({ producer, index }: ProducerCardProps) {
   return (
-    <div className="group relative border-b border-white/[0.05] py-7 px-3 flex items-start gap-6 hover:border-white/10 hover:bg-white/[0.015] transition-all duration-300 cursor-pointer">
+    <div className="group relative border-b border-white/5 py-7 px-2 flex items-start gap-6 hover:border-white/10 transition-all duration-300 cursor-pointer">
       {/* Index */}
       <span className="text-[11px] tracking-[0.2em] text-white/15 font-mono mt-1 min-w-[2rem]">
         {String(index + 1).padStart(2, "0")}

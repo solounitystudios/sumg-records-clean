@@ -205,6 +205,7 @@ function TimelineItemForm({
   songs,
   onSave,
   onCancel,
+  saving = false,
 }: {
   initial: Omit<ArtistTimelineItem, "id" | "createdAt" | "updatedAt">;
   releases: { slug: string; title: string }[];
@@ -213,6 +214,7 @@ function TimelineItemForm({
     data: Omit<ArtistTimelineItem, "id" | "createdAt" | "updatedAt">
   ) => void;
   onCancel: () => void;
+  saving?: boolean;
 }) {
   const [form, setForm] = useState(initial);
 
@@ -439,9 +441,10 @@ function TimelineItemForm({
       <div className="flex items-center gap-3 pt-2">
         <button
           type="submit"
-          className="border border-white/20 px-6 py-2.5 text-[11px] tracking-[0.15em] uppercase text-white hover:bg-white/[0.06] transition-colors"
+          disabled={saving}
+          className="border border-white/20 px-6 py-2.5 text-[11px] tracking-[0.15em] uppercase text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Save Item
+          {saving ? "Saving…" : "Save Item"}
         </button>
         <button
           type="button"
@@ -600,6 +603,8 @@ export default function ArtistTimelinePage() {
   const [editingItem, setEditingItem] = useState<ArtistTimelineItem | null>(
     null
   );
+  const [createSaving, setCreateSaving] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
 
   const filteredItems = useMemo(() => {
     let items = allItems;
@@ -631,22 +636,32 @@ export default function ArtistTimelinePage() {
   async function handleCreate(
     data: Omit<ArtistTimelineItem, "id" | "createdAt" | "updatedAt">
   ) {
+    setCreateSaving(true);
     try {
       await createTimelineItem(data);
       notify("success", `Timeline item "${data.title}" created.`);
       setShowForm(false);
     } catch {
-      // Error toast already shown by store
+      // bgSync already showed an error toast; keep the form open.
+    } finally {
+      setCreateSaving(false);
     }
   }
 
-  function handleUpdate(
+  async function handleUpdate(
     data: Omit<ArtistTimelineItem, "id" | "createdAt" | "updatedAt">
   ) {
     if (!editingItem) return;
-    updateTimelineItem(editingItem.id, data);
-    notify("success", `"${data.title}" updated.`);
-    setEditingItem(null);
+    setEditSaving(true);
+    try {
+      await updateTimelineItem(editingItem.id, data);
+      notify("success", `"${data.title}" updated.`);
+      setEditingItem(null);
+    } catch {
+      // bgSync already surfaced an error toast; keep form open with edits.
+    } finally {
+      setEditSaving(false);
+    }
   }
 
   function handleDelete(id: string) {
@@ -739,6 +754,7 @@ export default function ArtistTimelinePage() {
             songs={artistSongs}
             onSave={handleCreate}
             onCancel={() => setShowForm(false)}
+            saving={createSaving}
           />
         )}
 
@@ -750,6 +766,7 @@ export default function ArtistTimelinePage() {
             songs={artistSongs}
             onSave={handleUpdate}
             onCancel={() => setEditingItem(null)}
+            saving={editSaving}
           />
         )}
 

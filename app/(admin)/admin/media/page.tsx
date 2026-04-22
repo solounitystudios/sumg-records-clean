@@ -6,6 +6,7 @@ import { MediaUploader } from "@/components/admin/MediaUploader";
 import { MediaLibraryGrid } from "@/components/admin/MediaLibraryGrid";
 import { useCmsStore } from "@/lib/cms/store";
 import { uploadAsset } from "@/lib/media";
+import { getCurrentUploader } from "@/lib/auth";
 import { AssetType } from "@/lib/types";
 
 export default function AdminMedia() {
@@ -15,7 +16,11 @@ export default function AdminMedia() {
 
   async function handleUpload(file: File, type: AssetType) {
     setUploading(true);
-    const result = await uploadAsset(file, type, "admin");
+
+    // Resolve the actual user identity for the audit trail.
+    const uploadedBy = await getCurrentUploader();
+
+    const result = await uploadAsset(file, type, uploadedBy);
     setUploading(false);
 
     if (!result.success || !result.asset) {
