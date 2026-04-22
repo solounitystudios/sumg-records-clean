@@ -188,6 +188,17 @@ export type SyncState = "idle" | "syncing" | "error";
 /** Where the currently-displayed data originated from. */
 export type DataSource = "db" | "seed";
 
+/**
+ * Returned by publishRelease so callers can distinguish a full publish from a
+ * partial-success where some linked-song DB writes failed.
+ */
+export type PublishReleaseResult = {
+  release: CMSRelease | undefined;
+  linkedSongsAttempted: number;
+  linkedSongsSucceeded: number;
+  linkedSongsFailed: number;
+};
+
 interface CmsStoreState {
   artists: CMSArtist[];
   producers: CMSProducer[];
@@ -236,11 +247,13 @@ interface CmsStoreActions {
   updateRelease: (id: string, data: Partial<CMSRelease>) => Promise<CMSRelease | undefined>;
   /**
    * Publishes a release and automatically publishes all non-archived songs
-   * linked to that release.
+   * linked to that release. Awaits every linked-song DB write before
+   * returning. Returns a truthful result with per-song success/failure counts
+   * so the UI can distinguish a full publish from a partial-success.
    */
-  publishRelease: (id: string) => Promise<CMSRelease | undefined>;
+  publishRelease: (id: string) => Promise<PublishReleaseResult>;
   deleteRelease: (id: string) => void;
-  updateTracklist: (releaseId: string, tracklist: CMSSong[]) => void;
+  updateTracklist: (releaseId: string, tracklist: CMSSong[]) => Promise<void>;
 
   // Songs
   getSongById: (id: string) => CMSSong | undefined;
@@ -862,43 +875,88 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
    * Automation: all songs linked to this release whose status is NOT
    * "archived" are automatically published too, so they immediately appear
    * on the public artist and release pages.
+   *
+   * All linked-song DB writes are awaited concurrently via Promise.all.
+   * The linked-songs toast fires only after all writes resolve:
+   *   • All succeeded  → success toast.
+   *   • One or more failed → error toast naming the count; bgSync rollback
+   *     reverts the failed songs back to their original state.
+   * Returns a PublishReleaseResult with per-song counts so callers can act
+   * on a partial-success without inspecting toast state.
    */
   const publishRelease = useCallback(
-    async (id: string): Promise<CMSRelease | undefined> => {
+    async (id: string): Promise<PublishReleaseResult> => {
       const release = releases.find((r) => r.id === id);
-      const result = await updateRelease(id, {
+      const updated = await updateRelease(id, {
         status: "published",
         isVisible: true,
         publishAt: now(),
       });
-      // Auto-publish linked songs
+
+      let linkedSongsAttempted = 0;
+      let linkedSongsSucceeded = 0;
+      let linkedSongsFailed = 0;
+
       if (release) {
         const linkedSongs = songs.filter(
           (s) => s.releaseSlug === release.slug && s.status !== "archived"
         );
-        linkedSongs.forEach((s) => {
-          const t = now();
-          setSongs((prev) =>
-            prev.map((existing) =>
-              existing.id === s.id
-                ? { ...existing, status: "published", isVisible: true, updatedAt: t }
-                : existing
-            )
-          );
-          bgSync((sb) =>
-            sb.from("songs")
-              .update({ status: "published", is_visible: true, updated_at: t })
-              .eq("id", s.id)
-          );
-        });
+        linkedSongsAttempted = linkedSongs.length;
+
         if (linkedSongs.length > 0) {
-          notify(
-            "success",
-            `${linkedSongs.length} linked song${linkedSongs.length !== 1 ? "s" : ""} published automatically.`
+          // Stamp each song's updatedAt once so the rollback closure captures
+          // the correct value per song.
+          const timestamps = new Map(linkedSongs.map((s) => [s.id, now()]));
+
+          // Apply all optimistic updates in one batched setState call.
+          setSongs((prev) =>
+            prev.map((s) => {
+              const t = timestamps.get(s.id);
+              if (!t) return s;
+              return { ...s, status: "published", isVisible: true, updatedAt: t };
+            })
           );
+
+          // Await every linked-song DB write concurrently.
+          const results = await Promise.all(
+            linkedSongs.map((s) => {
+              const orig = s;
+              const t = timestamps.get(s.id)!;
+              return bgSync(
+                (sb) =>
+                  sb.from("songs")
+                    .update({ status: "published", is_visible: true, updated_at: t })
+                    .eq("id", s.id),
+                () =>
+                  setSongs((prev) =>
+                    prev.map((existing) =>
+                      existing.id === orig.id ? orig : existing
+                    )
+                  )
+              );
+            })
+          );
+
+          results.forEach((ok) => {
+            if (ok) linkedSongsSucceeded++;
+            else linkedSongsFailed++;
+          });
+
+          if (linkedSongsFailed === 0) {
+            notify(
+              "success",
+              `${linkedSongsSucceeded} linked song${linkedSongsSucceeded !== 1 ? "s" : ""} published automatically.`
+            );
+          } else {
+            notify(
+              "error",
+              `${linkedSongsFailed} of ${linkedSongsAttempted} linked song${linkedSongsAttempted !== 1 ? "s" : ""} failed to publish — check the DB or retry.`
+            );
+          }
         }
       }
-      return result;
+
+      return { release: updated, linkedSongsAttempted, linkedSongsSucceeded, linkedSongsFailed };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [releases, songs, updateRelease]
@@ -918,7 +976,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateTracklist = useCallback(
-    (releaseId: string, tracklist: CMSSong[]) => {
+    async (releaseId: string, tracklist: CMSSong[]): Promise<void> => {
       let original: CMSRelease | undefined;
       setReleases((prev) =>
         prev.map((r) => {
@@ -928,7 +986,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
         })
       );
       const orig = original;
-      bgSync(
+      const ok = await bgSync(
         (sb) =>
           sb.from("releases").update({
             tracklist,
@@ -936,6 +994,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
           }).eq("id", releaseId),
         orig ? () => setReleases((prev) => prev.map((r) => (r.id === releaseId ? orig : r))) : undefined
       );
+      if (!ok) throw new Error("Failed to update tracklist.");
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -1174,7 +1233,7 @@ export function CmsStoreProvider({ children }: { children: ReactNode }) {
           orig
             ? () =>
                 setTimelineItems((prev) =>
-                  prev.map((t) => (t.id === id ? orig! : t))
+                  prev.map((t) => (t.id === id ? orig : t))
                 )
             : undefined
         );

@@ -474,7 +474,7 @@ export default function EditReleasePage() {
           ? providerConfig
           : undefined,
       });
-      updateTracklist(release.id, tracklist);
+      await updateTracklist(release.id, tracklist);
       notify("success", `Release "${form.title}" saved.`);
     } catch {
       // bgSync already surfaced an error toast; keep form edits intact.
