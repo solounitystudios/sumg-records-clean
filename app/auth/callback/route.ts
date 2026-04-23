@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { sanitizeRedirect } from "@/lib/auth/sanitize-redirect";
-
 /**
  * GET /auth/callback
  *
@@ -17,7 +15,8 @@ export async function GET(request: NextRequest) {
 
   const code = searchParams.get("code");
   const type = searchParams.get("type"); // present for recovery links
-  const next = sanitizeRedirect(searchParams.get("next"), "/admin");
+  const rawNext = searchParams.get("next");
+  const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/admin";
 
   // No code — nothing to exchange; send to login with an error hint
   if (!code) {

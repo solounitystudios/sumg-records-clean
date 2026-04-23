@@ -1,8 +1,9 @@
 "use client";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCmsStore } from "@/lib/cms/store";
-import { useRole } from "@/lib/auth/use-role";
+import { createClient } from "@/lib/supabase/client";
 
 type NavItem = { label: string; href: string; icon: string };
 type NavDivider = { divider: true };
@@ -43,7 +44,16 @@ export function AdminShell({ children, title }: AdminShellProps) {
   const pathname = usePathname();
   const { notifications, dismissNotification, isLoading, syncState, dataSource } =
     useCmsStore();
-  const role = useRole();
+  const [roleLabel, setRoleLabel] = useState("");
+  useEffect(() => {
+    const LABELS: Record<string, string> = {
+      admin: "Admin", release_manager: "Release Mgr", media_manager: "Media Mgr", editor: "Editor",
+    };
+    createClient().auth.getUser().then(({ data }) => {
+      const raw = (data.user?.app_metadata?.role as string | undefined) ?? "";
+      setRoleLabel(LABELS[raw] ?? raw);
+    }).catch(() => undefined);
+  }, []);
 
   // ── Derive indicator values ─────────────────────────────────────────────────
 
@@ -136,7 +146,7 @@ export function AdminShell({ children, title }: AdminShellProps) {
           {/* Role badge */}
           <div className="ml-4 pl-4 border-l border-white/5 flex items-center gap-2">
             <span className="text-[9px] tracking-[0.15em] uppercase text-white/15 select-none">
-              {role.roleLabel}
+              {roleLabel}
             </span>
           </div>
         </div>
