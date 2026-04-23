@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { sanitizeRedirect } from "@/lib/auth/sanitize-redirect";
 
 const ERROR_MESSAGES: Record<string, string> = {
   link_expired: "That recovery link has expired. Please request a new one below.",
@@ -15,7 +14,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = sanitizeRedirect(searchParams.get("redirect"), "/admin");
+  const redirectParam = searchParams.get("redirect");
   const errorParam = searchParams.get("error");
 
   const [email, setEmail] = useState("");
@@ -38,7 +37,7 @@ function LoginForm() {
     setLoading(true);
 
     const sb = createClient();
-    const { error: authError } = await sb.auth.signInWithPassword({ email, password });
+    const { data, error: authError } = await sb.auth.signInWithPassword({ email, password });
 
     if (authError) {
       setError(authError.message);
@@ -46,7 +45,14 @@ function LoginForm() {
       return;
     }
 
-    router.push(redirect);
+    const CMS_ROLES = ["admin", "editor", "media_manager", "release_manager"];
+    const role = (data.user?.app_metadata?.role as string | undefined) ?? "";
+    const safeParam = redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//")
+      ? redirectParam
+      : null;
+    const destination = safeParam ?? (CMS_ROLES.includes(role) ? "/admin" : "/dashboard");
+
+    router.push(destination);
     router.refresh();
   }
 

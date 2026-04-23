@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { getSession } from "@/lib/auth"
+import { getAuthUser } from "@/lib/auth"
 import MobileNav from "./mobile-nav"
 
 const navLinks = [
@@ -11,7 +11,7 @@ const navLinks = [
 ]
 
 export default async function Nav() {
-  const session = await getSession()
+  const session = await getAuthUser()
 
   return (
     <nav className="border-b border-white/10 bg-[#06070a]/80 backdrop-blur sticky top-0 z-50">

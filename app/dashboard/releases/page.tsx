@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { getReleases, getArtistReleases } from "@/lib/db/releases"
 import { formatStreams } from "@/lib/data"
-import { getSession } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth"
 
 export const metadata = { title: "Releases — Artist Dashboard" }
 
@@ -13,12 +13,12 @@ const statusStyle: Record<string, string> = {
 }
 
 export default async function DashboardReleasesPage() {
-  const session = await getSession()
-  const isAdmin = session?.role === "admin"
+  const user = await requireAuth()
+  const isAdmin = user.role === "admin"
 
   const releases = isAdmin
     ? await getReleases()
-    : await getArtistReleases(session!.sub)
+    : await getArtistReleases(user.artistSlug ?? "")
 
   const sorted = [...releases].sort((a, b) => {
     const order = { live: 0, scheduled: 1, draft: 2, archived: 3 }

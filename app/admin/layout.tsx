@@ -1,6 +1,5 @@
 import Link from "next/link"
-import { requireAdmin } from "@/lib/auth"
-import { logout } from "@/app/actions/auth"
+import { signout } from "@/app/actions/auth"
 
 const adminNav = [
   { href: "/admin", label: "Overview", exact: true },
@@ -15,8 +14,6 @@ const adminNav = [
 ]
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await requireAdmin()
-
   return (
     <div className="min-h-screen bg-[#06070a] text-white flex">
       <aside className="hidden lg:flex w-56 shrink-0 flex-col border-r border-white/10 bg-[#08090d]">
@@ -35,7 +32,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           ))}
         </nav>
         <div className="px-3 py-4 border-t border-white/10">
-          <form action={logout}>
+          <form action={signout}>
             <button
               type="submit"
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition text-left"

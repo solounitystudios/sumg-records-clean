@@ -3,26 +3,26 @@ import { formatStreams, formatRevenue } from "@/lib/data"
 import { getArtists, getArtistBySlug } from "@/lib/db/artists"
 import { getReleases, getArtistReleases } from "@/lib/db/releases"
 import { getRoyalties } from "@/lib/db/royalties"
-import { getSession } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth"
 
 export const metadata = { title: "Artist Dashboard — SUMG Records" }
 
 export default async function DashboardPage() {
-  const session = await getSession()
-  const isAdmin = session?.role === "admin"
+  const user = await requireAuth()
+  const isAdmin = user.role === "admin"
+  const artistSlug = user.artistSlug ?? ""
 
   const [allArtists, allReleases, allRoyalties] = await Promise.all([
     getArtists(),
-    isAdmin ? getReleases() : getArtistReleases(session!.sub),
+    isAdmin ? getReleases() : getArtistReleases(artistSlug),
     getRoyalties(),
   ])
 
-  // For artist role, scope everything to their slug
-  const artists = isAdmin ? allArtists : allArtists.filter((a) => a.slug === session!.sub)
+  const artists = isAdmin ? allArtists : allArtists.filter((a) => a.slug === artistSlug)
   const releases = allReleases
   const royalties = isAdmin
     ? allRoyalties
-    : allRoyalties.filter((r) => r.artistSlug === session!.sub)
+    : allRoyalties.filter((r) => r.artistSlug === artistSlug)
 
   const q1Royalties = royalties.filter((r) => r.period === "2026-Q1")
   const totalQ1Revenue = q1Royalties.reduce((s, r) => s + r.revenue, 0)

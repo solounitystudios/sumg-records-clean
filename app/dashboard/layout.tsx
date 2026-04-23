@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { requireAuth } from "@/lib/auth"
-import { logout } from "@/app/actions/auth"
+import { signout } from "@/app/actions/auth"
 
 const dashNav = [
   { href: "/dashboard", label: "Overview" },
@@ -9,7 +9,7 @@ const dashNav = [
 ]
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await requireAuth()
+  const user = await requireAuth()
 
   return (
     <div className="min-h-screen bg-[#06070a] text-white flex">
@@ -29,7 +29,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           ))}
         </nav>
         <div className="px-3 py-4 border-t border-white/10">
-          <form action={logout}>
+          <form action={signout}>
             <button
               type="submit"
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition text-left"
@@ -37,7 +37,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               Sign Out
             </button>
           </form>
-          {session.role === "admin" && (
+          {user.role === "admin" && (
             <Link
               href="/admin"
               className="mt-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition"

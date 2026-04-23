@@ -1,26 +1,49 @@
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
-import { decodeSession, SESSION_COOKIE } from "@/lib/session"
-import type { SessionPayload } from "@/lib/session"
+import type { User } from "@supabase/supabase-js"
 
-export type { SessionPayload } from "@/lib/session"
+const CMS_ROLES = ["admin", "editor", "media_manager", "release_manager"] as const
 
-export async function getSession(): Promise<SessionPayload | null> {
-  const cookieStore = await cookies()
-  const token = cookieStore.get(SESSION_COOKIE)?.value
-  if (!token) return null
-  return decodeSession(token)
+export interface AuthUser {
+  id: string
+  email: string | undefined
+  role: string
+  // Populated from app_metadata.artist_slug for artist accounts.
+  // Set this in Supabase Auth admin when provisioning artist users.
+  artistSlug: string | null
 }
 
-export async function requireAuth(): Promise<SessionPayload> {
-  const session = await getSession()
-  if (!session) redirect("/login")
-  return session
+function toAuthUser(user: User): AuthUser {
+  return {
+    id: user.id,
+    email: user.email,
+    role: (user.app_metadata?.role as string | undefined) ?? "",
+    artistSlug: (user.app_metadata?.artist_slug as string | null) ?? null,
+  }
 }
 
-export async function requireAdmin(): Promise<SessionPayload> {
-  const session = await getSession()
-  if (!session) redirect("/login")
-  if (session.role !== "admin") redirect("/dashboard")
-  return session
+export async function getAuthUser(): Promise<AuthUser | null> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return null
+  return toAuthUser(user)
+}
+
+export async function requireAuth(): Promise<AuthUser> {
+  const user = await getAuthUser()
+  if (!user) redirect("/login")
+  return user
+}
+
+export async function requireAdmin(): Promise<AuthUser> {
+  const user = await getAuthUser()
+  if (!user) redirect("/login")
+  if (user.role !== "admin") redirect("/login?error=no_role")
+  return user
+}
+
+export function isCmsRole(role: string): boolean {
+  return CMS_ROLES.includes(role as (typeof CMS_ROLES)[number])
 }

@@ -2,18 +2,18 @@ import Link from "next/link"
 import { getRoyalties } from "@/lib/db/royalties"
 import { getArtists } from "@/lib/db/artists"
 import { formatStreams, formatRevenue } from "@/lib/data"
-import { getSession } from "@/lib/auth"
+import { requireAuth } from "@/lib/auth"
 
 export const metadata = { title: "Royalties — Artist Dashboard" }
 
 export default async function DashboardRoyaltiesPage() {
-  const session = await getSession()
-  const isAdmin = session?.role === "admin"
+  const user = await requireAuth()
+  const isAdmin = user.role === "admin"
 
   const [allArtists, allRoyalties] = await Promise.all([getArtists(), getRoyalties()])
   const royalties = isAdmin
     ? allRoyalties
-    : allRoyalties.filter((r) => r.artistSlug === session!.sub)
+    : allRoyalties.filter((r) => r.artistSlug === (user.artistSlug ?? ""))
 
   const periods = ["2026-Q1", "2025-Q4"]
 
