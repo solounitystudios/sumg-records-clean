@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { unlinkArtistSpotify } from "@/app/actions/artists";
+import { formatFollowers } from "@/lib/spotifyFormat";
 
 // ─── Minimal types for search results (no server-only import) ─────────────────
 
@@ -12,12 +13,6 @@ interface SpotifySearchArtist {
   images: Array<{ url: string; width: number | null; height: number | null }>;
   genres: string[];
   external_urls: { spotify: string };
-}
-
-function formatFollowers(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
-  return String(n);
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────

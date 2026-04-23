@@ -388,6 +388,42 @@ CREATE TABLE IF NOT EXISTS shopify_campaigns (
 ALTER TABLE brands DROP COLUMN IF EXISTS featured_song_slugs;
 
 
+-- ─── Phase S — Spotify Intelligence Layer ────────────────────────────────────
+-- Additive safe migration — all statements use IF NOT EXISTS / ADD COLUMN IF NOT EXISTS.
+-- Run after all previous migrations.
+
+-- Artists: Spotify identity + cached rolling stats
+ALTER TABLE artists ADD COLUMN IF NOT EXISTS spotify_id              TEXT;
+ALTER TABLE artists ADD COLUMN IF NOT EXISTS tags                    JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE artists ADD COLUMN IF NOT EXISTS monthly_listeners       INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE artists ADD COLUMN IF NOT EXISTS total_streams           BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE artists ADD COLUMN IF NOT EXISTS release_count           INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE artists ADD COLUMN IF NOT EXISTS shop_url                TEXT;
+ALTER TABLE artists ADD COLUMN IF NOT EXISTS spotify_followers       INTEGER;
+ALTER TABLE artists ADD COLUMN IF NOT EXISTS spotify_popularity      INTEGER;
+ALTER TABLE artists ADD COLUMN IF NOT EXISTS spotify_last_synced_at  TIMESTAMPTZ;
+
+-- Songs: Spotify track identity + audio analysis
+ALTER TABLE songs ADD COLUMN IF NOT EXISTS spotify_track_id          TEXT;
+ALTER TABLE songs ADD COLUMN IF NOT EXISTS spotify_audio_features    JSONB;
+
+-- Releases: accent color + Spotify streaming metrics
+ALTER TABLE releases ADD COLUMN IF NOT EXISTS accent_color  TEXT;
+ALTER TABLE releases ADD COLUMN IF NOT EXISTS streams       BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE releases ADD COLUMN IF NOT EXISTS platforms     JSONB;
+
+-- Spotify artist snapshots: point-in-time follower/popularity history
+CREATE TABLE IF NOT EXISTS artist_spotify_snapshots (
+  id           TEXT PRIMARY KEY,
+  artist_slug  TEXT NOT NULL,
+  spotify_id   TEXT NOT NULL,
+  followers    INTEGER NOT NULL DEFAULT 0,
+  popularity   INTEGER NOT NULL DEFAULT 0,
+  genres       JSONB,
+  snapshot_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- RLS for artist_spotify_snapshots
 alter table artist_spotify_snapshots enable row level security;
 create policy if not exists "public read artist snapshots"
   on artist_spotify_snapshots for select using (true);

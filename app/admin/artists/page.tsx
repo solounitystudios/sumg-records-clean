@@ -1,8 +1,10 @@
 import Link from "next/link"
+import { Suspense } from "react"
 import { getArtists } from "@/lib/db/artists"
 import { getReleases } from "@/lib/db/releases"
 import { formatStreams } from "@/lib/data"
 import ArtistPhotoUpload from "./ArtistPhotoUpload"
+import { SpotifyStatsWidget } from "@/components/admin/SpotifyStatsWidget"
 
 export const metadata = { title: "Artist Management — SUMG Admin" }
 
@@ -93,6 +95,12 @@ export default async function ArtistsAdminPage() {
                       </span>
                     ))}
                   </div>
+
+                  {artist.spotifyId && (
+                    <Suspense fallback={null}>
+                      <SpotifyStatsWidget spotifyId={artist.spotifyId} />
+                    </Suspense>
+                  )}
                 </div>
               </div>
             </div>

@@ -11,6 +11,7 @@ const adminNav = [
   { href: "/admin/news", label: "News" },
   { href: "/admin/contributors", label: "Contributors" },
   { href: "/admin/lyrics", label: "Lyrics" },
+  { href: "/admin/spotify", label: "Spotify" },
 ]
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

@@ -11,6 +11,7 @@ import {
   getAllProducers,
 } from "@/lib/cms";
 import { DSPButtonGroup } from "@/components/admin/DSPLinksPanel";
+import { SpotifyEmbed } from "@/components/SpotifyEmbed";
 import Link from "next/link";
 
 interface Props {
@@ -178,6 +179,30 @@ export default async function SongPage({ params }: Props) {
                 Listen On
               </p>
               <DSPButtonGroup links={song.dspLinks} />
+            </div>
+          </section>
+        )}
+
+        {/* Spotify track embed */}
+        {song.spotifyTrackId && (
+          <section className="py-12 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <div className="flex items-center justify-between mb-6">
+                <p className="text-[10px] tracking-[0.3em] uppercase text-white/25">
+                  On Spotify
+                </p>
+                {song.dspLinks?.spotify && (
+                  <a
+                    href={song.dspLinks.spotify}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] tracking-[0.2em] uppercase border border-white/10 text-white/30 px-4 py-2 hover:border-white/30 hover:text-white/70 transition-colors"
+                  >
+                    Open ↗
+                  </a>
+                )}
+              </div>
+              <SpotifyEmbed type="track" id={song.spotifyTrackId} height={152} />
             </div>
           </section>
         )}
