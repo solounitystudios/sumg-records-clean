@@ -15,12 +15,15 @@ function toArtist(row: ArtistRow): Artist {
     genre: row.genre,
     bio: row.bio,
     tags: row.tags ?? [],
-    monthlyListeners: row.monthly_listeners,
-    totalStreams: row.total_streams,
-    releaseCount: row.release_count,
-    profileImageUrl: row.profile_image_url,
-    spotifyId: row.spotify_id,
-    socialLinks: row.social_links,
+    monthlyListeners: row.monthly_listeners ?? 0,
+    totalStreams: row.total_streams ?? 0,
+    releaseCount: row.release_count ?? 0,
+    profileImageUrl: row.profile_image_url ?? null,
+    heroImageUrl: row.hero_image_url ?? null,
+    status: row.status ?? "active",
+    featured: row.featured ?? false,
+    spotifyId: row.spotify_id ?? null,
+    socialLinks: row.social_links ?? null,
   }
 }
 

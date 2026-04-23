@@ -10,8 +10,18 @@ export interface Artist {
   totalStreams: number
   releaseCount: number
   profileImageUrl?: string | null
+  heroImageUrl?: string | null
+  status?: string | null
+  featured?: boolean
   spotifyId?: string | null
-  socialLinks?: { spotify?: string; instagram?: string; youtube?: string; twitter?: string; soundcloud?: string } | null
+  socialLinks?: {
+    spotify?: string
+    instagram?: string
+    youtube?: string
+    twitter?: string
+    soundcloud?: string
+    tiktok?: string
+  } | null
 }
 
 export interface Producer {

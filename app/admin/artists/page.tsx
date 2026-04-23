@@ -12,10 +12,18 @@ export default async function ArtistsAdminPage() {
   const [artists, allReleases] = await Promise.all([getArtists(), getReleases()])
   return (
     <main className="px-6 py-10 md:px-10">
-      <div className="mb-10">
-        <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">Admin</p>
-        <h1 className="text-3xl font-semibold">Artist Management</h1>
-        <p className="mt-2 text-sm text-white/50">Roster overview and artist profiles.</p>
+      <div className="mb-10 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">Admin</p>
+          <h1 className="text-3xl font-semibold">Artist Management</h1>
+          <p className="mt-2 text-sm text-white/50">Roster overview and artist profiles.</p>
+        </div>
+        <Link
+          href="/admin/artists/new"
+          className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-medium text-black hover:bg-white/90 transition"
+        >
+          + New Artist
+        </Link>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-4 mb-10">

@@ -50,6 +50,7 @@ const NAV: NavSection[] = [
     items: [
       { label: "Messages", href: "/admin/messages" },
       { label: "Assets",   href: "/admin/assets" },
+      { label: "Imports",  href: "/admin/imports" },
       { label: "Spotify",  href: "/admin/spotify" },
       { label: "Tasks",    href: "/admin/tasks" },
     ],

@@ -3,6 +3,7 @@ import Link from "next/link"
 import { getArtistBySlug } from "@/lib/db/artists"
 import { updateArtist } from "@/app/actions/artists"
 import { SpotifyLinkPanel } from "@/components/admin/SpotifyLinkPanel"
+import HeroImageUpload from "./HeroImageUpload"
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -15,6 +16,14 @@ const inputClass =
   "w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/25 focus:border-white/30 focus:outline-none focus:ring-1 focus:ring-white/20 transition"
 
 const labelClass = "block text-xs uppercase tracking-[0.2em] text-white/40 mb-2"
+
+const SOCIAL_FIELDS: { name: string; label: string; placeholder: string }[] = [
+  { name: "instagram",  label: "Instagram",  placeholder: "https://instagram.com/..." },
+  { name: "tiktok",     label: "TikTok",     placeholder: "https://tiktok.com/@..." },
+  { name: "twitter",    label: "Twitter / X", placeholder: "https://x.com/..." },
+  { name: "youtube",    label: "YouTube",    placeholder: "https://youtube.com/@..." },
+  { name: "soundcloud", label: "SoundCloud", placeholder: "https://soundcloud.com/..." },
+]
 
 export default async function EditArtistPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -37,7 +46,23 @@ export default async function EditArtistPage({ params }: { params: Promise<{ slu
         <p className="mt-1 text-sm text-white/50">{artist.name}</p>
       </div>
 
+      {/* Hero image */}
+      <div className="mb-8 rounded-2xl border border-white/[0.07] bg-[#0d1016] overflow-hidden">
+        <div className="px-5 py-4 border-b border-white/[0.05]">
+          <p className="text-xs uppercase tracking-[0.2em] text-white/35">Hero Image</p>
+        </div>
+        <div className="p-5">
+          <HeroImageUpload
+            artistSlug={artist.slug}
+            currentHeroUrl={artist.heroImageUrl}
+            currentProfileUrl={artist.profileImageUrl}
+          />
+        </div>
+      </div>
+
       <form action={action} className="space-y-6">
+
+        {/* Core fields */}
         <div>
           <label htmlFor="a-name" className={labelClass}>Name</label>
           <input
@@ -95,7 +120,7 @@ export default async function EditArtistPage({ params }: { params: Promise<{ slu
             defaultValue={artist.tags.join(", ")}
             className={inputClass}
           />
-          <p className="mt-1 text-xs text-white/25">Comma-separated values.</p>
+          <p className="mt-1 text-[10px] text-white/25">Comma-separated values.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -123,6 +148,47 @@ export default async function EditArtistPage({ params }: { params: Promise<{ slu
           </div>
         </div>
 
+        {/* Status + Featured */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="a-status" className={labelClass}>Status</label>
+            <select id="a-status" name="status" defaultValue={artist.status ?? "active"} className={inputClass}>
+              <option value="active"   className="bg-neutral-900">Active</option>
+              <option value="inactive" className="bg-neutral-900">Inactive</option>
+              <option value="archived" className="bg-neutral-900">Archived</option>
+            </select>
+          </div>
+          <div className="flex flex-col justify-end pb-1">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                name="featured"
+                defaultChecked={artist.featured ?? false}
+                className="w-4 h-4 rounded border border-white/20 bg-white/5 accent-white"
+              />
+              <span className="text-xs uppercase tracking-[0.2em] text-white/40">Featured</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Social links */}
+        <div className="space-y-3">
+          <p className="text-xs uppercase tracking-[0.2em] text-white/25">Social Links</p>
+          {SOCIAL_FIELDS.map(f => (
+            <div key={f.name}>
+              <label htmlFor={`a-${f.name}`} className={labelClass}>{f.label}</label>
+              <input
+                id={`a-${f.name}`}
+                name={f.name}
+                type="url"
+                placeholder={f.placeholder}
+                defaultValue={artist.socialLinks?.[f.name as keyof typeof artist.socialLinks] ?? ""}
+                className={inputClass}
+              />
+            </div>
+          ))}
+        </div>
+
         <div className="rounded-2xl border border-white/8 bg-white/3 px-5 py-4 text-xs text-white/30">
           Slug <span className="font-mono text-white/50 ml-2">{artist.slug}</span> · cannot be changed here
         </div>
@@ -143,7 +209,7 @@ export default async function EditArtistPage({ params }: { params: Promise<{ slu
         </div>
       </form>
 
-      {/* Spotify linking — separate from the main form so it submits via API */}
+      {/* Spotify linking */}
       <div className="mt-10 space-y-3">
         <p className="text-xs uppercase tracking-[0.2em] text-white/25">Streaming</p>
         <SpotifyLinkPanel
