@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { signout } from "@/app/actions/auth"
+import { requireAdmin } from "@/lib/auth"
 
 const adminNav = [
   { href: "/admin", label: "Overview", exact: true },
@@ -15,6 +16,7 @@ const adminNav = [
 ]
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  await requireAdmin()
   return (
     <div className="min-h-screen bg-[#06070a] text-white flex">
       <aside className="hidden lg:flex w-56 shrink-0 flex-col border-r border-white/10 bg-[#08090d]">

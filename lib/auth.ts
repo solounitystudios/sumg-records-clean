@@ -2,6 +2,10 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import type { User } from "@supabase/supabase-js"
 
+// Full label access: owner, co_owner retain all admin privileges going forward.
+// "admin" is kept for backward-compat with existing provisioned accounts.
+const EXECUTIVE_ROLES = ["owner", "co_owner", "admin"] as const
+
 const CMS_ROLES = ["admin", "editor", "media_manager", "release_manager"] as const
 
 export interface AuthUser {
@@ -40,8 +44,13 @@ export async function requireAuth(): Promise<AuthUser> {
 export async function requireAdmin(): Promise<AuthUser> {
   const user = await getAuthUser()
   if (!user) redirect("/login")
-  if (user.role !== "admin") redirect("/login?error=no_role")
+  if (!isExecutiveRole(user.role)) redirect("/login?error=no_role")
   return user
+}
+
+/** True for owner, co_owner, and admin — full label access. */
+export function isExecutiveRole(role: string): boolean {
+  return EXECUTIVE_ROLES.includes(role as (typeof EXECUTIVE_ROLES)[number])
 }
 
 export function isCmsRole(role: string): boolean {

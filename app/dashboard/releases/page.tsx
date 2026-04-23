@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { getReleases, getArtistReleases } from "@/lib/db/releases"
 import { formatStreams } from "@/lib/data"
-import { requireAuth } from "@/lib/auth"
+import { requireAuth, isExecutiveRole } from "@/lib/auth"
 
 export const metadata = { title: "Releases — Artist Dashboard" }
 
@@ -14,7 +14,7 @@ const statusStyle: Record<string, string> = {
 
 export default async function DashboardReleasesPage() {
   const user = await requireAuth()
-  const isAdmin = user.role === "admin"
+  const isAdmin = isExecutiveRole(user.role)
 
   const releases = isAdmin
     ? await getReleases()
@@ -31,7 +31,7 @@ export default async function DashboardReleasesPage() {
         <Link href="/dashboard" className="text-xs uppercase tracking-[0.2em] text-white/35 hover:text-white transition mb-4 inline-block">
           ← Dashboard
         </Link>
-        <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">Artist Portal</p>
+        <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">{isAdmin ? "Label Admin" : "Artist Portal"}</p>
         <h1 className="text-3xl font-semibold">Releases</h1>
         <p className="mt-1 text-sm text-white/50">
           {isAdmin ? "All SUMG releases and their current status." : "Your releases and their current status."}

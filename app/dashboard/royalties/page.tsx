@@ -2,13 +2,13 @@ import Link from "next/link"
 import { getRoyalties } from "@/lib/db/royalties"
 import { getArtists } from "@/lib/db/artists"
 import { formatStreams, formatRevenue } from "@/lib/data"
-import { requireAuth } from "@/lib/auth"
+import { requireAuth, isExecutiveRole } from "@/lib/auth"
 
 export const metadata = { title: "Royalties — Artist Dashboard" }
 
 export default async function DashboardRoyaltiesPage() {
   const user = await requireAuth()
-  const isAdmin = user.role === "admin"
+  const isAdmin = isExecutiveRole(user.role)
 
   const [allArtists, allRoyalties] = await Promise.all([getArtists(), getRoyalties()])
   const royalties = isAdmin
@@ -23,7 +23,7 @@ export default async function DashboardRoyaltiesPage() {
         <Link href="/dashboard" className="text-xs uppercase tracking-[0.2em] text-white/35 hover:text-white transition mb-4 inline-block">
           ← Dashboard
         </Link>
-        <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">Artist Portal</p>
+        <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">{isAdmin ? "Label Admin" : "Artist Portal"}</p>
         <h1 className="text-3xl font-semibold">Royalties</h1>
         <p className="mt-1 text-sm text-white/50">Earnings breakdown by artist and platform.</p>
       </div>

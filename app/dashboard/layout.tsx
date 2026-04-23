@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { requireAuth } from "@/lib/auth"
+import { requireAuth, isExecutiveRole } from "@/lib/auth"
 import { signout } from "@/app/actions/auth"
 
 const dashNav = [
@@ -10,12 +10,13 @@ const dashNav = [
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAuth()
+  const isExecutive = isExecutiveRole(user.role)
 
   return (
     <div className="min-h-screen bg-[#06070a] text-white flex">
       <aside className="hidden lg:flex w-56 shrink-0 flex-col border-r border-white/10 bg-[#08090d]">
         <div className="px-5 py-6 border-b border-white/10">
-          <p className="text-xs uppercase tracking-[0.3em] text-white/35">Artist Portal</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-white/35">{isExecutive ? "Label Admin" : "Artist Portal"}</p>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5">
           {dashNav.map((item) => (
@@ -37,7 +38,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
               Sign Out
             </button>
           </form>
-          {user.role === "admin" && (
+          {isExecutive && (
             <Link
               href="/admin"
               className="mt-1 flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/40 hover:text-white/70 hover:bg-white/5 transition"

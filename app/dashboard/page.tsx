@@ -3,13 +3,13 @@ import { formatStreams, formatRevenue } from "@/lib/data"
 import { getArtists, getArtistBySlug } from "@/lib/db/artists"
 import { getReleases, getArtistReleases } from "@/lib/db/releases"
 import { getRoyalties } from "@/lib/db/royalties"
-import { requireAuth } from "@/lib/auth"
+import { requireAuth, isExecutiveRole } from "@/lib/auth"
 
 export const metadata = { title: "Artist Dashboard — SUMG Records" }
 
 export default async function DashboardPage() {
   const user = await requireAuth()
-  const isAdmin = user.role === "admin"
+  const isAdmin = isExecutiveRole(user.role)
   const artistSlug = user.artistSlug ?? ""
 
   const [allArtists, allReleases, allRoyalties] = await Promise.all([
@@ -35,7 +35,7 @@ export default async function DashboardPage() {
   return (
     <main className="px-6 py-10 md:px-10">
       <div className="mb-10">
-        <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">Artist Portal</p>
+        <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">{isAdmin ? "Label Admin" : "Artist Portal"}</p>
         <h1 className="text-3xl font-semibold">
           {isAdmin ? "Dashboard" : artistName ?? "Dashboard"}
         </h1>

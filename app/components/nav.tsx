@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { getAuthUser } from "@/lib/auth"
+import { getAuthUser, isExecutiveRole } from "@/lib/auth"
 import MobileNav from "./mobile-nav"
 
 const navLinks = [
@@ -36,7 +36,7 @@ export default async function Nav() {
           <div className="hidden md:flex items-center gap-3">
             {session ? (
               <>
-                {session.role === "admin" && (
+                {isExecutiveRole(session.role) && (
                   <Link
                     href="/admin"
                     className="text-xs uppercase tracking-[0.2em] text-white/50 hover:text-white transition"
@@ -63,7 +63,7 @@ export default async function Nav() {
 
           <MobileNav
             isLoggedIn={session !== null}
-            isAdmin={session?.role === "admin"}
+            isAdmin={isExecutiveRole(session?.role ?? "")}
           />
         </div>
       </div>
