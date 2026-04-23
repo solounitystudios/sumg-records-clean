@@ -15,6 +15,7 @@ const NAV: NavSection[] = [
       { label: "Command Center", href: "/admin", exact: true },
       { label: "Website / CMS",  href: "/admin/cms" },
       { label: "Analytics",      href: "/admin/analytics" },
+      { label: "Intelligence",   href: "/admin/intelligence" },
     ],
   },
   {

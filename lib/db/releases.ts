@@ -1,5 +1,7 @@
 import { supabase } from "./supabase"
 import type { Release, Track } from "@/lib/data"
+import type { CMSRelease } from "@/lib/types"
+import { rowToRelease as rowToCMSRelease } from "@/lib/cms/mappers"
 
 const SELECT = "*"
 
@@ -65,4 +67,15 @@ export async function getArtistReleases(artistSlug: string): Promise<Release[]> 
     .order("release_date", { ascending: false })
   if (error) throw new Error(`getArtistReleases: ${error.message}`)
   return (data as ReleaseRow[]).map(toRelease)
+}
+
+// Returns full CMSRelease type (with rightsMetadata, distributionRecord, etc.)
+// Use in admin-only contexts that need publishing/distribution fields.
+export async function getAllReleasesAdmin(): Promise<CMSRelease[]> {
+  const { data, error } = await supabase
+    .from("releases")
+    .select(SELECT)
+    .order("release_date", { ascending: false })
+  if (error) throw new Error(`getAllReleasesAdmin: ${error.message}`)
+  return (data as ReleaseRow[]).map(rowToCMSRelease)
 }
