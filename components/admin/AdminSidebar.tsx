@@ -22,6 +22,7 @@ const NAV: NavSection[] = [
     key: "catalog",
     label: "CATALOG",
     items: [
+      { label: "Catalog",   href: "/admin/catalog" },
       { label: "Artists",   href: "/admin/artists" },
       { label: "Releases",  href: "/admin/releases" },
       { label: "Songs",     href: "/admin/lyrics" },
@@ -34,6 +35,7 @@ const NAV: NavSection[] = [
     key: "business",
     label: "BUSINESS",
     items: [
+      { label: "Rights",     href: "/admin/rights" },
       { label: "Royalties",  href: "/admin/royalties" },
       { label: "Finance",    href: "/admin/finance" },
       { label: "Publishing", href: "/admin/publishing" },
@@ -56,7 +58,8 @@ const NAV: NavSection[] = [
     key: "system",
     label: "SYSTEM",
     items: [
-      { label: "Settings", href: "/admin/settings" },
+      { label: "Integrity", href: "/admin/integrity" },
+      { label: "Settings",  href: "/admin/settings" },
     ],
   },
 ];
