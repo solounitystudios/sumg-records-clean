@@ -230,6 +230,16 @@ export interface CMSProducer {
   profileImageUrl?: string;
   heroImageUrl?: string;
   socialLinks?: SocialLinks;
+  /** YouTube channel URL set manually by admin */
+  ytChannelUrl?: string;
+  ytHandle?: string;
+  ytChannelId?: string;
+  ytUploadCadence?: number;
+  ytTitleTemplate?: string;
+  ytDescriptionTemplate?: string;
+  ytDefaultTags?: string[];
+  /** Slug of the linked DNA record (entity_type = 'producer') */
+  dnaSlug?: string;
   createdAt: string;
   updatedAt: string;
 }

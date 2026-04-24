@@ -34,6 +34,24 @@ export interface Producer {
   specialties: string[]
   credits: number
   bio: string
+  status?: string
+  imageUrl?: string | null
+  bannerUrl?: string | null
+  socialLinks?: {
+    youtube?: string
+    instagram?: string
+    twitter?: string
+    soundcloud?: string
+    tiktok?: string
+  } | null
+  ytChannelUrl?: string | null
+  ytHandle?: string | null
+  ytChannelId?: string | null
+  ytUploadCadence?: number
+  ytTitleTemplate?: string | null
+  ytDescriptionTemplate?: string | null
+  ytDefaultTags?: string[]
+  dnaSlug?: string | null
 }
 
 export interface Brand {
