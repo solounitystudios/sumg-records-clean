@@ -60,6 +60,7 @@ const NAV: NavSection[] = [
     key: "system",
     label: "SYSTEM",
     items: [
+      { label: "DNA",       href: "/admin/dna" },
       { label: "Integrity", href: "/admin/integrity" },
       { label: "Settings",  href: "/admin/settings" },
     ],

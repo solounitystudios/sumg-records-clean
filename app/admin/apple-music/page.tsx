@@ -386,7 +386,9 @@ export default async function AppleMusicAdminPage() {
     getAllSongs(),
   ]);
 
-  const rosterStubs = artists.map((a) => ({ slug: a.slug, name: a.name }));
+  const rosterStubs   = artists.map((a) => ({ slug: a.slug, name: a.name }));
+  const releaseStubs  = releases.map((r) => ({ slug: r.slug, title: r.title, artistName: r.artistName }));
+  const songStubs     = songs.map((s) => ({ slug: s.slug, title: s.title, artistName: s.artistName }));
 
   const tabs = {
     overview: <OverviewTab artists={artists} releases={releases} songs={songs} />,
@@ -398,7 +400,7 @@ export default async function AppleMusicAdminPage() {
         <p className="text-[10px] uppercase tracking-[0.2em] text-white/40 mb-5">Search Apple Music Catalog</p>
         <div className="border border-white/10 bg-[#0d1016] p-6">
           <Suspense fallback={<div className="text-xs text-white/25 animate-pulse py-4">Loading…</div>}>
-            <AppleMusicSearchPanel artists={rosterStubs} />
+            <AppleMusicSearchPanel artists={rosterStubs} releases={releaseStubs} songs={songStubs} />
           </Suspense>
         </div>
       </section>
