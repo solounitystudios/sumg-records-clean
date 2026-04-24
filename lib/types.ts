@@ -209,6 +209,9 @@ export interface CMSArtist {
   providerConfig?: ProviderConfig;
   /** Bare 22-char Spotify artist ID — derived from socialLinks.spotify or set explicitly via admin */
   spotifyId?: string;
+  /** Numeric Apple Music artist ID */
+  appleMusicId?: string;
+  appleMusicUrl?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -295,6 +298,9 @@ export interface CMSRelease {
   distributionRecord?: DistributionRecord;
   /** Where this record's data originated (manual entry, import, etc.). */
   dataSource?: DataOriginSource;
+  /** Numeric Apple Music album ID */
+  appleMusicAlbumId?: string;
+  appleMusicUrl?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -344,6 +350,9 @@ export interface CMSSong {
   spotifyTrackId?: string;
   /** Audio-feature data fetched from the Spotify audio-features endpoint */
   spotifyAudioFeatures?: SpotifyAudioFeatures;
+  /** Numeric Apple Music song ID */
+  appleMusicSongId?: string;
+  appleMusicUrl?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -395,6 +404,7 @@ export interface SocialLinks {
   spotify?: string;
   soundcloud?: string;
   youtube?: string;
+  appleMusic?: string;
 }
 
 // ─── Spotify enrichment ───────────────────────────────────────────────────────

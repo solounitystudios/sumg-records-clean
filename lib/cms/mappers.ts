@@ -21,6 +21,8 @@ export function rowToArtist(r: any): CMSArtist {
     associatedBrands: r.associated_brands ?? undefined,
     providerConfig: r.provider_config ?? undefined,
     spotifyId: r.spotify_id ?? undefined,
+    appleMusicId: r.apple_music_id ?? undefined,
+    appleMusicUrl: r.apple_music_url ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -99,6 +101,8 @@ export function rowToRelease(r: any): CMSRelease {
     rightsMetadata: r.rights_metadata ?? undefined,
     distributionRecord: r.distribution_record ?? undefined,
     dataSource: r.data_source ?? undefined,
+    appleMusicAlbumId: r.apple_album_id ?? undefined,
+    appleMusicUrl: r.apple_url ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -131,6 +135,8 @@ export function rowToSong(r: any): CMSSong {
     dataSource: r.data_source ?? undefined,
     spotifyTrackId: r.spotify_track_id ?? undefined,
     spotifyAudioFeatures: r.spotify_audio_features ?? undefined,
+    appleMusicSongId: r.apple_song_id ?? undefined,
+    appleMusicUrl: r.apple_url ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

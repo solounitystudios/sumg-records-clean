@@ -14,6 +14,8 @@ export interface Artist {
   status?: string | null
   featured?: boolean
   spotifyId?: string | null
+  appleMusicId?: string | null
+  appleMusicUrl?: string | null
   socialLinks?: {
     spotify?: string
     instagram?: string
@@ -21,6 +23,7 @@ export interface Artist {
     twitter?: string
     soundcloud?: string
     tiktok?: string
+    appleMusic?: string
   } | null
 }
 

@@ -23,6 +23,8 @@ function toArtist(row: ArtistRow): Artist {
     status: row.status ?? "active",
     featured: row.featured ?? false,
     spotifyId: row.spotify_id ?? null,
+    appleMusicId: row.apple_music_id ?? null,
+    appleMusicUrl: row.apple_music_url ?? null,
     socialLinks: row.social_links ?? null,
   }
 }
