@@ -22,6 +22,7 @@ export default async function YouTubeOverviewPage() {
     .reduce((s, c) => s + c.uploadCadence, 0)
 
   const nav = [
+    { label: "Engine",      href: "/admin/youtube/engine",      desc: `${counts.pending} ready to process` },
     { label: "Channels",    href: "/admin/youtube/channels",    desc: `${channels.length} configured` },
     { label: "Queue",       href: "/admin/youtube/queue",       desc: `${counts.pending + counts.processing} pending` },
     { label: "Jobs",        href: "/admin/youtube/jobs",        desc: `${counts.uploaded} uploaded · ${counts.failed} failed` },
@@ -70,7 +71,7 @@ export default async function YouTubeOverviewPage() {
       </div>
 
       {/* Nav cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         {nav.map(({ label, href, desc }) => (
           <Link key={href} href={href}
             className="border border-white/[0.07] bg-[#0d1016] p-5 hover:border-white/15 hover:bg-white/[0.03] transition-colors rounded-2xl group">

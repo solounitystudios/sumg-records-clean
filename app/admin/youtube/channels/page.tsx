@@ -59,6 +59,14 @@ export default async function YouTubeChannelsPage() {
                       <p className="text-[10px] text-white/20 font-mono mt-0.5">{ch.channelId}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-none">
+                      {ch.oauthConnected ? (
+                        <span className="text-[9px] text-green-400/60 border border-green-500/20 px-1.5 py-0.5 rounded">OAuth ✓</span>
+                      ) : (
+                        <Link href="/admin/youtube/engine"
+                          className="text-[9px] text-white/25 hover:text-white/50 border border-white/[0.07] px-1.5 py-0.5 rounded transition-colors">
+                          Connect →
+                        </Link>
+                      )}
                       {ch.channelUrl && (
                         <a href={ch.channelUrl} target="_blank" rel="noopener noreferrer"
                           className="text-[10px] text-white/20 hover:text-white/50 transition-colors">↗</a>
