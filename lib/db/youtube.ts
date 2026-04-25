@@ -3,7 +3,7 @@ import { supabase } from "./supabase"
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type YtChannelStatus = "active" | "paused" | "revoked"
-export type YtJobStatus = "pending" | "processing" | "uploaded" | "failed" | "cancelled"
+export type YtJobStatus = "needs_asset" | "scheduled" | "pending" | "processing" | "uploaded" | "failed" | "cancelled"
 
 export interface YtChannel {
   id: string
@@ -23,8 +23,9 @@ export interface YtChannel {
 export interface YtUploadJob {
   id: string
   producerSlug: string
-  assetId: string
-  ytChannelId: string
+  assetId: string | null
+  ytChannelId: string | null
+  dnaPackId: string | null
   status: YtJobStatus
   title: string | null
   description: string | null
@@ -65,8 +66,9 @@ function toJob(r: any): YtUploadJob {
   return {
     id: r.id,
     producerSlug: r.producer_slug,
-    assetId: r.asset_id,
-    ytChannelId: r.yt_channel_id,
+    assetId: r.asset_id ?? null,
+    ytChannelId: r.yt_channel_id ?? null,
+    dnaPackId: r.dna_pack_id ?? null,
     status: r.status,
     title: r.title ?? null,
     description: r.description ?? null,
@@ -129,8 +131,8 @@ export async function getQueuedJobs(): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
     .select("*, yt_channels(channel_handle), assets(filename)")
-    .in("status", ["pending", "processing"])
-    .order("scheduled_at", { ascending: true })
+    .in("status", ["needs_asset", "scheduled", "pending", "processing"])
+    .order("created_at", { ascending: false })
   if (error) throw new Error(`getQueuedJobs: ${error.message}`)
   return (data ?? []).map(toJob)
 }
@@ -150,7 +152,7 @@ export async function getJobCounts(): Promise<Record<YtJobStatus, number>> {
     .from("yt_upload_jobs")
     .select("status")
   if (error) throw new Error(`getJobCounts: ${error.message}`)
-  const counts: Record<YtJobStatus, number> = { pending: 0, processing: 0, uploaded: 0, failed: 0, cancelled: 0 }
+  const counts: Record<YtJobStatus, number> = { needs_asset: 0, scheduled: 0, pending: 0, processing: 0, uploaded: 0, failed: 0, cancelled: 0 }
   for (const row of data ?? []) counts[row.status as YtJobStatus] = (counts[row.status as YtJobStatus] ?? 0) + 1
   return counts
 }

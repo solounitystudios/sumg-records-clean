@@ -91,6 +91,57 @@ export async function createYtJob(formData: FormData) {
   redirect("/admin/youtube/queue")
 }
 
+export async function createYtJobFromPack(formData: FormData) {
+  await requireAdmin()
+
+  const packId       = formData.get("pack_id")?.toString() ?? ""
+  const producerSlug = formData.get("producer_slug")?.toString().trim() ?? ""
+  const channelId    = formData.get("yt_channel_id")?.toString().trim() || null
+  const assetId      = formData.get("asset_id")?.toString().trim() || null
+  const title        = formData.get("title")?.toString().trim() || null
+  const description  = formData.get("description")?.toString().trim() || null
+  const scheduledRaw = formData.get("scheduled_at")?.toString().trim()
+  const tags         = parseTags(formData.get("tags")?.toString() ?? "")
+
+  if (!packId || !producerSlug) throw new Error("pack_id and producer_slug are required.")
+
+  const status = assetId ? (scheduledRaw ? "scheduled" : "pending") : "needs_asset"
+
+  const { data: job, error: jobErr } = await supabase
+    .from("yt_upload_jobs")
+    .insert({
+      producer_slug: producerSlug,
+      asset_id:      assetId,
+      yt_channel_id: channelId,
+      dna_pack_id:   packId,
+      status,
+      title,
+      description,
+      tags,
+      scheduled_at:  scheduledRaw ? new Date(scheduledRaw).toISOString() : null,
+      updated_at:    new Date().toISOString(),
+    })
+    .select("id")
+    .single()
+
+  if (jobErr) throw new Error(jobErr.message)
+
+  const { error: packErr } = await supabase
+    .from("dna_packs")
+    .update({
+      yt_job_id:  job.id,
+      status:     "assigned_to_queue",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", packId)
+
+  if (packErr) throw new Error(packErr.message)
+
+  revalidatePath("/admin/dna/packs")
+  revalidatePath("/admin/youtube/queue")
+  redirect("/admin/youtube/queue")
+}
+
 export async function cancelYtJob(formData: FormData) {
   await requireAdmin()
 

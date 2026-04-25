@@ -60,9 +60,9 @@ export default async function YouTubeOverviewPage() {
       <div className="border border-white/[0.07] bg-[#0d1016] p-6 rounded-2xl mb-8">
         <p className="text-[10px] uppercase tracking-[0.2em] text-white/35 mb-5">Job Status</p>
         <div className="flex flex-wrap gap-6">
-          {(["pending", "processing", "uploaded", "failed", "cancelled"] as const).map((s) => (
+          {(["needs_asset", "scheduled", "pending", "processing", "uploaded", "failed", "cancelled"] as const).map((s) => (
             <div key={s}>
-              <p className="text-[9px] uppercase tracking-[0.12em] text-white/25 mb-1">{s}</p>
+              <p className="text-[9px] uppercase tracking-[0.12em] text-white/25 mb-1">{s.replace("_", " ")}</p>
               <p className="text-lg font-semibold tabular-nums">{counts[s]}</p>
             </div>
           ))}

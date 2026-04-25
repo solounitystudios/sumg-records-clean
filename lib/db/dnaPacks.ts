@@ -52,6 +52,16 @@ export async function getAllVariations(): Promise<ProducerVariation[]> {
   return (data ?? []) as ProducerVariation[]
 }
 
+export async function getPackById(id: string): Promise<DNAPack | null> {
+  const { data, error } = await supabase
+    .from("dna_packs")
+    .select("*")
+    .eq("id", id)
+    .single()
+  if (error) return null
+  return data as DNAPack
+}
+
 export async function getAllPacks(): Promise<DNAPack[]> {
   const { data, error } = await supabase
     .from("dna_packs")
