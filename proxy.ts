@@ -54,18 +54,20 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Admin: require a CMS role in app_metadata
-  const CMS_ROLES = ["admin", "editor", "media_manager", "release_manager"] as const;
+  // Admin: require a recognised label role in app_metadata.
+  // Executive roles (owner, co_owner) get full access; CMS roles get scoped access.
+  const ADMIN_ROLES = ["owner", "co_owner", "admin", "editor", "media_manager", "release_manager"] as const;
   const role = (user.app_metadata?.role as string | undefined) ?? "";
 
-  if (!CMS_ROLES.includes(role as (typeof CMS_ROLES)[number])) {
+  if (!ADMIN_ROLES.includes(role as (typeof ADMIN_ROLES)[number])) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("error", "no_role");
     return NextResponse.redirect(loginUrl);
   }
 
-  // Settings pages restricted to admin only
-  if (pathname.startsWith("/admin/settings") && role !== "admin") {
+  // Settings pages restricted to owner/co_owner/admin only
+  const SETTINGS_ROLES = ["owner", "co_owner", "admin"];
+  if (pathname.startsWith("/admin/settings") && !SETTINGS_ROLES.includes(role)) {
     const adminUrl = new URL("/admin", request.url);
     adminUrl.searchParams.set("error", "settings_admin_only");
     return NextResponse.redirect(adminUrl);

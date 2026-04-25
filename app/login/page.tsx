@@ -45,12 +45,12 @@ function LoginForm() {
       return;
     }
 
-    const CMS_ROLES = ["admin", "editor", "media_manager", "release_manager"];
+    const ADMIN_ROLES = ["owner", "co_owner", "admin", "editor", "media_manager", "release_manager"];
     const role = (data.user?.app_metadata?.role as string | undefined) ?? "";
     const safeParam = redirectParam && redirectParam.startsWith("/") && !redirectParam.startsWith("//")
       ? redirectParam
       : null;
-    const destination = safeParam ?? (CMS_ROLES.includes(role) ? "/admin" : "/dashboard");
+    const destination = safeParam ?? (ADMIN_ROLES.includes(role) ? "/admin" : "/dashboard");
 
     router.push(destination);
     router.refresh();
