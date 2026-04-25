@@ -22,9 +22,10 @@ export async function retryFailedJob(formData: FormData) {
   const id = formData.get("id")?.toString() ?? ""
   if (!id) throw new Error("Job ID required")
 
+  // Manual retry resets the counter so the job can go through MAX_RETRIES again.
   await supabase
     .from("yt_upload_jobs")
-    .update({ status: "pending", error_message: null, updated_at: new Date().toISOString() })
+    .update({ status: "pending", error_message: null, retry_count: 0, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("status", "failed")
 

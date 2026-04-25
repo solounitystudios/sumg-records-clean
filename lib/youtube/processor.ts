@@ -24,6 +24,8 @@ async function addLog(
 
 // ─── Job fetching ─────────────────────────────────────────────────────────────
 
+const MAX_RETRIES = 5
+
 interface RawJob {
   id:            string
   title:         string | null
@@ -33,6 +35,7 @@ interface RawJob {
   yt_channel_id: string | null
   scheduled_at:  string | null
   status:        string
+  retry_count:   number
   yt_channels:   { channel_id: string; channel_handle: string | null; oauth_refresh_token: string | null } | null
 }
 
@@ -40,11 +43,12 @@ async function fetchReadyJobs(): Promise<RawJob[]> {
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("id, title, description, tags, asset_id, yt_channel_id, scheduled_at, status, yt_channels(channel_id, channel_handle, oauth_refresh_token)")
+    .select("id, title, description, tags, asset_id, yt_channel_id, scheduled_at, status, retry_count, yt_channels(channel_id, channel_handle, oauth_refresh_token)")
     .in("status", ["pending", "scheduled"])
     .or(`scheduled_at.is.null,scheduled_at.lte.${now}`)
     .not("asset_id", "is", null)
     .not("yt_channel_id", "is", null)
+    .lt("retry_count", MAX_RETRIES)
     .order("created_at", { ascending: true })
     .limit(10)
 
@@ -107,12 +111,19 @@ async function runJobReal(job: RawJob): Promise<ProcessResult> {
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    const newRetryCount = (job.retry_count ?? 0) + 1
     await supabase.from("yt_upload_jobs").update({
       status:        "failed",
       error_message: message,
+      retry_count:   newRetryCount,
       updated_at:    new Date().toISOString(),
     }).eq("id", jobId)
-    await addLog(jobId, chanId, "error", `Failed: ${message}`)
+    const exhausted = newRetryCount >= MAX_RETRIES
+    await addLog(jobId, chanId, "error",
+      exhausted
+        ? `Failed (retry ${newRetryCount}/${MAX_RETRIES} — max retries reached, job will not auto-retry): ${message}`
+        : `Failed (retry ${newRetryCount}/${MAX_RETRIES}): ${message}`,
+    )
     return { jobId, title, status: "failed", error: message, simulated: false }
   }
 }

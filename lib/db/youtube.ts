@@ -38,6 +38,7 @@ export interface YtUploadJob {
   ytVideoId: string | null
   ytVideoUrl: string | null
   errorMessage: string | null
+  retryCount: number
   createdAt: string
   updatedAt: string
   // Joined
@@ -95,6 +96,7 @@ function toJob(r: any): YtUploadJob {
     ytVideoId:    r.yt_video_id ?? null,
     ytVideoUrl:   r.yt_video_url ?? null,
     errorMessage: r.error_message ?? null,
+    retryCount:   r.retry_count ?? 0,
     createdAt:    r.created_at,
     updatedAt:    r.updated_at,
     channelHandle:  r.yt_channels?.channel_handle ?? null,
