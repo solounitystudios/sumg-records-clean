@@ -142,6 +142,35 @@ export async function createYtJobFromPack(formData: FormData) {
   redirect("/admin/youtube/queue")
 }
 
+export async function assignAssetToJob(formData: FormData) {
+  await requireAdmin()
+
+  const jobId       = formData.get("job_id")?.toString() ?? ""
+  const assetId     = formData.get("asset_id")?.toString().trim() || null
+  const scheduledRaw = formData.get("scheduled_at")?.toString().trim()
+
+  if (!jobId)    throw new Error("job_id is required.")
+  if (!assetId)  throw new Error("Please select an audio asset.")
+
+  const status = scheduledRaw ? "scheduled" : "pending"
+
+  const { error } = await supabase
+    .from("yt_upload_jobs")
+    .update({
+      asset_id:     assetId,
+      status,
+      scheduled_at: scheduledRaw ? new Date(scheduledRaw).toISOString() : null,
+      updated_at:   new Date().toISOString(),
+    })
+    .eq("id", jobId)
+    .eq("status", "needs_asset")
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath("/admin/youtube/queue")
+  revalidatePath("/admin/youtube/jobs")
+}
+
 export async function cancelYtJob(formData: FormData) {
   await requireAdmin()
 
@@ -150,7 +179,7 @@ export async function cancelYtJob(formData: FormData) {
     .from("yt_upload_jobs")
     .update({ status: "cancelled", updated_at: new Date().toISOString() })
     .eq("id", id)
-    .in("status", ["pending", "processing"])
+    .in("status", ["needs_asset", "scheduled", "pending", "processing"])
 
   if (error) throw new Error(error.message)
 
