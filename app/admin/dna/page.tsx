@@ -56,7 +56,7 @@ export default async function DNALandingPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-10">
+      <div className="grid grid-cols-2 gap-4 mb-6">
         {[
           { label: "Artists", value: artists.length, href: "/admin/dna/artists" },
           { label: "Producers", value: producers.length, href: "/admin/dna/producers" },
@@ -68,6 +68,25 @@ export default async function DNALandingPage() {
           >
             <p className="text-2xl font-semibold tabular-nums">{value}</p>
             <p className="text-[10px] text-white/35 uppercase tracking-wide mt-1">{label} →</p>
+          </Link>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 mb-10">
+        {[
+          { label: "Pack Builder", desc: "Generate content from DNA", href: "/admin/dna/builder", accent: true },
+          { label: "Saved Packs",  desc: "Draft · approved · queued",  href: "/admin/dna/packs" },
+          { label: "Variations",   desc: "35 producer presets",        href: "/admin/dna/variations" },
+        ].map(({ label, desc, href, accent }) => (
+          <Link
+            key={label}
+            href={href}
+            className={`rounded-2xl border p-4 hover:bg-white/[0.03] transition-colors ${
+              accent ? "border-white/20 bg-white/[0.03]" : "border-white/[0.07] bg-[#0d1016]"
+            }`}
+          >
+            <p className="text-sm font-semibold text-white/80">{label}</p>
+            <p className="text-[10px] text-white/30 mt-0.5">{desc}</p>
           </Link>
         ))}
       </div>
