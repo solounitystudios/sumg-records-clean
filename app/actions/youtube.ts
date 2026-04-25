@@ -145,14 +145,27 @@ export async function createYtJobFromPack(formData: FormData) {
 export async function assignAssetToJob(formData: FormData) {
   await requireAdmin()
 
-  const jobId       = formData.get("job_id")?.toString() ?? ""
-  const assetId     = formData.get("asset_id")?.toString().trim() || null
+  const jobId        = formData.get("job_id")?.toString() ?? ""
+  const assetId      = formData.get("asset_id")?.toString().trim() || null
   const scheduledRaw = formData.get("scheduled_at")?.toString().trim()
 
-  if (!jobId)    throw new Error("job_id is required.")
-  if (!assetId)  throw new Error("Please select an audio asset.")
+  if (!jobId)   throw new Error("job_id is required.")
+  if (!assetId) throw new Error("Please select an asset.")
 
-  const status = scheduledRaw ? "scheduled" : "pending"
+  // Determine next status based on asset MIME type:
+  //   video/* → pending (or scheduled) — already upload-ready
+  //   audio/* → needs_render — must render to MP4 first
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("mime_type")
+    .eq("id", assetId)
+    .single()
+
+  const mime    = (asset as { mime_type: string } | null)?.mime_type ?? ""
+  const isVideo = mime.startsWith("video/")
+  const status  = isVideo
+    ? (scheduledRaw ? "scheduled" : "pending")
+    : "needs_render"
 
   const { error } = await supabase
     .from("yt_upload_jobs")
@@ -168,6 +181,7 @@ export async function assignAssetToJob(formData: FormData) {
   if (error) throw new Error(error.message)
 
   revalidatePath("/admin/youtube/queue")
+  revalidatePath("/admin/youtube/render")
   revalidatePath("/admin/youtube/jobs")
 }
 
@@ -179,7 +193,7 @@ export async function cancelYtJob(formData: FormData) {
     .from("yt_upload_jobs")
     .update({ status: "cancelled", updated_at: new Date().toISOString() })
     .eq("id", id)
-    .in("status", ["needs_asset", "scheduled", "pending", "processing"])
+    .in("status", ["needs_asset", "needs_render", "scheduled", "pending", "processing"])
 
   if (error) throw new Error(error.message)
 

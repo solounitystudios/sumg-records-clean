@@ -23,8 +23,9 @@ export default async function YouTubeOverviewPage() {
 
   const nav = [
     { label: "Engine",      href: "/admin/youtube/engine",      desc: `${counts.pending} ready to process` },
+    { label: "Render",      href: "/admin/youtube/render",      desc: `${counts.needs_render} awaiting render` },
+    { label: "Queue",       href: "/admin/youtube/queue",       desc: `${counts.pending + counts.processing + counts.needs_render} active` },
     { label: "Channels",    href: "/admin/youtube/channels",    desc: `${channels.length} configured` },
-    { label: "Queue",       href: "/admin/youtube/queue",       desc: `${counts.pending + counts.processing} pending` },
     { label: "Jobs",        href: "/admin/youtube/jobs",        desc: `${counts.uploaded} uploaded · ${counts.failed} failed` },
   ]
 
@@ -61,7 +62,7 @@ export default async function YouTubeOverviewPage() {
       <div className="border border-white/[0.07] bg-[#0d1016] p-6 rounded-2xl mb-8">
         <p className="text-[10px] uppercase tracking-[0.2em] text-white/35 mb-5">Job Status</p>
         <div className="flex flex-wrap gap-6">
-          {(["needs_asset", "scheduled", "pending", "processing", "uploaded", "failed", "cancelled"] as const).map((s) => (
+          {(["needs_asset", "needs_render", "scheduled", "pending", "processing", "uploaded", "failed", "cancelled"] as const).map((s) => (
             <div key={s}>
               <p className="text-[9px] uppercase tracking-[0.12em] text-white/25 mb-1">{s.replace("_", " ")}</p>
               <p className="text-lg font-semibold tabular-nums">{counts[s]}</p>
@@ -71,7 +72,7 @@ export default async function YouTubeOverviewPage() {
       </div>
 
       {/* Nav cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
         {nav.map(({ label, href, desc }) => (
           <Link key={href} href={href}
             className="border border-white/[0.07] bg-[#0d1016] p-5 hover:border-white/15 hover:bg-white/[0.03] transition-colors rounded-2xl group">

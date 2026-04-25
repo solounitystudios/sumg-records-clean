@@ -7,13 +7,14 @@ import { getAllPacks } from "@/lib/db/dnaPacks"
 export const metadata = { title: "Upload Jobs — SUMG Admin" }
 
 const STATUS_STYLE: Record<string, string> = {
-  needs_asset: "text-orange-400/60 border-orange-500/20",
-  scheduled:   "text-violet-400/60 border-violet-500/20",
-  pending:     "text-yellow-400/60 border-yellow-500/20",
-  processing:  "text-sky-400/60 border-sky-500/20",
-  uploaded:    "text-green-400/60 border-green-500/20",
-  failed:      "text-red-400/60 border-red-500/20",
-  cancelled:   "text-white/25 border-white/10",
+  needs_asset:  "text-orange-400/60 border-orange-500/20",
+  needs_render: "text-amber-400/60 border-amber-500/20",
+  scheduled:    "text-violet-400/60 border-violet-500/20",
+  pending:      "text-yellow-400/60 border-yellow-500/20",
+  processing:   "text-sky-400/60 border-sky-500/20",
+  uploaded:     "text-green-400/60 border-green-500/20",
+  failed:       "text-red-400/60 border-red-500/20",
+  cancelled:    "text-white/25 border-white/10",
 }
 
 export default async function UploadJobsPage() {
@@ -40,7 +41,7 @@ export default async function UploadJobsPage() {
 
       {/* Status summary */}
       <div className="grid grid-cols-3 sm:grid-cols-7 gap-3 mb-8">
-        {(["needs_asset", "scheduled", "pending", "processing", "uploaded", "failed", "cancelled"] as const).map((s) => (
+        {(["needs_asset", "needs_render", "scheduled", "pending", "processing", "uploaded", "failed", "cancelled"] as const).map((s) => (
           <div key={s} className={`border rounded-xl px-3 py-3 ${STATUS_STYLE[s]}`}>
             <p className="text-[9px] uppercase tracking-[0.12em] opacity-70 mb-1 truncate">{s.replace("_", " ")}</p>
             <p className="text-xl font-semibold tabular-nums">{counts[s]}</p>

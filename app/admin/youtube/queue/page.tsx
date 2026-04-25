@@ -19,26 +19,29 @@ const input =
 const labelClass = "block text-[10px] uppercase tracking-[0.2em] text-white/35 mb-1.5"
 
 const STATUS_STYLE: Record<string, string> = {
-  needs_asset: "text-orange-400/80 border-orange-500/30 bg-orange-400/5",
-  scheduled:   "text-violet-400/80 border-violet-500/30 bg-violet-400/5",
-  pending:     "text-yellow-400/70 border-yellow-500/25 bg-yellow-400/5",
-  processing:  "text-sky-400/70 border-sky-500/25 bg-sky-400/5",
+  needs_asset:  "text-orange-400/80 border-orange-500/30 bg-orange-400/5",
+  needs_render: "text-amber-400/80 border-amber-500/30 bg-amber-400/5",
+  scheduled:    "text-violet-400/80 border-violet-500/30 bg-violet-400/5",
+  pending:      "text-yellow-400/70 border-yellow-500/25 bg-yellow-400/5",
+  processing:   "text-sky-400/70 border-sky-500/25 bg-sky-400/5",
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  needs_asset: "needs asset",
-  scheduled:   "scheduled",
-  pending:     "pending",
-  processing:  "processing",
+  needs_asset:  "needs asset",
+  needs_render: "needs render",
+  scheduled:    "scheduled",
+  pending:      "pending",
+  processing:   "processing",
 }
 
-const CANCELLABLE = new Set(["needs_asset", "scheduled", "pending"])
+const CANCELLABLE = new Set(["needs_asset", "needs_render", "scheduled", "pending"])
 
 // ─── Readiness ────────────────────────────────────────────────────────────────
 
 interface ReadinessCheck {
   channelConnected:   boolean
-  audioAsset:         boolean
+  assetAssigned:      boolean
+  videoRendered:      boolean
   titlePresent:       boolean
   descriptionPresent: boolean
   tagsPresent:        boolean
@@ -47,9 +50,11 @@ interface ReadinessCheck {
 }
 
 function computeReadiness(job: YtUploadJob, linkedPack: DNAPack | null): ReadinessCheck {
+  const isVideo = !!(job.assetMimeType?.startsWith("video/"))
   return {
     channelConnected:   !!job.ytChannelId,
-    audioAsset:         !!job.assetId,
+    assetAssigned:      !!job.assetId,
+    videoRendered:      isVideo,
     titlePresent:       !!(job.title?.trim()),
     descriptionPresent: !!(job.description?.trim()),
     tagsPresent:        job.tags.length > 0,
@@ -61,7 +66,7 @@ function computeReadiness(job: YtUploadJob, linkedPack: DNAPack | null): Readine
 }
 
 function isJobReady(r: ReadinessCheck): boolean {
-  return r.channelConnected && r.audioAsset && r.titlePresent && r.descriptionPresent && r.tagsPresent
+  return r.channelConnected && r.videoRendered && r.titlePresent && r.descriptionPresent && r.tagsPresent
 }
 
 // ─── Readiness checklist component ───────────────────────────────────────────
@@ -71,7 +76,8 @@ function ReadinessChecklist({ check }: { check: ReadinessCheck }) {
 
   const required: Array<{ label: string; pass: boolean }> = [
     { label: "Channel connected",    pass: check.channelConnected },
-    { label: "Audio asset selected", pass: check.audioAsset },
+    { label: "Asset assigned",       pass: check.assetAssigned },
+    { label: "MP4 rendered",         pass: check.videoRendered },
     { label: "Title present",        pass: check.titlePresent },
     { label: "Description present",  pass: check.descriptionPresent },
     { label: "Tags present",         pass: check.tagsPresent },
@@ -161,10 +167,14 @@ function ReadinessChecklist({ check }: { check: ReadinessCheck }) {
 function AssetAssignForm({
   jobId,
   audioAssets,
+  videoAssets,
 }: {
-  jobId: string
+  jobId:       string
   audioAssets: AssetRow[]
+  videoAssets: AssetRow[]
 }) {
+  const hasAny = audioAssets.length > 0 || videoAssets.length > 0
+
   return (
     <form action={assignAssetToJob} className="mt-3 space-y-3">
       <input type="hidden" name="job_id" value={jobId} />
@@ -174,11 +184,12 @@ function AssetAssignForm({
           htmlFor={`asset-${jobId}`}
           className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1.5"
         >
-          Audio Asset *
+          Asset *
+          <span className="ml-1 normal-case text-white/20">(audio → needs render · video → pending)</span>
         </label>
-        {audioAssets.length === 0 ? (
+        {!hasAny ? (
           <p className="text-[11px] text-white/30">
-            No audio assets yet.{" "}
+            No audio or video assets yet.{" "}
             <Link href="/admin/assets" className="underline underline-offset-2">
               Upload one →
             </Link>
@@ -190,13 +201,25 @@ function AssetAssignForm({
             required
             className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-sm text-white focus:border-white/30 focus:outline-none focus:ring-1 focus:ring-white/20 transition appearance-none"
           >
-            <option value="">Select audio file…</option>
-            {audioAssets.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.filename}
-                {a.size_bytes ? ` · ${formatBytes(a.size_bytes)}` : ""}
-              </option>
-            ))}
+            <option value="">Select asset…</option>
+            {audioAssets.length > 0 && (
+              <optgroup label="Audio — will queue for render">
+                {audioAssets.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.filename}{a.size_bytes ? ` · ${formatBytes(a.size_bytes)}` : ""}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {videoAssets.length > 0 && (
+              <optgroup label="Video MP4 — upload-ready">
+                {videoAssets.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.filename}{a.size_bytes ? ` · ${formatBytes(a.size_bytes)}` : ""}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
         )}
       </div>
@@ -233,11 +256,12 @@ function AssetAssignForm({
 
 export default async function UploadQueuePage() {
   await requireAdmin()
-  const [jobs, channels, producers, audioAssets, packs] = await Promise.all([
+  const [jobs, channels, producers, audioAssets, videoAssets, packs] = await Promise.all([
     getQueuedJobs(),
     getAllChannels(),
     getProducers(),
     getAssets("audio"),
+    getAssets("video"),
     getAllPacks(),
   ])
 
@@ -245,9 +269,10 @@ export default async function UploadQueuePage() {
   const producerMap    = Object.fromEntries(producers.map((p) => [p.slug, p.name]))
   const packMap        = Object.fromEntries(packs.map((p) => [p.id, p]))
 
-  const needsAsset = jobs.filter((j) => j.status === "needs_asset").length
-  const scheduled  = jobs.filter((j) => j.status === "scheduled").length
-  const active     = jobs.filter((j) => j.status === "pending" || j.status === "processing").length
+  const needsAsset  = jobs.filter((j) => j.status === "needs_asset").length
+  const needsRender = jobs.filter((j) => j.status === "needs_render").length
+  const scheduled   = jobs.filter((j) => j.status === "scheduled").length
+  const active      = jobs.filter((j) => j.status === "pending" || j.status === "processing").length
 
   return (
     <div className="px-6 py-8 max-w-5xl">
@@ -266,11 +291,12 @@ export default async function UploadQueuePage() {
 
       {/* Status breakdown */}
       {jobs.length > 0 && (
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-4 gap-3 mb-6">
           {[
-            { label: "Needs Asset", count: needsAsset, style: "text-orange-400" },
-            { label: "Scheduled",   count: scheduled,  style: "text-violet-400" },
-            { label: "Active",      count: active,     style: "text-yellow-400" },
+            { label: "Needs Asset",  count: needsAsset,  style: "text-orange-400" },
+            { label: "Needs Render", count: needsRender, style: "text-amber-400" },
+            { label: "Scheduled",    count: scheduled,   style: "text-violet-400" },
+            { label: "Active",       count: active,      style: "text-yellow-400" },
           ].map(({ label, count, style }) => (
             <div
               key={label}
@@ -321,7 +347,7 @@ export default async function UploadQueuePage() {
                           >
                             {STATUS_LABEL[job.status] ?? job.status}
                           </span>
-                          {!isNeedsAsset && (
+                          {job.status !== "needs_asset" && job.status !== "needs_render" && (
                             <span
                               className={`text-[8px] px-1.5 py-0.5 rounded-full border flex-none ${
                                 ready
@@ -387,17 +413,32 @@ export default async function UploadQueuePage() {
                     {isNeedsAsset && (
                       <details open className="mt-2">
                         <summary className="text-[10px] text-orange-400/60 hover:text-orange-400 cursor-pointer transition-colors list-none flex items-center gap-1">
-                          <span className="text-[9px]">▸</span> Assign audio asset to activate
+                          <span className="text-[9px]">▸</span> Assign asset to activate
                         </summary>
                         <div className="pl-1">
-                          <AssetAssignForm jobId={job.id} audioAssets={audioAssets} />
+                          <AssetAssignForm jobId={job.id} audioAssets={audioAssets} videoAssets={videoAssets} />
                           <ReadinessChecklist check={readiness} />
                         </div>
                       </details>
                     )}
 
+                    {/* ── needs_render: go to render page ── */}
+                    {job.status === "needs_render" && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <span className="text-[10px] text-amber-400/60">
+                          Audio assigned — render to MP4 before upload
+                        </span>
+                        <Link
+                          href="/admin/youtube/render"
+                          className="text-[10px] border border-amber-500/25 text-amber-400/60 hover:border-amber-500/40 hover:text-amber-400 px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          Render now →
+                        </Link>
+                      </div>
+                    )}
+
                     {/* ── pending / scheduled / processing: checklist only ── */}
-                    {!isNeedsAsset && (
+                    {job.status !== "needs_asset" && job.status !== "needs_render" && (
                       <details className="mt-2">
                         <summary className="text-[10px] text-white/20 hover:text-white/45 cursor-pointer transition-colors">
                           Upload readiness{" "}

@@ -3,7 +3,7 @@ import { supabase } from "./supabase"
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type YtChannelStatus = "active" | "paused" | "revoked"
-export type YtJobStatus = "needs_asset" | "scheduled" | "pending" | "processing" | "uploaded" | "failed" | "cancelled"
+export type YtJobStatus = "needs_asset" | "needs_render" | "scheduled" | "pending" | "processing" | "uploaded" | "failed" | "cancelled"
 export type EngineLogLevel = "info" | "warn" | "error"
 
 export interface YtChannel {
@@ -43,6 +43,7 @@ export interface YtUploadJob {
   // Joined
   channelHandle?: string | null
   assetFilename?: string | null
+  assetMimeType?: string | null
 }
 
 export interface EngineLog {
@@ -98,6 +99,7 @@ function toJob(r: any): YtUploadJob {
     updatedAt:    r.updated_at,
     channelHandle:  r.yt_channels?.channel_handle ?? null,
     assetFilename:  r.assets?.filename ?? null,
+    assetMimeType:  r.assets?.mime_type ?? null,
   }
 }
 
@@ -150,7 +152,7 @@ export async function getChannelById(id: string): Promise<YtChannel | null> {
 export async function getAllJobs(limit = 100): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("*, yt_channels(channel_handle), assets(filename)")
+    .select("*, yt_channels(channel_handle), assets(filename, mime_type)")
     .order("created_at", { ascending: false })
     .limit(limit)
   if (error) throw new Error(`getAllJobs: ${error.message}`)
@@ -160,17 +162,27 @@ export async function getAllJobs(limit = 100): Promise<YtUploadJob[]> {
 export async function getQueuedJobs(): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("*, yt_channels(channel_handle), assets(filename)")
-    .in("status", ["needs_asset", "scheduled", "pending", "processing"])
+    .select("*, yt_channels(channel_handle), assets(filename, mime_type)")
+    .in("status", ["needs_asset", "needs_render", "scheduled", "pending", "processing"])
     .order("created_at", { ascending: false })
   if (error) throw new Error(`getQueuedJobs: ${error.message}`)
+  return (data ?? []).map(toJob)
+}
+
+export async function getJobsNeedingRender(): Promise<YtUploadJob[]> {
+  const { data, error } = await supabase
+    .from("yt_upload_jobs")
+    .select("*, yt_channels(channel_handle), assets(filename, mime_type)")
+    .eq("status", "needs_render")
+    .order("created_at", { ascending: true })
+  if (error) return []
   return (data ?? []).map(toJob)
 }
 
 export async function getRecentUploads(limit = 10): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("*, yt_channels(channel_handle), assets(filename)")
+    .select("*, yt_channels(channel_handle), assets(filename, mime_type)")
     .eq("status", "uploaded")
     .order("uploaded_at", { ascending: false })
     .limit(limit)
@@ -181,7 +193,7 @@ export async function getRecentUploads(limit = 10): Promise<YtUploadJob[]> {
 export async function getFailedJobs(): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("*, yt_channels(channel_handle), assets(filename)")
+    .select("*, yt_channels(channel_handle), assets(filename, mime_type)")
     .eq("status", "failed")
     .order("updated_at", { ascending: false })
   if (error) return []
@@ -191,7 +203,7 @@ export async function getFailedJobs(): Promise<YtUploadJob[]> {
 export async function getJobsByProducer(producerSlug: string): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("*, yt_channels(channel_handle), assets(filename)")
+    .select("*, yt_channels(channel_handle), assets(filename, mime_type)")
     .eq("producer_slug", producerSlug)
     .order("created_at", { ascending: false })
   if (error) throw new Error(`getJobsByProducer: ${error.message}`)
@@ -203,7 +215,7 @@ export async function getJobCounts(): Promise<Record<YtJobStatus, number>> {
     .from("yt_upload_jobs")
     .select("status")
   if (error) throw new Error(`getJobCounts: ${error.message}`)
-  const counts: Record<YtJobStatus, number> = { needs_asset: 0, scheduled: 0, pending: 0, processing: 0, uploaded: 0, failed: 0, cancelled: 0 }
+  const counts: Record<YtJobStatus, number> = { needs_asset: 0, needs_render: 0, scheduled: 0, pending: 0, processing: 0, uploaded: 0, failed: 0, cancelled: 0 }
   for (const row of data ?? []) counts[row.status as YtJobStatus] = (counts[row.status as YtJobStatus] ?? 0) + 1
   return counts
 }
