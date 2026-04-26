@@ -22,8 +22,9 @@ export default async function YouTubeOverviewPage() {
     .reduce((s, c) => s + c.uploadCadence, 0)
 
   const nav = [
-    { label: "Audio Inbox",    href: "/admin/youtube/inbox",    desc: "Bulk automation pipeline" },
-    { label: "Command Panel",  href: "/admin/youtube/command",  desc: "Pipeline health & calendar" },
+    { label: "Audio Inbox",    href: "/admin/youtube/inbox",        desc: "Bulk automation pipeline" },
+    { label: "Command Panel",  href: "/admin/youtube/command",      desc: "Pipeline health & calendar" },
+    { label: "Monetization",   href: "/admin/youtube/monetization", desc: "Revenue, RPM & valuations" },
     { label: "Schedule",       href: "/admin/youtube/schedule", desc: `${channels.filter(c => c.status === "active").length} active channels` },
     { label: "Engine",         href: "/admin/youtube/engine",   desc: `${counts.pending} ready to process` },
     { label: "Render",         href: "/admin/youtube/render",   desc: `${counts.needs_render} awaiting render` },
