@@ -18,6 +18,11 @@ export interface InboxActionLogEntry {
   at: string
 }
 
+export interface TitleVariant {
+  text: string
+  ctrScore: number
+}
+
 export interface AudioInboxRow {
   id: string
   assetId: string
@@ -37,6 +42,15 @@ export interface AudioInboxRow {
   actionLog: InboxActionLogEntry[]
   createdAt: string
   updatedAt: string
+  // Variants + selection + locking
+  titleVariants: TitleVariant[]
+  selectedTitleIndex: number
+  thumbnailVariants: string[]
+  selectedThumbnailIndex: number
+  pinnedComment: string | null
+  ctaCopy: string | null
+  lockedTitle: boolean
+  lockedMetadata: boolean
   // Signal intelligence
   bpm: number | null
   keySignature: string | null
@@ -73,6 +87,14 @@ function toRow(r: any): AudioInboxRow {
     actionLog:            (r.action_log as InboxActionLogEntry[]) ?? [],
     createdAt:            r.created_at,
     updatedAt:            r.updated_at,
+    titleVariants:          (r.title_variants as TitleVariant[]) ?? [],
+    selectedTitleIndex:     r.selected_title_index ?? 0,
+    thumbnailVariants:      (r.thumbnail_variants as string[]) ?? [],
+    selectedThumbnailIndex: r.selected_thumbnail_index ?? 0,
+    pinnedComment:          r.pinned_comment ?? null,
+    ctaCopy:                r.cta_copy ?? null,
+    lockedTitle:            r.locked_title ?? false,
+    lockedMetadata:         r.locked_metadata ?? false,
     bpm:                  r.bpm ?? null,
     keySignature:         r.key_signature ?? null,
     durationSeconds:      r.duration_seconds ?? null,

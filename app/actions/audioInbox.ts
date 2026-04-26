@@ -7,7 +7,7 @@ import { getInboxItemById } from "@/lib/db/audioInbox"
 import { getDNABySlug } from "@/lib/db/dna"
 import { renderJobToMp4 } from "@/lib/youtube/renderer"
 import { autoScheduleAllActiveChannels } from "@/lib/youtube/scheduler"
-import type { InboxActionLogEntry, InboxStatus } from "@/lib/db/audioInbox"
+import type { InboxActionLogEntry, InboxStatus, TitleVariant } from "@/lib/db/audioInbox"
 import type { ProducerVariation } from "@/lib/db/dnaPacks"
 
 // ─── Producer classification patterns ────────────────────────────────────────
@@ -101,6 +101,68 @@ function buildThumbnailPrompt(variation: ProducerVariation, visualDna: Record<st
   }
   parts.push("Professional music thumbnail, high contrast, no text")
   return parts.join(". ")
+}
+
+// ─── Title CTR scoring + variant builders ─────────────────────────────────────
+
+function scoreTitleCtr(title: string): number {
+  let score = 30
+  const len = title.length
+  if (len >= 40 && len <= 62) score += 20
+  else if (len >= 28 && len <= 72) score += 10
+  if (/\[FREE\]/i.test(title)) score += 15
+  if (/type\s*beat/i.test(title)) score += 10
+  if (title.includes(new Date().getFullYear().toString())) score += 5
+  if (len < 22) score -= 15
+  if (len > 75) score -= 10
+  // penalise ALL_CAPS words (looks spammy)
+  const words = title.split(/\s+/)
+  const capsWords = words.filter((w) => w.length > 2 && w === w.toUpperCase() && /[A-Z]/.test(w))
+  if (capsWords.length > words.length * 0.5) score -= 10
+  return Math.max(0, Math.min(100, score))
+}
+
+function buildTitleVariants(
+  formula: string | null,
+  producerName: string,
+  trackName: string,
+  genre: string,
+): TitleVariant[] {
+  const year = new Date().getFullYear()
+  const texts = [
+    // Variant 0: producer formula (brand)
+    buildTitle(formula, producerName, trackName, genre),
+    // Variant 1: [FREE] CTR-optimised
+    `[FREE] ${trackName} Type Beat | ${genre} ${year}`,
+    // Variant 2: search/discovery
+    `${genre} Type Beat ${year} | ${trackName} (Prod. ${producerName})`,
+  ]
+  return texts.map((text) => ({ text, ctrScore: scoreTitleCtr(text) }))
+}
+
+function buildThumbnailVariants(
+  variation: ProducerVariation,
+  visualDna: Record<string, unknown> | null,
+  genre: string,
+): string[] {
+  const colors = variation.colors.length > 0 ? variation.colors.join(", ") : "dark, high contrast"
+  return [
+    // Variant 0: visual world (primary, existing logic)
+    buildThumbnailPrompt(variation, visualDna),
+    // Variant 1: energy / cinematic
+    `Dynamic ${genre} music producer aesthetic, neon studio lighting, ${colors} color grading, cinematic wide composition. Professional music thumbnail, no text, no faces.`,
+    // Variant 2: minimal / abstract
+    `Minimal abstract art for ${genre} music, ${colors} palette, geometric forms, subtle texture, premium dark background. No text, no faces.`,
+  ]
+}
+
+function buildPinnedComment(producerName: string, title: string): string {
+  const slug = producerName.toLowerCase().replace(/\s+/g, "")
+  return `🔥 "${title}" — available for licensing!\n\n📩 DM for leases or contact SUMG Records\n🎵 Tag us if you use this beat: #${slug}\n\nFree lease for non-profit use. Premium leases available.`
+}
+
+function buildCtaCopy(producerName: string): string {
+  return `Produced by ${producerName} | For licensing: SUMG Records | © ${new Date().getFullYear()} All rights reserved`
 }
 
 // ─── Action log helper ────────────────────────────────────────────────────────
@@ -233,13 +295,14 @@ export async function generateMetadata(inboxId: string): Promise<{ ok: boolean; 
   const genreCore = dna?.genre_core ?? ["Hip Hop"]
   const genre = genreCore[0] ?? "Hip Hop"
 
-  const generatedTitle = buildTitle(variation?.yt_title_formula ?? null, producerName, trackName, genre)
+  const fallbackVariation = variation ?? ({
+    sound_direction: null,
+    tag_bank: [],
+  } as unknown as ProducerVariation)
+
   const generatedDescription = buildDescription(
     producerName,
-    variation ?? ({
-      sound_direction: null,
-      tag_bank: [],
-    } as unknown as ProducerVariation),
+    fallbackVariation,
     dna?.identity_summary ?? null,
     genreCore,
   )
@@ -251,18 +314,34 @@ export async function generateMetadata(inboxId: string): Promise<{ ok: boolean; 
     new Date().getFullYear().toString(),
   ].filter(Boolean).slice(0, 30)
 
-  await supabase
-    .from("audio_inbox")
-    .update({
-      generated_title:       generatedTitle,
-      generated_description: generatedDescription,
-      generated_tags:        generatedTags,
-      status:                "needs_thumbnail",
-      updated_at:            new Date().toISOString(),
-    })
-    .eq("id", inboxId)
+  const ctaCopy = buildCtaCopy(producerName)
 
-  await appendLog(inboxId, "generate_metadata", `Title: "${generatedTitle}" | Tags: ${generatedTags.length}`)
+  const dbUpdate: Record<string, unknown> = {
+    generated_description: generatedDescription,
+    generated_tags:        generatedTags,
+    cta_copy:              ctaCopy,
+    status:                "needs_thumbnail",
+    updated_at:            new Date().toISOString(),
+  }
+
+  // Respect locked_title: skip title variant generation if locked
+  if (!item.lockedTitle) {
+    const titleVariants = buildTitleVariants(variation?.yt_title_formula ?? null, producerName, trackName, genre)
+    const bestIdx = titleVariants.reduce(
+      (best, v, i) => v.ctrScore > titleVariants[best].ctrScore ? i : best,
+      0,
+    )
+    dbUpdate.title_variants       = titleVariants
+    dbUpdate.selected_title_index = bestIdx
+    dbUpdate.generated_title      = titleVariants[bestIdx].text
+  }
+
+  await supabase.from("audio_inbox").update(dbUpdate).eq("id", inboxId)
+
+  const activeTitle = item.lockedTitle
+    ? (item.overrideTitle ?? item.generatedTitle ?? "—")
+    : (dbUpdate.generated_title as string)
+  await appendLog(inboxId, "generate_metadata", `Title: "${activeTitle}" | Tags: ${generatedTags.length}${item.lockedTitle ? " (title locked)" : ""}`)
   revalidateInbox()
   return { ok: true }
 }
@@ -305,18 +384,35 @@ export async function generateThumbnailPrompt(inboxId: string): Promise<{ ok: bo
     return { ok: true }
   }
 
-  const prompt = buildThumbnailPrompt(variation, dna?.visual_dna ?? null)
+  const genreCore = dna?.genre_core ?? ["Hip Hop"]
+  const genre = genreCore[0] ?? "Hip Hop"
+  const producerName = item.producerSlug!
+    .replace(/(^\w|-\w)/g, (m) => m.replace("-", " ").toUpperCase())
+    .replace(/_/g, " ")
+
+  const thumbnailVariants = buildThumbnailVariants(variation, dna?.visual_dna ?? null, genre)
+  const primaryPrompt = thumbnailVariants[0]
+
+  const effectiveTitle =
+    item.titleVariants[item.selectedTitleIndex]?.text ??
+    item.overrideTitle ??
+    item.generatedTitle ??
+    "New Beat"
+  const pinnedComment = buildPinnedComment(producerName, effectiveTitle)
 
   await supabase
     .from("audio_inbox")
     .update({
-      thumbnail_prompt: prompt,
-      status:           "needs_render",
-      updated_at:       new Date().toISOString(),
+      thumbnail_variants:       thumbnailVariants,
+      selected_thumbnail_index: 0,
+      thumbnail_prompt:         primaryPrompt,
+      pinned_comment:           pinnedComment,
+      status:                   "needs_render",
+      updated_at:               new Date().toISOString(),
     })
     .eq("id", inboxId)
 
-  await appendLog(inboxId, "generate_thumbnail", `Prompt generated (${prompt.length} chars)`)
+  await appendLog(inboxId, "generate_thumbnail", `3 variants generated (primary: ${primaryPrompt.length} chars)`)
   revalidateInbox()
   return { ok: true }
 }
@@ -333,9 +429,13 @@ export async function createInboxDNAPack(inboxId: string): Promise<{ ok: boolean
 
   const dna = await getDNABySlug("producer", item.producerSlug)
 
-  const title = item.overrideTitle || item.generatedTitle || "Untitled Beat"
-  const description = item.overrideDescription || item.generatedDescription
-  const tags = item.overrideTags.length > 0 ? item.overrideTags : item.generatedTags
+  const variantTitle  = item.titleVariants[item.selectedTitleIndex]?.text ?? null
+  const variantThumb  = item.thumbnailVariants[item.selectedThumbnailIndex] ?? null
+  const title         = item.overrideTitle || variantTitle || item.generatedTitle || "Untitled Beat"
+  const baseDesc      = item.overrideDescription || item.generatedDescription
+  const description   = item.ctaCopy ? `${baseDesc ?? ""}\n\n${item.ctaCopy}` : baseDesc
+  const tags          = item.overrideTags.length > 0 ? item.overrideTags : item.generatedTags
+  const thumbPrompt   = variantThumb || item.thumbnailPrompt
 
   const { data: pack, error } = await supabase
     .from("dna_packs")
@@ -346,7 +446,7 @@ export async function createInboxDNAPack(inboxId: string): Promise<{ ok: boolean
       producer_variation_id: item.variationId ?? null,
       asset_id:              item.assetId,
       platform:              "youtube_beat",
-      thumbnail_prompt:      item.thumbnailPrompt,
+      thumbnail_prompt:      thumbPrompt,
       yt_description:        description,
       hashtags:              tags,
       updated_at:            new Date().toISOString(),
@@ -390,9 +490,11 @@ export async function createInboxYtJob(inboxId: string): Promise<{ ok: boolean; 
 
   const channelId = (channels as Array<{ id: string }> | null)?.[0]?.id ?? null
 
-  const title = item.overrideTitle || item.generatedTitle
-  const description = item.overrideDescription || item.generatedDescription
-  const tags = item.overrideTags.length > 0 ? item.overrideTags : item.generatedTags
+  const variantTitle  = item.titleVariants[item.selectedTitleIndex]?.text ?? null
+  const title         = item.overrideTitle || variantTitle || item.generatedTitle
+  const baseDesc      = item.overrideDescription || item.generatedDescription
+  const description   = item.ctaCopy ? `${baseDesc ?? ""}\n\n${item.ctaCopy}` : baseDesc
+  const tags          = item.overrideTags.length > 0 ? item.overrideTags : item.generatedTags
 
   const { data: job, error } = await supabase
     .from("yt_upload_jobs")
@@ -458,13 +560,16 @@ export async function approveInboxItem(inboxId: string): Promise<{ ok: boolean; 
     if (!r.ok) return r
   }
 
-  // 2. Generate metadata
-  const metaResult = await generateMetadata(inboxId)
-  if (!metaResult.ok) return metaResult
+  // 2. Generate metadata + thumbnail (skip if locked)
+  if (!item.lockedMetadata) {
+    const metaResult = await generateMetadata(inboxId)
+    if (!metaResult.ok) return metaResult
 
-  // 3. Generate thumbnail prompt
-  const thumbResult = await generateThumbnailPrompt(inboxId)
-  if (!thumbResult.ok) return thumbResult
+    const thumbResult = await generateThumbnailPrompt(inboxId)
+    if (!thumbResult.ok) return thumbResult
+  } else {
+    await appendLog(inboxId, "approve", "Metadata + thumbnail locked — skipping generation")
+  }
 
   // 4. Create DNA pack
   const packResult = await createInboxDNAPack(inboxId)
@@ -484,22 +589,26 @@ export async function approveInboxItem(inboxId: string): Promise<{ ok: boolean; 
 export async function updateInboxMetadata(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   await requireAdmin()
 
-  const id             = formData.get("id")?.toString() ?? ""
-  const overrideTitle  = formData.get("override_title")?.toString().trim() || null
-  const overrideDesc   = formData.get("override_description")?.toString().trim() || null
-  const tagsRaw        = formData.get("override_tags")?.toString() ?? ""
-  const overrideTags   = tagsRaw.split("\n").map(s => s.trim()).filter(Boolean)
-  const producerSlug   = formData.get("producer_slug")?.toString().trim() || null
-  const thumbnailProm  = formData.get("thumbnail_prompt")?.toString().trim() || null
+  const id            = formData.get("id")?.toString() ?? ""
+  const overrideTitle = formData.get("override_title")?.toString().trim() || null
+  const overrideDesc  = formData.get("override_description")?.toString().trim() || null
+  const tagsRaw       = formData.get("override_tags")?.toString() ?? ""
+  const overrideTags  = tagsRaw.split("\n").map(s => s.trim()).filter(Boolean)
+  const producerSlug  = formData.get("producer_slug")?.toString().trim() || null
+  const thumbnailProm = formData.get("thumbnail_prompt")?.toString().trim() || null
+  const pinnedComment = formData.get("pinned_comment")?.toString().trim() || null
+  const ctaCopy       = formData.get("cta_copy")?.toString().trim() || null
 
   if (!id) return { ok: false, error: "id required" }
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  if (overrideTitle  !== undefined) updates.override_title       = overrideTitle
-  if (overrideDesc   !== undefined) updates.override_description = overrideDesc
-  if (tagsRaw        !== undefined) updates.override_tags        = overrideTags
-  if (producerSlug   !== undefined) updates.producer_slug        = producerSlug
-  if (thumbnailProm  !== undefined) updates.thumbnail_prompt     = thumbnailProm
+  updates.override_title       = overrideTitle
+  updates.override_description = overrideDesc
+  updates.override_tags        = overrideTags
+  updates.producer_slug        = producerSlug
+  updates.thumbnail_prompt     = thumbnailProm
+  updates.pinned_comment       = pinnedComment
+  updates.cta_copy             = ctaCopy
 
   const { error } = await supabase.from("audio_inbox").update(updates).eq("id", id)
   if (error) return { ok: false, error: error.message }
@@ -516,20 +625,74 @@ export async function resetInboxItem(inboxId: string): Promise<void> {
   await supabase
     .from("audio_inbox")
     .update({
-      status:                "new_asset",
-      producer_slug:         null,
-      variation_id:          null,
-      dna_pack_id:           null,
-      yt_job_id:             null,
-      generated_title:       null,
-      generated_description: null,
-      generated_tags:        [],
-      thumbnail_prompt:      null,
-      error_message:         null,
-      updated_at:            new Date().toISOString(),
+      status:                   "new_asset",
+      producer_slug:            null,
+      variation_id:             null,
+      dna_pack_id:              null,
+      yt_job_id:                null,
+      generated_title:          null,
+      generated_description:    null,
+      generated_tags:           [],
+      thumbnail_prompt:         null,
+      title_variants:           [],
+      selected_title_index:     0,
+      thumbnail_variants:       [],
+      selected_thumbnail_index: 0,
+      pinned_comment:           null,
+      cta_copy:                 null,
+      locked_title:             false,
+      locked_metadata:          false,
+      error_message:            null,
+      updated_at:               new Date().toISOString(),
     })
     .eq("id", inboxId)
   await appendLog(inboxId, "reset", "Item reset to new_asset")
+  revalidateInbox()
+}
+
+// ─── Variant selection + locks ────────────────────────────────────────────────
+
+export async function selectTitleVariant(inboxId: string, index: number): Promise<void> {
+  await requireAdmin()
+  const item = await getInboxItemById(inboxId)
+  if (!item || index < 0 || index >= item.titleVariants.length) return
+  await supabase
+    .from("audio_inbox")
+    .update({ selected_title_index: index, updated_at: new Date().toISOString() })
+    .eq("id", inboxId)
+  await appendLog(inboxId, "select_title", `Variant ${index} selected: "${item.titleVariants[index].text}"`)
+  revalidateInbox()
+}
+
+export async function selectThumbnailVariant(inboxId: string, index: number): Promise<void> {
+  await requireAdmin()
+  const item = await getInboxItemById(inboxId)
+  if (!item || index < 0 || index >= item.thumbnailVariants.length) return
+  await supabase
+    .from("audio_inbox")
+    .update({ selected_thumbnail_index: index, updated_at: new Date().toISOString() })
+    .eq("id", inboxId)
+  await appendLog(inboxId, "select_thumbnail", `Variant ${index} selected`)
+  revalidateInbox()
+}
+
+export async function setLockedTitle(inboxId: string, locked: boolean): Promise<void> {
+  await requireAdmin()
+  await supabase
+    .from("audio_inbox")
+    .update({ locked_title: locked, updated_at: new Date().toISOString() })
+    .eq("id", inboxId)
+  await appendLog(inboxId, locked ? "lock_title" : "unlock_title", locked ? "Title locked" : "Title unlocked")
+  revalidateInbox()
+}
+
+export async function setLockedMetadata(inboxId: string, locked: boolean): Promise<void> {
+  await requireAdmin()
+  await supabase
+    .from("audio_inbox")
+    .update({ locked_metadata: locked, updated_at: new Date().toISOString() })
+    .eq("id", inboxId)
+  await appendLog(inboxId, locked ? "lock_metadata" : "unlock_metadata", locked ? "All metadata locked" : "Metadata unlocked")
   revalidateInbox()
 }
 

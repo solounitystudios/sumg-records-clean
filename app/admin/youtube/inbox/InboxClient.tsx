@@ -14,6 +14,10 @@ import {
   classifyAsset,
   approveInboxItem,
   resetInboxItem,
+  selectTitleVariant,
+  selectThumbnailVariant,
+  setLockedTitle,
+  setLockedMetadata,
 } from "@/app/actions/audioInbox"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -99,6 +103,8 @@ interface RowEdit {
   overrideTags:        string
   thumbnailPrompt:     string
   producerSlug:        string
+  pinnedComment:       string
+  ctaCopy:             string
 }
 
 function initEdit(item: AudioInboxRow): RowEdit {
@@ -108,6 +114,8 @@ function initEdit(item: AudioInboxRow): RowEdit {
     overrideTags:        (item.overrideTags.length > 0 ? item.overrideTags : item.generatedTags).join("\n"),
     thumbnailPrompt:     item.thumbnailPrompt ?? "",
     producerSlug:        item.producerSlug ?? "",
+    pinnedComment:       item.pinnedComment ?? "",
+    ctaCopy:             item.ctaCopy ?? "",
   }
 }
 
@@ -147,6 +155,8 @@ function InboxRow({
     fd.set("override_tags", edit.overrideTags)
     fd.set("thumbnail_prompt", edit.thumbnailPrompt)
     fd.set("producer_slug", edit.producerSlug)
+    fd.set("pinned_comment", edit.pinnedComment)
+    fd.set("cta_copy", edit.ctaCopy)
     const r = await updateInboxMetadata(fd)
     setSaving(false)
     if (r.ok) { setEditing(false); onRefresh(); showMessage("Saved") }
@@ -176,6 +186,26 @@ function InboxRow({
     setEdit(initEdit(item))
     onRefresh()
     showMessage("Reset to new_asset")
+  }
+
+  async function handleSelectTitle(index: number) {
+    await selectTitleVariant(item.id, index)
+    onRefresh()
+  }
+
+  async function handleSelectThumbnail(index: number) {
+    await selectThumbnailVariant(item.id, index)
+    onRefresh()
+  }
+
+  async function handleToggleLockTitle() {
+    await setLockedTitle(item.id, !item.lockedTitle)
+    onRefresh()
+  }
+
+  async function handleToggleLockMeta() {
+    await setLockedMetadata(item.id, !item.lockedMetadata)
+    onRefresh()
   }
 
   const displayTitle = item.overrideTitle || item.generatedTitle
@@ -293,16 +323,59 @@ function InboxRow({
         <div className="px-11 pb-4 pt-1 bg-black/20 border-t border-white/[0.04]">
           {!editing ? (
             <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Title variant selector */}
+              {item.titleVariants.length > 0 ? (
                 <div>
-                  <p className="text-[9px] uppercase tracking-[0.2em] text-white/25 mb-1">Title</p>
-                  <p className="text-xs text-white/60">{displayTitle || <span className="text-white/20 italic">not set</span>}</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-[9px] uppercase tracking-[0.2em] text-white/25">Title Variants</p>
+                    <button
+                      onClick={handleToggleLockTitle}
+                      title={item.lockedTitle ? "Unlock title" : "Lock title"}
+                      className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${item.lockedTitle ? "border-amber-500/40 text-amber-400/70 bg-amber-500/5" : "border-white/10 text-white/20 hover:text-white/40"}`}
+                    >
+                      {item.lockedTitle ? "🔒 locked" : "lock"}
+                    </button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {item.titleVariants.map((v, i) => {
+                      const isActive = i === item.selectedTitleIndex
+                      const ctrColor = v.ctrScore >= 70 ? "text-emerald-400" : v.ctrScore >= 50 ? "text-amber-400" : "text-red-400/70"
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => handleSelectTitle(i)}
+                          className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${isActive ? "border-white/25 bg-white/[0.05]" : "border-white/[0.07] bg-white/[0.02] hover:border-white/15"}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <span className={`text-xs leading-snug ${isActive ? "text-white/80" : "text-white/45"}`}>{v.text}</span>
+                            <span className={`text-[9px] font-mono shrink-0 mt-0.5 ${ctrColor}`}>CTR:{v.ctrScore}</span>
+                          </div>
+                          {isActive && <span className="text-[8px] text-emerald-400/60 mt-0.5 block">✓ active</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[9px] uppercase tracking-[0.2em] text-white/25 mb-1">Title</p>
+                    <p className="text-xs text-white/60">{displayTitle ?? <span className="text-white/20 italic">not set</span>}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase tracking-[0.2em] text-white/25 mb-1">Variation</p>
+                    <p className="text-xs text-white/45 font-mono">{item.variationId?.slice(0, 8) ?? "—"}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Variation (shown when variants are present) */}
+              {item.titleVariants.length > 0 && item.variationId && (
                 <div>
                   <p className="text-[9px] uppercase tracking-[0.2em] text-white/25 mb-1">Variation</p>
-                  <p className="text-xs text-white/45 font-mono">{item.variationId?.slice(0, 8) ?? "—"}</p>
+                  <p className="text-xs text-white/40 font-mono">{item.variationId.slice(0, 8)}</p>
                 </div>
-              </div>
+              )}
 
               {/* Signal intelligence */}
               {(item.qualityScore !== null || item.durationSeconds !== null) && (
@@ -372,10 +445,48 @@ function InboxRow({
                 </div>
               )}
 
-              {item.thumbnailPrompt && (
+              {/* Thumbnail variant selector */}
+              {item.thumbnailVariants.length > 0 ? (
+                <div>
+                  <p className="text-[9px] uppercase tracking-[0.2em] text-white/25 mb-2">Thumbnail Variants</p>
+                  <div className="space-y-1.5">
+                    {item.thumbnailVariants.map((prompt, i) => {
+                      const isActive = i === item.selectedThumbnailIndex
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => handleSelectThumbnail(i)}
+                          className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${isActive ? "border-white/25 bg-white/[0.05]" : "border-white/[0.07] bg-white/[0.02] hover:border-white/15"}`}
+                        >
+                          <p className={`text-[10px] leading-relaxed line-clamp-2 ${isActive ? "text-white/65" : "text-white/35"}`}>{prompt}</p>
+                          {isActive && <span className="text-[8px] text-emerald-400/60 mt-0.5 block">✓ active</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : item.thumbnailPrompt ? (
                 <div>
                   <p className="text-[9px] uppercase tracking-[0.2em] text-white/25 mb-1">Thumbnail Prompt</p>
                   <p className="text-[10px] text-white/40 leading-relaxed line-clamp-3">{item.thumbnailPrompt}</p>
+                </div>
+              ) : null}
+
+              {/* Pinned comment + CTA */}
+              {(item.pinnedComment || item.ctaCopy) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {item.pinnedComment && (
+                    <div>
+                      <p className="text-[9px] uppercase tracking-[0.2em] text-white/25 mb-1">Pinned Comment</p>
+                      <p className="text-[10px] text-white/40 leading-relaxed line-clamp-4 whitespace-pre-line">{item.pinnedComment}</p>
+                    </div>
+                  )}
+                  {item.ctaCopy && (
+                    <div>
+                      <p className="text-[9px] uppercase tracking-[0.2em] text-white/25 mb-1">CTA Copy</p>
+                      <p className="text-[10px] text-white/40 leading-relaxed">{item.ctaCopy}</p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -402,7 +513,7 @@ function InboxRow({
                 </div>
               )}
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
                 <button
                   onClick={() => { setEditing(true); setEdit(initEdit(item)) }}
                   className="text-[10px] border border-white/15 px-3 py-1.5 rounded-lg text-white/50 hover:text-white hover:border-white/30 transition-colors"
@@ -410,9 +521,15 @@ function InboxRow({
                   Edit Fields
                 </button>
                 <button
+                  onClick={handleToggleLockMeta}
+                  className={`text-[10px] px-3 py-1.5 rounded-lg border transition-colors ${item.lockedMetadata ? "border-amber-500/40 text-amber-400/70 bg-amber-500/5 hover:border-amber-500/60" : "border-white/10 text-white/25 hover:text-white/50 hover:border-white/20"}`}
+                >
+                  {item.lockedMetadata ? "🔒 Meta Locked" : "Lock Meta"}
+                </button>
+                <button
                   onClick={handleReset}
                   disabled={acting}
-                  className="text-[10px] text-white/20 hover:text-red-400/60 transition-colors"
+                  className="text-[10px] text-white/20 hover:text-red-400/60 transition-colors ml-auto"
                 >
                   Reset
                 </button>
@@ -480,13 +597,37 @@ function InboxRow({
 
               {/* Thumbnail prompt */}
               <div>
-                <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1">Thumbnail Prompt</label>
+                <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1">Thumbnail Prompt Override</label>
                 <textarea
                   value={edit.thumbnailPrompt}
                   onChange={(e) => setEdit((p) => ({ ...p, thumbnailPrompt: e.target.value }))}
                   rows={3}
                   placeholder="Describe the visual for the thumbnail…"
                   className="w-full rounded-lg border border-white/15 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/20 focus:border-white/30 focus:outline-none transition resize-y"
+                />
+              </div>
+
+              {/* Pinned comment */}
+              <div>
+                <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1">Pinned Comment</label>
+                <textarea
+                  value={edit.pinnedComment}
+                  onChange={(e) => setEdit((p) => ({ ...p, pinnedComment: e.target.value }))}
+                  rows={3}
+                  placeholder="Comment to pin on the YouTube video…"
+                  className="w-full rounded-lg border border-white/15 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/20 focus:border-white/30 focus:outline-none transition resize-y"
+                />
+              </div>
+
+              {/* CTA copy */}
+              <div>
+                <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1">CTA Copy <span className="normal-case text-white/20">(appended to description)</span></label>
+                <input
+                  type="text"
+                  value={edit.ctaCopy}
+                  onChange={(e) => setEdit((p) => ({ ...p, ctaCopy: e.target.value }))}
+                  placeholder="Call-to-action for description footer…"
+                  className="w-full rounded-lg border border-white/15 bg-white/[0.04] px-3 py-2 text-sm text-white placeholder:text-white/20 focus:border-white/30 focus:outline-none transition"
                 />
               </div>
 
