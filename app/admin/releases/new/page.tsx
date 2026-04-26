@@ -89,7 +89,7 @@ export default async function NewReleasePage() {
           <select id="status" name="status" defaultValue="draft" className={inputClass}>
             <option value="draft">Draft</option>
             <option value="scheduled">Scheduled</option>
-            <option value="live">Live</option>
+            <option value="published">Published</option>
             <option value="archived">Archived</option>
           </select>
         </div>

@@ -116,7 +116,7 @@ export default async function AnalyticsPage() {
   // ── Overview numbers ─────────────────────────────────────────────────
   const totalStreams        = artists.reduce((s, a) => s + a.totalStreams, 0)
   const totalMonthly        = artists.reduce((s, a) => s + a.monthlyListeners, 0)
-  const liveReleases        = releases.filter((r) => r.status === "live")
+  const liveReleases        = releases.filter((r) => r.status === "published")
   const linkedToSpotify     = artists.filter((a) => !!a.spotifyId)
 
   const q1 = royalties.filter((r) => r.period === "2026-Q1")
@@ -134,7 +134,7 @@ export default async function AnalyticsPage() {
 
   // ── Top releases by stream count ──────────────────────────────────────
   const topReleases = [...releases]
-    .filter((r) => r.status === "live")
+    .filter((r) => r.status === "published")
     .sort((a, b) => b.streams - a.streams)
     .slice(0, 8)
   const maxReleaseStreams = topReleases[0]?.streams ?? 1
@@ -149,7 +149,7 @@ export default async function AnalyticsPage() {
     duration: string
   }
   const allTracks: TrackRow[] = releases
-    .filter((r) => r.status === "live")
+    .filter((r) => r.status === "published")
     .flatMap((r) =>
       r.tracks.map((t) => ({
         title: t.title,

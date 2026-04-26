@@ -33,7 +33,7 @@ export default async function CmsPage() {
     getLyricProjects(),
   ])
 
-  const liveReleases   = releases.filter((r) => r.status === "live")
+  const liveReleases   = releases.filter((r) => r.status === "published")
   const draftReleases  = releases.filter((r) => r.status === "draft")
   const featuredNews   = news.filter((n) => n.featured)
   const visibleSections = config.sectionVisibility

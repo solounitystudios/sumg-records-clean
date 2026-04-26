@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { getReleaseBySlug } from "@/lib/db/releases"
-import { updateRelease } from "@/app/actions/releases"
+import { updateRelease, archiveRelease, restoreRelease, deleteRelease } from "@/app/actions/releases"
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -20,7 +20,11 @@ export default async function EditReleasePage({ params }: { params: Promise<{ sl
   const release = await getReleaseBySlug(slug)
   if (!release) notFound()
 
-  const action = updateRelease.bind(null, slug)
+  const action        = updateRelease.bind(null, slug)
+  const archiveAction = archiveRelease.bind(null, slug)
+  const restoreAction = restoreRelease.bind(null, slug)
+  const deleteAction  = deleteRelease.bind(null, slug)
+  const isArchived    = release.status === "archived"
 
   return (
     <main className="px-6 py-10 md:px-10 max-w-xl">
@@ -42,7 +46,7 @@ export default async function EditReleasePage({ params }: { params: Promise<{ sl
           <select name="status" defaultValue={release.status} className={inputClass}>
             <option value="draft">Draft</option>
             <option value="scheduled">Scheduled</option>
-            <option value="live">Live</option>
+            <option value="published">Published</option>
             <option value="archived">Archived</option>
           </select>
         </div>
@@ -118,6 +122,49 @@ export default async function EditReleasePage({ params }: { params: Promise<{ sl
           </Link>
         </div>
       </form>
+
+      {/* Danger Zone — owner, co_owner, admin only */}
+      <div className="mt-10 rounded-2xl border border-white/[0.07] bg-[#0d1016] px-5 py-5">
+        <p className="text-xs uppercase tracking-[0.2em] text-white/25 mb-4">Danger Zone</p>
+        <div className="space-y-4">
+          {isArchived ? (
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm text-white/60">This release is archived and hidden from the public site.</p>
+                <p className="text-xs text-white/30 mt-0.5">Restoring sets status back to draft for review.</p>
+              </div>
+              <form action={restoreAction}>
+                <button type="submit" className="shrink-0 rounded-full border border-emerald-500/30 px-4 py-2 text-xs font-medium text-emerald-400 hover:border-emerald-500/60 hover:text-emerald-300 transition">
+                  Restore Release
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm text-white/60">Archive this release to hide it from the public site.</p>
+                <p className="text-xs text-white/30 mt-0.5">Can be restored at any time.</p>
+              </div>
+              <form action={archiveAction}>
+                <button type="submit" className="shrink-0 rounded-full border border-red-500/20 px-4 py-2 text-xs font-medium text-red-400/70 hover:border-red-500/40 hover:text-red-400 transition">
+                  Archive Release
+                </button>
+              </form>
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-4 pt-3 border-t border-white/[0.05]">
+            <div>
+              <p className="text-sm text-white/60">Permanently delete this release.</p>
+              <p className="text-xs text-red-400/50 mt-0.5">This cannot be undone. All associated data will be lost.</p>
+            </div>
+            <form action={deleteAction}>
+              <button type="submit" className="shrink-0 rounded-full border border-red-500/30 px-4 py-2 text-xs font-medium text-red-400 hover:border-red-500/60 hover:bg-red-500/10 transition">
+                Delete Permanently
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
     </main>
   )
 }

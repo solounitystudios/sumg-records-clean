@@ -54,7 +54,7 @@ export default async function ArtistsAdminPage() {
       <div className="space-y-4">
         {artists.map((artist) => {
           const artistReleases = allReleases.filter((r) => r.artistSlug === artist.slug)
-          const liveReleases   = artistReleases.filter((r) => r.status === "live")
+          const liveReleases   = artistReleases.filter((r) => r.status === "published")
           const isArchived     = artist.status === "archived"
 
           const archiveAction = archiveArtist.bind(null, artist.slug)

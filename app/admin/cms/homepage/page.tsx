@@ -28,7 +28,7 @@ export default async function EditHomepagePage() {
     getBrands(),
   ])
 
-  const liveReleases = releases.filter((r) => r.status === "live")
+  const liveReleases = releases.filter((r) => r.status === "published")
 
   return (
     <main className="px-6 py-10 md:px-10 max-w-3xl">

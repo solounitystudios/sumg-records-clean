@@ -27,7 +27,7 @@ export default async function DashboardPage() {
   const q1Royalties = royalties.filter((r) => r.period === "2026-Q1")
   const totalQ1Revenue = q1Royalties.reduce((s, r) => s + r.revenue, 0)
   const totalQ1Streams = q1Royalties.reduce((s, r) => s + r.streams, 0)
-  const liveReleases = releases.filter((r) => r.status === "live")
+  const liveReleases = releases.filter((r) => r.status === "published")
   const scheduledReleases = releases.filter((r) => r.status === "scheduled")
 
   const artistName = isAdmin ? null : artists[0]?.name

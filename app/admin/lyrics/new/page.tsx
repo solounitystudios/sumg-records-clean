@@ -12,7 +12,7 @@ const labelClass = "block text-xs uppercase tracking-[0.2em] text-white/40 mb-2"
 
 export default async function NewLyricProjectPage() {
   const [artists, releases] = await Promise.all([getArtists(), getReleases()])
-  const activeReleases = releases.filter((r) => r.status === "live" || r.status === "scheduled")
+  const activeReleases = releases.filter((r) => r.status === "published" || r.status === "scheduled")
 
   return (
     <main className="px-6 py-10 md:px-10 max-w-xl">

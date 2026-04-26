@@ -86,7 +86,7 @@ export interface Release {
   artistName: string
   releaseDate: string
   type: "single" | "EP" | "album"
-  status: "draft" | "scheduled" | "live" | "archived"
+  status: "draft" | "scheduled" | "published" | "archived"
   streams: number
   platforms: string[]
   tracks: Track[]

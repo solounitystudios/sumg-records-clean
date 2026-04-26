@@ -21,7 +21,7 @@ export default async function DashboardReleasesPage() {
     : await getArtistReleases(user.artistSlug ?? "")
 
   const sorted = [...releases].sort((a, b) => {
-    const order = { live: 0, scheduled: 1, draft: 2, archived: 3 }
+    const order: Record<string, number> = { published: 0, scheduled: 1, draft: 2, archived: 3 }
     return order[a.status] - order[b.status]
   })
 
@@ -82,7 +82,7 @@ export default async function DashboardReleasesPage() {
                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
                   <div className="rounded-xl border border-white/8 bg-white/3 px-3 py-2.5">
                     <div className="text-xs text-white/30 uppercase tracking-[0.12em] mb-0.5">Streams</div>
-                    <div className="font-medium">{release.status === "live" ? formatStreams(release.streams) : "—"}</div>
+                    <div className="font-medium">{release.status === "published" ? formatStreams(release.streams) : "—"}</div>
                   </div>
                   <div className="rounded-xl border border-white/8 bg-white/3 px-3 py-2.5">
                     <div className="text-xs text-white/30 uppercase tracking-[0.12em] mb-0.5">Tracks</div>
@@ -94,7 +94,7 @@ export default async function DashboardReleasesPage() {
                   </div>
                 </div>
 
-                {release.status === "live" && release.tracks.length > 0 && (
+                {release.status === "published" && release.tracks.length > 0 && (
                   <div className="mt-4">
                     <div className="text-xs text-white/35 uppercase tracking-[0.15em] mb-2">Top Track</div>
                     {(() => {

@@ -16,7 +16,7 @@ export default async function AdminPage() {
   const [artists, releases, royalties] = await Promise.all([getArtists(), getReleases(), getRoyalties()])
   const activeArtists   = artists.filter((a) => !a.status || a.status === "active").length
   const archivedArtists = artists.filter((a) => a.status === "archived").length
-  const liveReleases = releases.filter((r) => r.status === "live").length
+  const liveReleases = releases.filter((r) => r.status === "published").length
   const draftReleases = releases.filter((r) => r.status === "draft").length
   const q1Revenue = royalties
     .filter((r) => r.period === "2026-Q1")
@@ -32,9 +32,9 @@ export default async function AdminPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-10">
         {[
           { label: "Active Artists",   value: activeArtists.toString(),   sub: archivedArtists > 0 ? `${archivedArtists} archived` : "on roster" },
-          { label: "Live Releases",    value: liveReleases.toString(),    sub: `${draftReleases} in draft` },
-          { label: "Q1 2026 Revenue",  value: formatRevenue(q1Revenue),   sub: "Across all artists" },
-          { label: "Total Releases",   value: releases.length.toString(), sub: `${liveReleases} live` },
+          { label: "Published Releases", value: liveReleases.toString(),    sub: `${draftReleases} in draft` },
+          { label: "Q1 2026 Revenue",   value: formatRevenue(q1Revenue),   sub: "Across all artists" },
+          { label: "Total Releases",    value: releases.length.toString(), sub: `${liveReleases} published` },
         ].map(({ label, value, sub }) => (
           <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-6">
             <div className="text-xs uppercase tracking-[0.2em] text-white/35 mb-3">{label}</div>
@@ -92,7 +92,7 @@ export default async function AdminPage() {
                 </div>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-                    release.status === "live"
+                    release.status === "published"
                       ? "bg-emerald-500/15 text-emerald-400"
                       : release.status === "scheduled"
                         ? "bg-amber-500/15 text-amber-400"

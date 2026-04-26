@@ -70,14 +70,49 @@ export async function createRelease(formData: FormData) {
     release_date: releaseDate,
     status,
     accent_color: accentColor,
-    streams: 0,
-    platforms: [],
     tracklist: [],
     description: "",
   })
 
   if (error) throw new Error(error.message)
 
+  revalidatePath("/admin/releases")
+  redirect("/admin/releases")
+}
+
+// Archive / restore / delete require owner, co_owner, or admin — enforced by requireAdmin()
+
+export async function archiveRelease(slug: string): Promise<void> {
+  await requireAdmin()
+  const { error } = await supabase
+    .from("releases")
+    .update({ status: "archived", updated_at: new Date().toISOString() })
+    .eq("slug", slug)
+  if (error) throw new Error(error.message)
+  revalidatePath("/admin/releases")
+  revalidatePath(`/releases/${slug}`)
+  redirect("/admin/releases")
+}
+
+export async function restoreRelease(slug: string): Promise<void> {
+  await requireAdmin()
+  const { error } = await supabase
+    .from("releases")
+    .update({ status: "draft", updated_at: new Date().toISOString() })
+    .eq("slug", slug)
+  if (error) throw new Error(error.message)
+  revalidatePath("/admin/releases")
+  revalidatePath(`/releases/${slug}`)
+  redirect("/admin/releases")
+}
+
+export async function deleteRelease(slug: string): Promise<void> {
+  await requireAdmin()
+  const { error } = await supabase
+    .from("releases")
+    .delete()
+    .eq("slug", slug)
+  if (error) throw new Error(error.message)
   revalidatePath("/admin/releases")
   redirect("/admin/releases")
 }
