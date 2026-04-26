@@ -81,10 +81,14 @@ export async function uploadAssetFile(formData: FormData): Promise<AssetUploadRe
 
   const assetId = (row as { id: string }).id
 
-  // Auto-create inbox entry for audio assets so they flow into the automation pipeline
+  // Auto-create inbox entry for audio assets and run signal analysis
   if (assetType === "audio") {
     const { createInboxEntry } = await import("@/lib/db/audioInbox")
-    await createInboxEntry(assetId)
+    const entry = await createInboxEntry(assetId)
+    if (entry) {
+      const { scoreAudioAsset } = await import("@/app/actions/audioInbox")
+      await scoreAudioAsset(entry.id)
+    }
     revalidatePath("/admin/youtube/inbox")
   }
 

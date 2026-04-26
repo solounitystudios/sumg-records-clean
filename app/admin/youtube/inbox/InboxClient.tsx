@@ -6,6 +6,7 @@ import type { AudioInboxRow, InboxStatus } from "@/lib/db/audioInbox"
 import {
   bulkAutoProcess,
   bulkApprove,
+  bulkAutoApproveHighScore,
   bulkCreateJobs,
   bulkRender,
   bulkSchedule,
@@ -69,6 +70,25 @@ function formatBytes(bytes: number | null): string {
   if (!bytes) return "—"
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatDuration(secs: number | null): string {
+  if (!secs) return "—"
+  const m = Math.floor(secs / 60)
+  const s = Math.floor(secs % 60)
+  return `${m}:${String(s).padStart(2, "0")}`
+}
+
+function ScoreBadge({ label, value }: { label: string; value: number }) {
+  const color =
+    value >= 80 ? "text-emerald-400" :
+    value >= 60 ? "text-amber-400" :
+    "text-red-400/70"
+  return (
+    <span className={`text-[9px] font-mono tabular-nums leading-none ${color}`} title={`${label}: ${value}/100`}>
+      {label}<span className="opacity-50">:</span>{value}
+    </span>
+  )
 }
 
 // ─── Inline edit state ────────────────────────────────────────────────────────
@@ -202,6 +222,15 @@ function InboxRow({
           )}
         </div>
 
+        {/* Score badges */}
+        {(item.qualityScore !== null || item.commercialScore !== null || item.ctrScore !== null) && (
+          <div className="hidden md:flex items-center gap-2 flex-none">
+            {item.qualityScore    !== null && <ScoreBadge label="Q"   value={item.qualityScore} />}
+            {item.commercialScore !== null && <ScoreBadge label="C"   value={item.commercialScore} />}
+            {item.ctrScore        !== null && <ScoreBadge label="CTR" value={item.ctrScore} />}
+          </div>
+        )}
+
         {/* Status pill */}
         <div className="flex-none">
           <span
@@ -274,6 +303,63 @@ function InboxRow({
                   <p className="text-xs text-white/45 font-mono">{item.variationId?.slice(0, 8) ?? "—"}</p>
                 </div>
               </div>
+
+              {/* Signal intelligence */}
+              {(item.qualityScore !== null || item.durationSeconds !== null) && (
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <p className="text-[9px] uppercase tracking-[0.2em] text-white/25 mb-2.5">Signal Intelligence</p>
+                  <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    {item.qualityScore !== null && (
+                      <div>
+                        <p className="text-[8px] text-white/20 uppercase tracking-wide mb-0.5">Quality</p>
+                        <ScoreBadge label="Q" value={item.qualityScore} />
+                      </div>
+                    )}
+                    {item.commercialScore !== null && (
+                      <div>
+                        <p className="text-[8px] text-white/20 uppercase tracking-wide mb-0.5">Commercial</p>
+                        <ScoreBadge label="C" value={item.commercialScore} />
+                      </div>
+                    )}
+                    {item.ctrScore !== null && (
+                      <div>
+                        <p className="text-[8px] text-white/20 uppercase tracking-wide mb-0.5">CTR</p>
+                        <ScoreBadge label="CTR" value={item.ctrScore} />
+                      </div>
+                    )}
+                    {item.durationSeconds !== null && (
+                      <div>
+                        <p className="text-[8px] text-white/20 uppercase tracking-wide mb-0.5">Duration</p>
+                        <span className="text-[9px] font-mono text-white/50">{formatDuration(item.durationSeconds)}</span>
+                      </div>
+                    )}
+                    {item.bpm !== null && (
+                      <div>
+                        <p className="text-[8px] text-white/20 uppercase tracking-wide mb-0.5">BPM</p>
+                        <span className="text-[9px] font-mono text-white/50">{Math.round(item.bpm)}</span>
+                      </div>
+                    )}
+                    {item.keySignature && (
+                      <div>
+                        <p className="text-[8px] text-white/20 uppercase tracking-wide mb-0.5">Key</p>
+                        <span className="text-[9px] font-mono text-white/50">{item.keySignature}</span>
+                      </div>
+                    )}
+                    {!!item.signalData?.bitrate_kbps && (
+                      <div>
+                        <p className="text-[8px] text-white/20 uppercase tracking-wide mb-0.5">Bitrate</p>
+                        <span className="text-[9px] font-mono text-white/50">{String(item.signalData.bitrate_kbps)}kbps</span>
+                      </div>
+                    )}
+                    {!!item.signalData?.codec && (
+                      <div>
+                        <p className="text-[8px] text-white/20 uppercase tracking-wide mb-0.5">Codec</p>
+                        <span className="text-[9px] font-mono text-white/50">{String(item.signalData.codec)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {(item.overrideTags.length > 0 || item.generatedTags.length > 0) && (
                 <div>
@@ -518,6 +604,7 @@ export function InboxClient({ items, producers, counts, activeFilter }: Props) {
           />
           <span className="text-[9px] uppercase tracking-[0.2em] text-white/25 flex-1">File</span>
           <span className="text-[9px] uppercase tracking-[0.2em] text-white/25 w-28 flex-none hidden sm:block">Producer</span>
+          <span className="text-[9px] uppercase tracking-[0.2em] text-white/25 flex-none hidden md:block">Scores</span>
           <span className="text-[9px] uppercase tracking-[0.2em] text-white/25 flex-none">Status</span>
           <span className="text-[9px] uppercase tracking-[0.2em] text-white/25 w-48 flex-none hidden lg:block">Title</span>
           <span className="text-[9px] uppercase tracking-[0.2em] text-white/25 w-24 flex-none">Actions</span>
@@ -569,6 +656,12 @@ export function InboxClient({ items, producers, counts, activeFilter }: Props) {
                 className="text-[11px] border border-orange-500/30 px-3 py-1.5 rounded-xl text-orange-400/70 hover:text-orange-400 hover:border-orange-500/50 transition-colors whitespace-nowrap"
               >
                 Approve
+              </button>
+              <button
+                onClick={() => runBulk("Auto-Approve ≥80", bulkAutoApproveHighScore)}
+                className="text-[11px] border border-emerald-500/30 px-3 py-1.5 rounded-xl text-emerald-400/70 hover:text-emerald-400 hover:border-emerald-500/50 transition-colors whitespace-nowrap"
+              >
+                Auto-Approve ≥80
               </button>
               <button
                 onClick={() => runBulk("Create Jobs", bulkCreateJobs)}

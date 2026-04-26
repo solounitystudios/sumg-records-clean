@@ -632,6 +632,157 @@ export async function bulkRender(inboxIds: string[]): Promise<{ processed: numbe
   return { processed, errors }
 }
 
+// ─── Signal intelligence: score audio asset ───────────────────────────────────
+
+export async function scoreAudioAsset(inboxId: string): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin()
+
+  const item = await getInboxItemById(inboxId)
+  if (!item) return { ok: false, error: "Inbox item not found" }
+  if (!item.assetUrl) return { ok: false, error: "No asset URL" }
+
+  try {
+    const res = await fetch(item.assetUrl)
+    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`)
+    const buffer = Buffer.from(await res.arrayBuffer())
+
+    const { parseBuffer } = await import("music-metadata")
+    const meta = await parseBuffer(buffer, { mimeType: item.assetMimeType ?? "audio/mpeg" })
+
+    const { format, common } = meta
+    const duration     = format.duration ?? null
+    const bitrate      = format.bitrate ?? null // bits/sec
+    const sampleRate   = format.sampleRate ?? null
+    const lossless     = format.lossless ?? false
+    const bpm          = common.bpm ?? null
+    const key          = common.key ?? null
+    const fileBytes    = item.assetSizeBytes ?? 0
+
+    // Quality score (0–100) — technical fidelity
+    let quality = 0
+    if (bitrate) {
+      const kbps = bitrate / 1000
+      if (kbps >= 320) quality += 40
+      else if (kbps >= 192) quality += 25
+      else if (kbps >= 128) quality += 15
+      else quality += 5
+    } else quality += 10
+    if (sampleRate) {
+      if (sampleRate >= 48000) quality += 20
+      else if (sampleRate >= 44100) quality += 15
+      else quality += 5
+    } else quality += 10
+    if (duration && duration >= 30 && duration <= 720) quality += 20
+    else if (duration) quality += 5
+    if (lossless) quality += 10
+    if (fileBytes > 5 * 1024 * 1024) quality += 10
+    else if (fileBytes > 2 * 1024 * 1024) quality += 5
+    quality = Math.min(100, quality)
+
+    // Commercial score (0–100) — market fit
+    let commercial = 0
+    if (duration) {
+      if (duration >= 150 && duration <= 270) commercial += 35 // 2:30–4:30 ideal
+      else if ((duration >= 90 && duration < 150) || (duration > 270 && duration <= 480)) commercial += 20
+      else commercial += 5
+    } else commercial += 10
+    if (bpm) {
+      if (bpm >= 130 && bpm <= 145) commercial += 30  // trap
+      else if (bpm > 145 && bpm <= 175) commercial += 22 // drill
+      else if (bpm >= 85 && bpm <= 100) commercial += 25  // boom bap / lo-fi
+      else commercial += 12
+    } else commercial += 8
+    if (quality >= 70) commercial += 20
+    else if (quality >= 50) commercial += 10
+    if (item.producerSlug) commercial += 15
+    commercial = Math.min(100, commercial)
+
+    // CTR score (0–100) — click-through-rate potential
+    let ctr = 0
+    if (bpm) {
+      if (bpm > 150) ctr += 25
+      else if (bpm >= 130) ctr += 20
+      else if (bpm >= 100) ctr += 15
+      else ctr += 10
+    } else ctr += 5
+    if (duration) {
+      if (duration >= 90 && duration <= 180) ctr += 25
+      else if (duration > 180 && duration <= 270) ctr += 20
+      else if (duration > 270 && duration <= 360) ctr += 15
+      else ctr += 8
+    } else ctr += 10
+    if (commercial >= 70) ctr += 25
+    else if (commercial >= 50) ctr += 15
+    else ctr += 5
+    ctr += item.producerSlug ? 15 : 5
+    if (quality >= 70) ctr += 10
+    ctr = Math.min(100, ctr)
+
+    const signalData = {
+      bitrate_kbps: bitrate ? Math.round(bitrate / 1000) : null,
+      sample_rate:  sampleRate,
+      channels:     format.numberOfChannels ?? null,
+      codec:        format.codec ?? null,
+      lossless,
+      container:    format.container ?? null,
+    }
+
+    await supabase
+      .from("audio_inbox")
+      .update({
+        bpm:              bpm !== null ? Math.round(bpm * 100) / 100 : null,
+        key_signature:    key ?? null,
+        duration_seconds: duration ?? null,
+        quality_score:    quality,
+        commercial_score: commercial,
+        ctr_score:        ctr,
+        signal_data:      signalData,
+        updated_at:       new Date().toISOString(),
+      })
+      .eq("id", inboxId)
+
+    const durFmt = duration
+      ? `${Math.floor(duration / 60)}:${String(Math.floor(duration % 60)).padStart(2, "0")}`
+      : "?:??"
+    await appendLog(
+      inboxId,
+      "signal_analysis",
+      `Q:${quality} C:${commercial} CTR:${ctr} | ${durFmt} | ${bpm ? `${Math.round(bpm)}bpm` : "no bpm"} | ${key ?? "no key"}`
+    )
+    revalidateInbox()
+    return { ok: true }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error("[audioInbox] scoreAudioAsset failed:", msg)
+    await appendLog(inboxId, "signal_analysis_error", msg)
+    return { ok: false, error: msg }
+  }
+}
+
+// ─── Bulk: auto-approve items with quality score ≥ 80 ────────────────────────
+
+export async function bulkAutoApproveHighScore(inboxIds: string[]): Promise<{ processed: number; errors: string[] }> {
+  await requireAdmin()
+
+  if (inboxIds.length === 0) return { processed: 0, errors: [] }
+
+  const errors: string[] = []
+  let processed = 0
+
+  for (const id of inboxIds) {
+    const item = await getInboxItemById(id)
+    if (!item) { errors.push(`${id}: not found`); continue }
+    if ((item.qualityScore ?? 0) < 80) continue // silently skip low-score
+
+    const r = await approveInboxItem(id)
+    if (r.ok) processed++
+    else errors.push(`${id}: ${r.error}`)
+  }
+
+  revalidateInbox()
+  return { processed, errors }
+}
+
 // ─── Bulk: schedule ───────────────────────────────────────────────────────────
 
 export async function bulkSchedule(inboxIds: string[]): Promise<{ processed: number; errors: string[] }> {

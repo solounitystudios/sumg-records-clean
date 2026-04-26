@@ -37,6 +37,14 @@ export interface AudioInboxRow {
   actionLog: InboxActionLogEntry[]
   createdAt: string
   updatedAt: string
+  // Signal intelligence
+  bpm: number | null
+  keySignature: string | null
+  durationSeconds: number | null
+  qualityScore: number | null
+  commercialScore: number | null
+  ctrScore: number | null
+  signalData: Record<string, unknown> | null
   // Joined from assets
   assetFilename: string | null
   assetUrl: string | null
@@ -65,6 +73,13 @@ function toRow(r: any): AudioInboxRow {
     actionLog:            (r.action_log as InboxActionLogEntry[]) ?? [],
     createdAt:            r.created_at,
     updatedAt:            r.updated_at,
+    bpm:                  r.bpm ?? null,
+    keySignature:         r.key_signature ?? null,
+    durationSeconds:      r.duration_seconds ?? null,
+    qualityScore:         r.quality_score ?? null,
+    commercialScore:      r.commercial_score ?? null,
+    ctrScore:             r.ctr_score ?? null,
+    signalData:           r.signal_data ?? null,
     assetFilename:        r.assets?.filename ?? null,
     assetUrl:             r.assets?.url ?? null,
     assetSizeBytes:       r.assets?.size_bytes ?? null,
