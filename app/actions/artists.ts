@@ -94,8 +94,6 @@ export async function updateArtist(slug: string, formData: FormData) {
   const bio = formData.get("bio")?.toString().trim() ?? ""
   const tagsRaw = formData.get("tags")?.toString().trim() ?? ""
   const tags = tagsRaw.split(",").map((t) => t.trim()).filter(Boolean)
-  const monthlyListeners = parseInt(formData.get("monthlyListeners")?.toString() ?? "0", 10)
-  const totalStreams = parseInt(formData.get("totalStreams")?.toString() ?? "0", 10)
   const status = formData.get("status")?.toString() ?? "active"
   const featured = formData.get("featured") === "on"
 
@@ -134,8 +132,6 @@ export async function updateArtist(slug: string, formData: FormData) {
       tags,
       status,
       featured,
-      monthly_listeners: isNaN(monthlyListeners) ? 0 : monthlyListeners,
-      total_streams: isNaN(totalStreams) ? 0 : totalStreams,
       social_links: socialLinks,
       updated_at: new Date().toISOString(),
     })
@@ -190,8 +186,6 @@ export async function createArtist(formData: FormData) {
     status,
     featured,
     featured_on_homepage: false,
-    monthly_listeners: 0,
-    total_streams: 0,
     release_count: 0,
     sort_order: 999,
     created_at: new Date().toISOString(),
@@ -239,4 +233,30 @@ export async function uploadArtistHeroImage(
   revalidatePath("/admin/artists")
   revalidatePath(`/artists/${artistSlug}`)
   return { url }
+}
+
+// Archive/restore require owner, co_owner, or admin — enforced by requireAdmin()
+
+export async function archiveArtist(slug: string): Promise<void> {
+  await requireAdmin()
+  const { error } = await supabase
+    .from("artists")
+    .update({ status: "archived", updated_at: new Date().toISOString() })
+    .eq("slug", slug)
+  if (error) throw new Error(error.message)
+  revalidatePath("/admin/artists")
+  revalidatePath(`/artists/${slug}`)
+  redirect("/admin/artists")
+}
+
+export async function restoreArtist(slug: string): Promise<void> {
+  await requireAdmin()
+  const { error } = await supabase
+    .from("artists")
+    .update({ status: "active", updated_at: new Date().toISOString() })
+    .eq("slug", slug)
+  if (error) throw new Error(error.message)
+  revalidatePath("/admin/artists")
+  revalidatePath(`/artists/${slug}`)
+  redirect("/admin/artists")
 }

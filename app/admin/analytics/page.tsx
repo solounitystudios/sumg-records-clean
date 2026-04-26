@@ -13,17 +13,19 @@ export const metadata = { title: "Analytics — SUMG Admin" }
 function SourceBadge({
   source,
 }: {
-  source: "db" | "spotify-api" | "placeholder"
+  source: "db" | "spotify-api" | "placeholder" | "manual"
 }) {
   const styles = {
     "db":           "bg-sky-500/10 text-sky-400/80 border-sky-500/20",
     "spotify-api":  "bg-emerald-500/10 text-emerald-400/80 border-emerald-500/20",
     "placeholder":  "bg-white/5 text-white/25 border-white/10",
+    "manual":       "bg-amber-500/10 text-amber-400/70 border-amber-500/20",
   }
   const labels = {
     "db":          "■ Supabase DB",
     "spotify-api": "◉ Spotify API",
     "placeholder": "◌ Placeholder",
+    "manual":      "⚠ Manually Set",
   }
   return (
     <span className={`text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 rounded-full border ${styles[source]}`}>
@@ -39,7 +41,7 @@ function SectionHeader({
   source,
 }: {
   title: string
-  source: "db" | "spotify-api" | "placeholder"
+  source: "db" | "spotify-api" | "placeholder" | "manual"
 }) {
   return (
     <div className="flex items-center justify-between mb-4">
@@ -196,8 +198,8 @@ export default async function AnalyticsPage() {
         <SectionHeader title="Overview" source="db" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {[
-            { label: "Total Streams",       value: formatStreams(totalStreams),    sub: "All artists · all-time" },
-            { label: "Monthly Listeners",   value: formatStreams(totalMonthly),   sub: "Active listeners" },
+            { label: "Total Streams",       value: formatStreams(totalStreams),    sub: "manually set · not from platform" },
+            { label: "Monthly Listeners",   value: formatStreams(totalMonthly),   sub: "manually set · not from platform" },
             { label: "Q1 2026 Revenue",     value: formatRevenue(q1Revenue),      sub: "Distributed royalties" },
             {
               label: "QoQ Growth",
@@ -222,7 +224,7 @@ export default async function AnalyticsPage() {
 
         {/* Top Artists */}
         <section>
-          <SectionHeader title="Top Artists — by Total Streams" source="db" />
+          <SectionHeader title="Top Artists — by Total Streams" source="manual" />
           <div className="rounded-2xl border border-white/10 bg-[#0d1016] divide-y divide-white/[0.04]">
             {topArtists.map((artist) => {
               const share = totalStreams > 0
@@ -236,8 +238,8 @@ export default async function AnalyticsPage() {
                       <p className="text-xs text-white/35">{artist.genre} · {artist.role}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm font-medium tabular-nums">{formatStreams(artist.totalStreams)}</p>
-                      <p className="text-xs text-white/30">{formatStreams(artist.monthlyListeners)}/mo</p>
+                      <p className="text-sm font-medium tabular-nums" title="Manually set — not synced from platform">{formatStreams(artist.totalStreams)}</p>
+                      <p className="text-xs text-white/30" title="Manually set — not synced from platform">{formatStreams(artist.monthlyListeners)}/mo</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -447,7 +449,7 @@ export default async function AnalyticsPage() {
             { label: "News Items",    value: news.length,                                  sub: `${news.filter((n) => n.featured).length} featured` },
             { label: "Tracks",        value: releases.flatMap((r) => r.tracks).length,     sub: "Across all releases" },
             { label: "Release Types", value: [...new Set(releases.map((r) => r.type))].length, sub: releases.filter((r) => r.type === "single").length + " singles" },
-            { label: "Avg Streams",   value: formatStreams(Math.round(totalStreams / Math.max(artists.length, 1))), sub: "Per artist" },
+            { label: "Avg Streams",   value: formatStreams(Math.round(totalStreams / Math.max(artists.length, 1))), sub: "Per artist · manually set" },
           ].map(({ label, value, sub }) => (
             <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
               <p className="text-[10px] uppercase tracking-[0.2em] text-white/30 mb-1.5">{label}</p>

@@ -318,8 +318,8 @@ export default async function IntelligencePage() {
                       <p className="text-xs text-white/30 truncate">{a.genre}</p>
                     </div>
                   </div>
-                  <span className="text-xs font-medium tabular-nums text-white/70">{formatStreams(a.totalStreams)}</span>
-                  <span className="text-xs tabular-nums text-white/45">{formatStreams(a.monthlyListeners)}</span>
+                  <span className="text-xs font-medium tabular-nums text-white/70" title="Manually set — not synced from platform">{formatStreams(a.totalStreams)}</span>
+                  <span className="text-xs tabular-nums text-white/45" title="Manually set — not synced from platform">{formatStreams(a.monthlyListeners)}</span>
                   <span className={`text-xs tabular-nums font-medium ${a.q1Revenue > 0 ? "text-emerald-400" : "text-white/20"}`}>
                     {a.q1Revenue > 0 ? formatRevenue(a.q1Revenue) : "—"}
                   </span>

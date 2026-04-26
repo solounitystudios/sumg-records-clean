@@ -54,7 +54,7 @@ export async function generateMetadata({ params }: Props) {
 export default async function ArtistPage({ params }: Props) {
   const { slug } = await params;
   const artist = await getArtistBySlug(slug);
-  if (!artist) notFound();
+  if (!artist || (artist.status && artist.status !== "active")) notFound();
 
   const releases = await getArtistReleases(artist.slug);
   const songs = await getSongsForArtist(artist.slug);

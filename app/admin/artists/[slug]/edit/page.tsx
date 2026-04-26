@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { getArtistBySlug } from "@/lib/db/artists"
-import { updateArtist } from "@/app/actions/artists"
+import { updateArtist, archiveArtist, restoreArtist } from "@/app/actions/artists"
 import { SpotifyLinkPanel } from "@/components/admin/SpotifyLinkPanel"
 import HeroImageUpload from "./HeroImageUpload"
 
@@ -30,7 +30,10 @@ export default async function EditArtistPage({ params }: { params: Promise<{ slu
   const artist = await getArtistBySlug(slug)
   if (!artist) notFound()
 
-  const action = updateArtist.bind(null, slug)
+  const action        = updateArtist.bind(null, slug)
+  const archiveAction = archiveArtist.bind(null, slug)
+  const restoreAction = restoreArtist.bind(null, slug)
+  const isArchived    = artist.status === "archived"
 
   return (
     <main className="px-6 py-10 md:px-10 max-w-xl">
@@ -123,38 +126,13 @@ export default async function EditArtistPage({ params }: { params: Promise<{ slu
           <p className="mt-1 text-[10px] text-white/25">Comma-separated values.</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="a-monthly" className={labelClass}>Monthly Listeners</label>
-            <input
-              id="a-monthly"
-              name="monthlyListeners"
-              type="number"
-              min="0"
-              defaultValue={artist.monthlyListeners}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label htmlFor="a-total" className={labelClass}>Total Streams</label>
-            <input
-              id="a-total"
-              name="totalStreams"
-              type="number"
-              min="0"
-              defaultValue={artist.totalStreams}
-              className={inputClass}
-            />
-          </div>
-        </div>
-
         {/* Status + Featured */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="a-status" className={labelClass}>Status</label>
             <select id="a-status" name="status" defaultValue={artist.status ?? "active"} className={inputClass}>
               <option value="active"   className="bg-neutral-900">Active</option>
-              <option value="inactive" className="bg-neutral-900">Inactive</option>
+              <option value="draft"    className="bg-neutral-900">Draft</option>
               <option value="archived" className="bg-neutral-900">Archived</option>
             </select>
           </div>
@@ -216,6 +194,42 @@ export default async function EditArtistPage({ params }: { params: Promise<{ slu
           artistSlug={artist.slug}
           initialSpotifyUrl={artist.socialLinks?.spotify}
         />
+      </div>
+
+      {/* Archive / Restore — owner, co_owner, admin only */}
+      <div className="mt-10 rounded-2xl border border-white/[0.07] bg-[#0d1016] px-5 py-5">
+        <p className="text-xs uppercase tracking-[0.2em] text-white/25 mb-4">Danger Zone</p>
+        {isArchived ? (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-white/60">This artist is archived and hidden from the public site.</p>
+              <p className="text-xs text-white/30 mt-0.5">Restoring sets status back to active.</p>
+            </div>
+            <form action={restoreAction}>
+              <button
+                type="submit"
+                className="shrink-0 rounded-full border border-emerald-500/30 px-4 py-2 text-xs font-medium text-emerald-400 hover:border-emerald-500/60 hover:text-emerald-300 transition"
+              >
+                Restore Artist
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-white/60">Archive this artist to hide them from the public site.</p>
+              <p className="text-xs text-white/30 mt-0.5">They can be restored at any time. Requires owner / co_owner / admin.</p>
+            </div>
+            <form action={archiveAction}>
+              <button
+                type="submit"
+                className="shrink-0 rounded-full border border-red-500/20 px-4 py-2 text-xs font-medium text-red-400/70 hover:border-red-500/40 hover:text-red-400 transition"
+              >
+                Archive Artist
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </main>
   )

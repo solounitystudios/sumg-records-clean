@@ -1,14 +1,21 @@
 import Link from "next/link"
-import { formatStreams, formatRevenue } from "@/lib/data"
+import { formatRevenue } from "@/lib/data"
 import { getArtists } from "@/lib/db/artists"
 import { getReleases } from "@/lib/db/releases"
 import { getRoyalties } from "@/lib/db/royalties"
 
 export const metadata = { title: "Admin Dashboard — SUMG Records" }
 
+const STATUS_CLS: Record<string, string> = {
+  active:   "bg-emerald-500/15 text-emerald-400",
+  draft:    "bg-white/8 text-white/35",
+  archived: "bg-red-500/10 text-red-400/60",
+}
+
 export default async function AdminPage() {
   const [artists, releases, royalties] = await Promise.all([getArtists(), getReleases(), getRoyalties()])
-  const totalStreams = artists.reduce((s, a) => s + a.totalStreams, 0)
+  const activeArtists   = artists.filter((a) => !a.status || a.status === "active").length
+  const archivedArtists = artists.filter((a) => a.status === "archived").length
   const liveReleases = releases.filter((r) => r.status === "live").length
   const draftReleases = releases.filter((r) => r.status === "draft").length
   const q1Revenue = royalties
@@ -24,10 +31,10 @@ export default async function AdminPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-10">
         {[
-          { label: "Total Streams", value: formatStreams(totalStreams), sub: "All artists" },
-          { label: "Live Releases", value: liveReleases.toString(), sub: `${draftReleases} in draft` },
-          { label: "Q1 2026 Revenue", value: formatRevenue(q1Revenue), sub: "Across all artists" },
-          { label: "Roster Size", value: artists.length.toString(), sub: "Active artists" },
+          { label: "Active Artists",   value: activeArtists.toString(),   sub: archivedArtists > 0 ? `${archivedArtists} archived` : "on roster" },
+          { label: "Live Releases",    value: liveReleases.toString(),    sub: `${draftReleases} in draft` },
+          { label: "Q1 2026 Revenue",  value: formatRevenue(q1Revenue),   sub: "Across all artists" },
+          { label: "Total Releases",   value: releases.length.toString(), sub: `${liveReleases} live` },
         ].map(({ label, value, sub }) => (
           <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-6">
             <div className="text-xs uppercase tracking-[0.2em] text-white/35 mb-3">{label}</div>
@@ -50,12 +57,11 @@ export default async function AdminPage() {
               <div key={artist.slug} className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <div className="text-sm font-medium truncate">{artist.name}</div>
-                  <div className="text-xs text-white/35">{artist.role}</div>
+                  <div className="text-xs text-white/35">{artist.role} · {artist.genre}</div>
                 </div>
-                <div className="text-right shrink-0">
-                  <div className="text-sm">{formatStreams(artist.monthlyListeners)}</div>
-                  <div className="text-xs text-white/35">monthly</div>
-                </div>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full shrink-0 ${STATUS_CLS[artist.status ?? "active"] ?? STATUS_CLS.active}`}>
+                  {artist.status ?? "active"}
+                </span>
               </div>
             ))}
           </div>

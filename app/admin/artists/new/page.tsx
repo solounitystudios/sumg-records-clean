@@ -92,7 +92,7 @@ export default function NewArtistPage() {
             <label htmlFor="a-status" className={labelClass}>Status</label>
             <select id="a-status" name="status" className={inputClass}>
               <option value="active"   className="bg-neutral-900">Active</option>
-              <option value="inactive" className="bg-neutral-900">Inactive</option>
+              <option value="draft"    className="bg-neutral-900">Draft</option>
               <option value="archived" className="bg-neutral-900">Archived</option>
             </select>
           </div>

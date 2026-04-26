@@ -96,11 +96,12 @@ export async function getAllArtists(): Promise<CMSArtist[]> {
     const { data, error } = await sb
       .from("artists")
       .select("*")
+      .eq("status", "active")
       .order("sort_order", { ascending: true });
     if (!error && data) return data.map(rowToArtist);
     if (error) console.error("[cms] artists:", error.message);
   }
-  return rawArtists as CMSArtist[];
+  return (rawArtists as CMSArtist[]).filter((a) => !a.status || a.status === "active");
 }
 
 export async function getArtistBySlug(slug: string): Promise<CMSArtist | undefined> {
@@ -110,11 +111,14 @@ export async function getArtistBySlug(slug: string): Promise<CMSArtist | undefin
       .from("artists")
       .select("*")
       .eq("slug", slug)
+      .eq("status", "active")
       .maybeSingle();
     if (!error && data) return rowToArtist(data);
     if (error) console.error("[cms] artist by slug:", error.message);
   }
-  return (rawArtists as CMSArtist[]).find((a) => a.slug === slug);
+  return (rawArtists as CMSArtist[]).find(
+    (a) => a.slug === slug && (!a.status || a.status === "active")
+  );
 }
 
 // ─── Producers ───────────────────────────────────────────────────────────────
