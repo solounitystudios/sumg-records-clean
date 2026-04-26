@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { autoScheduleAllActiveChannels } from "@/lib/youtube/scheduler"
 import { runProcessor } from "@/lib/youtube/processor"
+import { runAnalyticsSync } from "@/lib/youtube/analytics"
 
 const CRON_SECRET = process.env.CRON_SECRET ?? ""
 
@@ -19,9 +20,17 @@ async function handle(req: NextRequest) {
   }
 
   try {
-    const [schedulerSummary, processorSummary] = await Promise.all([
+    // Analytics sync runs independently — failures there must not block upload pipeline
+    const [schedulerSummary, processorSummary, analyticsSummary] = await Promise.all([
       autoScheduleAllActiveChannels(),
       runProcessor(),
+      runAnalyticsSync(200).catch((err) => ({
+        videosSynced:    0,
+        videosSkipped:   0,
+        channelsSynced:  0,
+        channelsSkipped: 0,
+        errors:          [err instanceof Error ? err.message : String(err)],
+      })),
     ])
 
     return NextResponse.json({
@@ -38,6 +47,13 @@ async function handle(req: NextRequest) {
         failed:    processorSummary.failed,
         skipped:   processorSummary.skipped,
         safeMode:  processorSummary.safeMode,
+      },
+      analytics: {
+        videosSynced:    analyticsSummary.videosSynced,
+        videosSkipped:   analyticsSummary.videosSkipped,
+        channelsSynced:  analyticsSummary.channelsSynced,
+        channelsSkipped: analyticsSummary.channelsSkipped,
+        errors:          analyticsSummary.errors,
       },
     })
   } catch (err) {

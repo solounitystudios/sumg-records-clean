@@ -27,6 +27,8 @@ export interface MonetizationOverview {
   avgRpm: number
   monetizedChannels: number
   totalChannels: number
+  syncedChannels: number
+  lastSyncedAt: string | null
   bestNiche: string | null
   topChannel: string | null
 }
@@ -48,6 +50,10 @@ export interface ChannelRevenueSummary {
   estAnnualRevenue: number
   uploadedTotal: number
   uploaded30d: number
+  // Analytics sync
+  statsLastSyncedAt: string | null
+  statsSyncError: string | null
+  dataSource: "real" | "estimated"
 }
 
 export interface ProducerEarning {
@@ -138,6 +144,8 @@ interface ChannelRow {
   monthly_views: number
   content_niche: string | null
   sponsor_tier: string
+  stats_last_synced_at: string | null
+  stats_sync_error: string | null
 }
 
 interface JobRow {
@@ -158,7 +166,8 @@ async function fetchBase(): Promise<{ channels: ChannelRow[]; jobs: JobRow[] }> 
       .select(
         "id, producer_slug, channel_handle, upload_cadence, status, " +
         "monetization_enabled, avg_rpm, avg_views_per_upload, " +
-        "subscriber_count, monthly_views, content_niche, sponsor_tier"
+        "subscriber_count, monthly_views, content_niche, sponsor_tier, " +
+        "stats_last_synced_at, stats_sync_error"
       )
       .order("producer_slug"),
     supabase
@@ -229,12 +238,21 @@ export async function getMonetizationOverview(): Promise<MonetizationOverview> {
   const sorted     = [...channels].sort((a, b) => estMonthly(b) - estMonthly(a))
   const topChannel = sorted[0]?.channel_handle ?? null
 
+  const syncedChannels = channels.filter((c) => c.stats_last_synced_at != null).length
+  const syncTimes = channels
+    .map((c) => c.stats_last_synced_at)
+    .filter((t): t is string => t != null)
+    .sort()
+  const lastSyncedAt = syncTimes.at(-1) ?? null
+
   return {
     estMonthlyRevenue: totalRev,
     estAnnualRevenue:  totalRev * 12,
     avgRpm,
     monetizedChannels: monetized.length,
     totalChannels:     channels.length,
+    syncedChannels,
+    lastSyncedAt,
     bestNiche,
     topChannel,
   }
@@ -252,6 +270,13 @@ export async function getChannelRevenueSummaries(): Promise<ChannelRevenueSummar
       const chJobs     = jobs.filter((j) => j.yt_channel_id === ch.id)
       const uploaded   = chJobs.filter((j) => j.status === "uploaded")
       const uploaded30 = uploaded.filter((j) => j.uploaded_at && j.uploaded_at >= cutoff)
+      const syncAge = ch.stats_last_synced_at
+        ? Date.now() - new Date(ch.stats_last_synced_at).getTime()
+        : null
+      // "real" = synced within the last 25 hours
+      const dataSource: "real" | "estimated" =
+        syncAge !== null && syncAge < 25 * 3_600_000 ? "real" : "estimated"
+
       return {
         channelId:           ch.id,
         channelHandle:       ch.channel_handle,
@@ -267,6 +292,9 @@ export async function getChannelRevenueSummaries(): Promise<ChannelRevenueSummar
         estAnnualRevenue:    estAnnual(ch),
         uploadedTotal:       uploaded.length,
         uploaded30d:         uploaded30.length,
+        statsLastSyncedAt:   ch.stats_last_synced_at,
+        statsSyncError:      ch.stats_sync_error,
+        dataSource,
       } satisfies ChannelRevenueSummary
     })
     .sort((a, b) => b.estMonthlyRevenue - a.estMonthlyRevenue)

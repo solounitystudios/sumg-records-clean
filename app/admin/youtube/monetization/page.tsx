@@ -65,6 +65,31 @@ const HEAT: Record<0 | 1 | 2 | 3 | 4, string> = {
   4: "bg-emerald-500/70",
 }
 
+// ─── Data source badge ────────────────────────────────────────────────────────
+
+function SourceBadge({ source, syncedAt, error }: { source: "real" | "estimated"; syncedAt: string | null; error?: string | null }) {
+  if (source === "real") {
+    const age = syncedAt
+      ? (() => {
+          const ms = Date.now() - new Date(syncedAt).getTime()
+          const h  = Math.floor(ms / 3_600_000)
+          const m  = Math.floor((ms % 3_600_000) / 60_000)
+          return h > 0 ? `${h}h ago` : `${m}m ago`
+        })()
+      : null
+    return (
+      <span title={syncedAt ?? undefined} className="text-[9px] border border-emerald-500/30 text-emerald-400/70 px-1.5 py-0.5 rounded whitespace-nowrap">
+        ✓ real{age ? ` · ${age}` : ""}
+      </span>
+    )
+  }
+  return (
+    <span title={error ?? "No sync yet — run cron or set YOUTUBE_API_KEY"} className="text-[9px] border border-white/10 text-white/25 px-1.5 py-0.5 rounded whitespace-nowrap">
+      ~ est
+    </span>
+  )
+}
+
 // ─── Section header ───────────────────────────────────────────────────────────
 
 function SectionHead({ title, sub }: { title: string; sub?: string }) {
@@ -112,6 +137,25 @@ export default async function MonetizationPage() {
         <p className="text-xs text-white/35 mt-1">Revenue projections, producer earnings, sponsor readiness and channel valuation.</p>
       </div>
 
+      {/* ── Sync status bar ──────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 rounded-xl border border-white/[0.05] bg-white/[0.02] text-[10px] text-white/35">
+        {overview.syncedChannels > 0 ? (
+          <>
+            <span className="text-emerald-400/60">✓ {overview.syncedChannels}/{overview.totalChannels} channels synced from YouTube Data API</span>
+            {overview.lastSyncedAt && (
+              <span className="text-white/20">
+                · last sync {new Date(overview.lastSyncedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true })}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-white/30">
+            No sync yet — all values are manually estimated.
+            Set <span className="font-mono text-white/50">YOUTUBE_API_KEY</span> or connect channel OAuth, then trigger <span className="font-mono text-white/50">GET /api/youtube/cron</span>.
+          </span>
+        )}
+      </div>
+
       {/* ── KPI overview ─────────────────────────────────────────────────────── */}
       <section>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -141,7 +185,7 @@ export default async function MonetizationPage() {
             <table className="w-full text-[11px]">
               <thead>
                 <tr className="border-b border-white/[0.05]">
-                  {["Channel", "Niche", "Subscribers", "RPM", "Views/Upload", "Monthly Views", "Est. Month", "Est. Year"].map((h) => (
+                  {["Channel", "Source", "Niche", "Subscribers", "RPM", "Views/Upload", "Monthly Views", "Est. Month", "Est. Year"].map((h) => (
                     <th key={h} className="text-left text-[9px] uppercase tracking-[0.15em] text-white/25 px-4 py-3 font-normal">{h}</th>
                   ))}
                 </tr>
@@ -152,6 +196,13 @@ export default async function MonetizationPage() {
                     <td className="px-4 py-3">
                       <p className="text-white/75 font-medium">{r.channelHandle ?? r.channelId.slice(0, 8)}</p>
                       <p className="text-[9px] text-white/30 mt-0.5">{r.producerSlug}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <SourceBadge
+                        source={r.dataSource}
+                        syncedAt={r.statsLastSyncedAt}
+                        error={r.statsSyncError}
+                      />
                     </td>
                     <td className="px-4 py-3 text-white/40">{r.contentNiche ?? "—"}</td>
                     <td className="px-4 py-3 text-white/50 tabular-nums">{fmt(r.subscriberCount)}</td>
