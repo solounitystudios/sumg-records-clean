@@ -21,7 +21,9 @@ const MIME_TO_TYPE: Record<string, AssetType> = {
   "audio/flac":      "audio",
   "audio/aac":       "audio",
   "audio/ogg":       "audio",
-  "video/mp4":       "image", // stored as "image" type until video bucket is confirmed
+  "video/mp4":       "video",
+  "video/quicktime": "video",
+  "video/webm":      "video",
   "application/pdf": "document",
   "text/plain":      "document",
   "application/msword": "document",
@@ -39,7 +41,8 @@ export async function uploadAssetFile(formData: FormData): Promise<AssetUploadRe
   if (file.size > MAX_BYTES) return { error: "File must be under 100 MB." }
 
   const assetType: AssetType = MIME_TO_TYPE[file.type] ?? "document"
-  const folder = formData.get("folder")?.toString() || assetType === "image" ? "images" : assetType === "audio" ? "audio" : "documents"
+  const explicitFolder = formData.get("folder")?.toString()
+  const folder = explicitFolder || (assetType === "image" ? "images" : assetType === "audio" ? "audio" : assetType === "video" ? "videos" : "documents")
   const id = crypto.randomUUID()
   const ext = file.name.split(".").pop() ?? "bin"
   const path = `${folder}/${id}.${ext}`
@@ -75,7 +78,17 @@ export async function uploadAssetFile(formData: FormData): Promise<AssetUploadRe
   }
 
   revalidatePath("/admin/assets")
-  return { id: (row as { id: string }).id, url, type: assetType }
+
+  const assetId = (row as { id: string }).id
+
+  // Auto-create inbox entry for audio assets so they flow into the automation pipeline
+  if (assetType === "audio") {
+    const { createInboxEntry } = await import("@/lib/db/audioInbox")
+    await createInboxEntry(assetId)
+    revalidatePath("/admin/youtube/inbox")
+  }
+
+  return { id: assetId, url, type: assetType }
 }
 
 export async function deleteAssetFile(id: string): Promise<{ ok: boolean; error?: string }> {
