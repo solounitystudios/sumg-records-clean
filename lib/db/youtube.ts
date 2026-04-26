@@ -19,6 +19,11 @@ export interface YtChannel {
   status: YtChannelStatus
   oauthConnected: boolean
   oauthConnectedAt: string | null
+  // Routing
+  preferredGenres: string[]
+  bpmMin: number | null
+  bpmMax: number | null
+  routingPriority: number
   createdAt: string
   updatedAt: string
 }
@@ -74,6 +79,10 @@ function toChannel(r: any): YtChannel {
     status:              r.status ?? "active",
     oauthConnected:      !!r.oauth_refresh_token,
     oauthConnectedAt:    r.oauth_connected_at ?? null,
+    preferredGenres:     r.preferred_genres ?? [],
+    bpmMin:              r.bpm_min ?? null,
+    bpmMax:              r.bpm_max ?? null,
+    routingPriority:     r.routing_priority ?? 0,
     createdAt:           r.created_at,
     updatedAt:           r.updated_at,
   }

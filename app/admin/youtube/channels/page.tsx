@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth"
 import { getAllChannels } from "@/lib/db/youtube"
 import { getProducers } from "@/lib/db/producers"
 import { createYtChannel } from "@/app/actions/youtube"
+import { ChannelsClient } from "./ChannelsClient"
 
 export const metadata = { title: "YouTube Channels — SUMG Admin" }
 
@@ -10,12 +11,6 @@ const input =
   "w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-white/30 focus:outline-none focus:ring-1 focus:ring-white/20 transition"
 
 const labelClass = "block text-[10px] uppercase tracking-[0.2em] text-white/35 mb-1.5"
-
-const STATUS_STYLE: Record<string, string> = {
-  active:  "text-green-400/70 border-green-500/25",
-  paused:  "text-yellow-400/60 border-yellow-500/20",
-  revoked: "text-red-400/50 border-red-500/20",
-}
 
 export default async function YouTubeChannelsPage() {
   await requireAdmin()
@@ -34,66 +29,9 @@ export default async function YouTubeChannelsPage() {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-        {/* Channel list */}
+        {/* Channel list with routing edit */}
         <div>
-          {channels.length === 0 ? (
-            <p className="text-sm text-white/25 py-12 text-center">No channels yet. Add one →</p>
-          ) : (
-            <div className="rounded-2xl border border-white/[0.07] bg-[#0d1016] overflow-hidden">
-              {channels.map((ch, i) => (
-                <div key={ch.id}
-                  className={`px-5 py-4 ${i < channels.length - 1 ? "border-b border-white/[0.05]" : ""}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-white/80 truncate">
-                          {ch.channelHandle ?? ch.channelId}
-                        </p>
-                        <span className={`text-[9px] border px-1.5 py-0.5 rounded uppercase tracking-wide ${STATUS_STYLE[ch.status]}`}>
-                          {ch.status}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-white/30 mt-0.5">
-                        {producerMap[ch.producerSlug] ?? ch.producerSlug} · {ch.uploadCadence} uploads/day
-                      </p>
-                      <p className="text-[10px] text-white/20 font-mono mt-0.5">{ch.channelId}</p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-none">
-                      {ch.oauthConnected ? (
-                        <span className="text-[9px] text-green-400/60 border border-green-500/20 px-1.5 py-0.5 rounded">OAuth ✓</span>
-                      ) : (
-                        <Link href="/admin/youtube/engine"
-                          className="text-[9px] text-white/25 hover:text-white/50 border border-white/[0.07] px-1.5 py-0.5 rounded transition-colors">
-                          Connect →
-                        </Link>
-                      )}
-                      {ch.channelUrl && (
-                        <a href={ch.channelUrl} target="_blank" rel="noopener noreferrer"
-                          className="text-[10px] text-white/20 hover:text-white/50 transition-colors">↗</a>
-                      )}
-                    </div>
-                  </div>
-
-                  {ch.titleTemplate && (
-                    <p className="mt-2 text-[10px] font-mono text-white/20 truncate">
-                      Title: {ch.titleTemplate}
-                    </p>
-                  )}
-
-                  {ch.defaultTags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {ch.defaultTags.slice(0, 5).map((t) => (
-                        <span key={t} className="text-[9px] px-1.5 py-0.5 border border-white/[0.06] text-white/25 rounded font-mono">{t}</span>
-                      ))}
-                      {ch.defaultTags.length > 5 && (
-                        <span className="text-[9px] text-white/20">+{ch.defaultTags.length - 5}</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+          <ChannelsClient channels={channels} producerMap={producerMap} />
         </div>
 
         {/* Add channel form */}
@@ -143,6 +81,32 @@ export default async function YouTubeChannelsPage() {
                 placeholder={"type beat\nhip hop\nfree beat"}
                 className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-white/30 focus:outline-none transition resize-y" />
               <p className="mt-1 text-[10px] text-white/20">One tag per line.</p>
+            </div>
+            <div className="pt-2 border-t border-white/[0.06]">
+              <p className="text-[9px] uppercase tracking-[0.2em] text-white/20 mb-3">Routing Config</p>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="yt-genres" className={labelClass}>Preferred Genres</label>
+                  <textarea id="yt-genres" name="preferred_genres" rows={2}
+                    placeholder={"trap\ndrill"}
+                    className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-white/30 focus:outline-none transition resize-none font-mono" />
+                  <p className="mt-1 text-[10px] text-white/20">One per line. Empty = accepts all.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="yt-bpm-min" className={labelClass}>BPM Min</label>
+                    <input id="yt-bpm-min" name="bpm_min" type="number" min="40" max="250" placeholder="e.g. 130" className={input} />
+                  </div>
+                  <div>
+                    <label htmlFor="yt-bpm-max" className={labelClass}>BPM Max</label>
+                    <input id="yt-bpm-max" name="bpm_max" type="number" min="40" max="250" placeholder="e.g. 165" className={input} />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="yt-priority" className={labelClass}>Routing Priority (0–10)</label>
+                  <input id="yt-priority" name="routing_priority" type="number" min="0" max="10" defaultValue="0" className={input} />
+                </div>
+              </div>
             </div>
             <button type="submit"
               className="w-full rounded-full bg-white px-5 py-2.5 text-sm font-medium text-black hover:bg-white/90 transition">

@@ -469,6 +469,71 @@ export async function createInboxDNAPack(inboxId: string): Promise<{ ok: boolean
   return { ok: true, packId: (pack as { id: string }).id }
 }
 
+// ─── Intelligent channel routing ─────────────────────────────────────────────
+
+type RoutingRow = {
+  id: string
+  preferred_genres: string[]
+  bpm_min: number | null
+  bpm_max: number | null
+  routing_priority: number
+}
+
+async function routeToChannel(
+  producerSlug: string,
+  bpm: number | null,
+  genre: string | null,
+): Promise<{ channelId: string | null; reason: string }> {
+  const { data: rows } = await supabase
+    .from("yt_channels")
+    .select("id, preferred_genres, bpm_min, bpm_max, routing_priority")
+    .eq("producer_slug", producerSlug)
+    .eq("status", "active")
+    .not("oauth_refresh_token", "is", null)
+    .order("routing_priority", { ascending: false })
+
+  if (!rows || rows.length === 0) return { channelId: null, reason: "no active channels with OAuth" }
+  if (rows.length === 1) return { channelId: (rows[0] as RoutingRow).id, reason: "only channel" }
+
+  let best: RoutingRow | null = null
+  let bestScore = -Infinity
+
+  for (const ch of rows as RoutingRow[]) {
+    let score = ch.routing_priority
+
+    // Genre match
+    if (ch.preferred_genres.length === 0) {
+      score += 20 // accepts all genres
+    } else if (genre && ch.preferred_genres.some((g) => g.toLowerCase() === genre.toLowerCase())) {
+      score += 40 // strong match
+    }
+
+    // BPM match
+    const hasBpmRange = ch.bpm_min !== null || ch.bpm_max !== null
+    if (!hasBpmRange) {
+      score += 20 // accepts all BPM
+    } else if (bpm === null) {
+      score += 5 // unknown BPM — neutral nudge
+    } else {
+      const aboveMin = ch.bpm_min === null || bpm >= ch.bpm_min
+      const belowMax = ch.bpm_max === null || bpm <= ch.bpm_max
+      if (aboveMin && belowMax) score += 40
+      else score -= 30 // out-of-range penalty
+    }
+
+    if (score > bestScore) {
+      bestScore = score
+      best = ch
+    }
+  }
+
+  const channelId = best?.id ?? (rows[0] as RoutingRow).id
+  const reason = best
+    ? `routed score:${bestScore} genre:${genre ?? "?"} bpm:${bpm ?? "?"}`
+    : "fallback to first channel"
+  return { channelId, reason }
+}
+
 // ─── Create YT job ────────────────────────────────────────────────────────────
 
 export async function createInboxYtJob(inboxId: string): Promise<{ ok: boolean; jobId?: string; error?: string }> {
@@ -479,16 +544,10 @@ export async function createInboxYtJob(inboxId: string): Promise<{ ok: boolean; 
   if (!item.producerSlug) return { ok: false, error: "No producer assigned" }
   if (item.ytJobId) return { ok: true, jobId: item.ytJobId }
 
-  // Find active channel for this producer
-  const { data: channels } = await supabase
-    .from("yt_channels")
-    .select("id")
-    .eq("producer_slug", item.producerSlug)
-    .eq("status", "active")
-    .not("oauth_refresh_token", "is", null)
-    .limit(1)
-
-  const channelId = (channels as Array<{ id: string }> | null)?.[0]?.id ?? null
+  // Intelligent channel routing — score channels against signal data + genre
+  const dnaForRouting = await getDNABySlug("producer", item.producerSlug)
+  const genreFirst = (dnaForRouting?.genre_core ?? [])[0] ?? null
+  const { channelId, reason: routeReason } = await routeToChannel(item.producerSlug, item.bpm, genreFirst)
 
   const variantTitle  = item.titleVariants[item.selectedTitleIndex]?.text ?? null
   const title         = item.overrideTitle || variantTitle || item.generatedTitle
@@ -535,7 +594,7 @@ export async function createInboxYtJob(inboxId: string): Promise<{ ok: boolean; 
   await appendLog(
     inboxId,
     "create_yt_job",
-    `Created job ${jobId}${channelId ? ` on channel ${channelId}` : " (no channel assigned)"}`
+    `Created job ${jobId}${channelId ? ` on channel ${channelId} [${routeReason}]` : " (no channel assigned)"}`
   )
   revalidateInbox()
   revalidatePath("/admin/youtube/queue")

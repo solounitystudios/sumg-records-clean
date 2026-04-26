@@ -17,16 +17,23 @@ export async function createYtChannel(formData: FormData) {
 
   if (!producerSlug || !channelId) throw new Error("producer_slug and channel_id are required.")
 
+  const bpmMinRaw = formData.get("bpm_min")?.toString().trim()
+  const bpmMaxRaw = formData.get("bpm_max")?.toString().trim()
+
   const { error } = await supabase.from("yt_channels").insert({
-    producer_slug: producerSlug,
-    channel_id: channelId,
-    channel_handle: formData.get("channel_handle")?.toString().trim() || null,
-    channel_url: formData.get("channel_url")?.toString().trim() || null,
-    upload_cadence: parseInt(formData.get("upload_cadence")?.toString() ?? "3", 10) || 3,
-    title_template: formData.get("title_template")?.toString().trim() || null,
+    producer_slug:        producerSlug,
+    channel_id:           channelId,
+    channel_handle:       formData.get("channel_handle")?.toString().trim() || null,
+    channel_url:          formData.get("channel_url")?.toString().trim() || null,
+    upload_cadence:       parseInt(formData.get("upload_cadence")?.toString() ?? "3", 10) || 3,
+    title_template:       formData.get("title_template")?.toString().trim() || null,
     description_template: formData.get("description_template")?.toString().trim() || null,
-    default_tags: parseTags(formData.get("default_tags")?.toString() ?? ""),
-    status: "active",
+    default_tags:         parseTags(formData.get("default_tags")?.toString() ?? ""),
+    preferred_genres:     parseTags(formData.get("preferred_genres")?.toString() ?? "").map((g) => g.toLowerCase()),
+    bpm_min:              bpmMinRaw ? parseInt(bpmMinRaw, 10) || null : null,
+    bpm_max:              bpmMaxRaw ? parseInt(bpmMaxRaw, 10) || null : null,
+    routing_priority:     parseInt(formData.get("routing_priority")?.toString() ?? "0", 10) || 0,
+    status:               "active",
   })
 
   if (error) throw new Error(error.message)
@@ -57,6 +64,32 @@ export async function updateYtChannel(id: string, formData: FormData) {
 
   revalidatePath("/admin/youtube/channels")
   redirect("/admin/youtube/channels")
+}
+
+export async function updateChannelRouting(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin()
+
+  const id = formData.get("id")?.toString() ?? ""
+  if (!id) return { ok: false, error: "id required" }
+
+  const genresRaw = formData.get("preferred_genres")?.toString() ?? ""
+  const preferred_genres = genresRaw.split("\n").map((s) => s.trim().toLowerCase()).filter(Boolean)
+  const bpmMinRaw = formData.get("bpm_min")?.toString().trim()
+  const bpmMaxRaw = formData.get("bpm_max")?.toString().trim()
+  const bpm_min = bpmMinRaw ? parseInt(bpmMinRaw, 10) || null : null
+  const bpm_max = bpmMaxRaw ? parseInt(bpmMaxRaw, 10) || null : null
+  const routing_priority = parseInt(formData.get("routing_priority")?.toString() ?? "0", 10) || 0
+
+  const { error } = await supabase
+    .from("yt_channels")
+    .update({ preferred_genres, bpm_min, bpm_max, routing_priority, updated_at: new Date().toISOString() })
+    .eq("id", id)
+
+  if (error) return { ok: false, error: error.message }
+
+  revalidatePath("/admin/youtube/channels")
+  revalidatePath("/admin/youtube")
+  return { ok: true }
 }
 
 export async function createYtJob(formData: FormData) {
