@@ -5,9 +5,17 @@ interface Props {
   artists: CMSArtist[];
 }
 
+const EXCLUDED_STATUSES = new Set(["archived", "inactive", "draft", "tester", "demo"]);
+
+function isPrimary(a: CMSArtist) {
+  return !!(a.featured ?? a.tier === "primary");
+}
+
 export function FeaturedArtists({ artists }: Props) {
-  const featuredArtists = artists.filter((a) => a.featured ?? a.tier === "primary");
-  const secondaryArtists = artists.filter((a) => !(a.featured ?? a.tier === "primary"));
+  const visible = artists
+    .filter((a) => !EXCLUDED_STATUSES.has((a as unknown as Record<string, unknown>).status as string))
+    .sort((a, b) => Number(isPrimary(b)) - Number(isPrimary(a)));
+
   return (
     <section id="artists" className="py-28 px-6 lg:px-10 max-w-7xl mx-auto">
       {/* Section header */}
@@ -35,20 +43,10 @@ export function FeaturedArtists({ artists }: Props) {
         </div>
       </div>
 
-      {/* Primary featured rail */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-        {featuredArtists.map((artist) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {visible.map((artist) => (
           <a key={artist.id} href={`/artists/${artist.slug}`} className="block">
             <ArtistCard artist={artist} size="large" />
-          </a>
-        ))}
-      </div>
-
-      {/* Secondary row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {secondaryArtists.map((artist) => (
-          <a key={artist.id} href={`/artists/${artist.slug}`} className="block">
-            <ArtistCard artist={artist} size="small" />
           </a>
         ))}
       </div>

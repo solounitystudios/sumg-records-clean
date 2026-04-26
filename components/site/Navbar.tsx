@@ -12,6 +12,18 @@ const navLinks = [
   { label: "Shop", href: "/shop" },
 ];
 
+const mobileLinks = [
+  { label: "Home", href: "/" },
+  { label: "Artists", href: "/artists" },
+  { label: "Releases", href: "/releases" },
+  { label: "Songs", href: "/songs" },
+  { label: "Producers", href: "/producers" },
+  { label: "Brands", href: "/brands" },
+  { label: "About", href: "/about" },
+  { label: "Shop", href: "/shop" },
+  { label: "Contact", href: "/contact" },
+];
+
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -41,6 +53,7 @@ export function Navbar() {
   const closeMenu = () => setMenuOpen(false);
 
   return (
+    <>
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled || menuOpen
@@ -109,39 +122,34 @@ export function Navbar() {
         </button>
       </div>
 
-      {/* Mobile menu panel */}
-      <div
-        className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
-          menuOpen ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"
-        }`}
-      >
-        <nav className="bg-black/95 border-t border-white/5 px-6 py-6 flex flex-col gap-1">
-          {navLinks.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              onClick={closeMenu}
-              className="text-[12px] tracking-[0.25em] uppercase text-white/45 hover:text-white py-3 border-b border-white/[0.04] last:border-0 transition-colors duration-300"
-            >
-              {link.label}
-            </a>
-          ))}
-          <a
-            href="/contact"
-            onClick={closeMenu}
-            className="mt-4 text-[10px] tracking-[0.2em] uppercase text-white/40 hover:text-white transition-colors duration-300"
-          >
-            Contact →
-          </a>
-          <a
-            href="/releases"
-            onClick={closeMenu}
-            className="mt-3 inline-flex items-center justify-center text-[10px] tracking-[0.25em] uppercase text-black bg-white hover:bg-white/90 px-5 py-3.5 transition-all duration-300"
-          >
-            Listen Now
-          </a>
-        </nav>
-      </div>
     </header>
+
+    {/* Mobile full-screen overlay — fixed to viewport so content is never clipped */}
+    <div
+      className={`fixed inset-x-0 top-16 bottom-0 z-40 md:hidden overflow-y-auto bg-black/95 transition-opacity duration-300 ${
+        menuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+      }`}
+    >
+      <nav className="border-t border-white/5 px-6 py-6 flex flex-col gap-1">
+        {mobileLinks.map((link) => (
+          <a
+            key={link.label}
+            href={link.href}
+            onClick={closeMenu}
+            className="text-[12px] tracking-[0.25em] uppercase text-white/45 hover:text-white py-3 border-b border-white/[0.04] last:border-0 transition-colors duration-300"
+          >
+            {link.label}
+          </a>
+        ))}
+        <a
+          href="/releases"
+          onClick={closeMenu}
+          className="mt-5 inline-flex items-center justify-center text-[10px] tracking-[0.25em] uppercase text-black bg-white hover:bg-white/90 px-5 py-3.5 transition-all duration-300"
+        >
+          Listen Now
+        </a>
+      </nav>
+    </div>
+    </>
   );
 }
