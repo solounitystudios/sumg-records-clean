@@ -226,7 +226,7 @@ export default async function ScheduleAdminPage() {
               <p><span className="font-semibold text-white/40">Vercel Cron</span> — add to <code className="font-mono text-white/40">vercel.json</code>:{" "}
                 <code className="font-mono text-white/35">{'"crons": [&#123;"path": "/api/youtube/cron", "schedule": "0 0,8,16 * * *"&#125;]'}</code>
               </p>
-              <p><span className="font-semibold text-white/40">GitHub Actions</span> — use <code className="font-mono text-white/40">schedule: cron: …</code> and <code className="font-mono text-white/40">curl -H "Authorization: Bearer $CRON_SECRET" {cronUrl}</code></p>
+              <p><span className="font-semibold text-white/40">GitHub Actions</span> — use <code className="font-mono text-white/40">schedule: cron: …</code> and <code className="font-mono text-white/40">curl -H &quot;Authorization: Bearer $CRON_SECRET&quot; {cronUrl}</code></p>
             </div>
           </div>
         </div>

@@ -214,7 +214,7 @@ export default async function EditDNAPage({ params }: Props) {
           <div>
             <label htmlFor="dna-forbidden" className={label}>Forbidden Elements</label>
             <textarea id="dna-forbidden" name="forbidden_elements" rows={5} placeholder={"country elements\nlive band arrangements\nauto-tune overuse"} defaultValue={record.forbidden_elements.join("\n")} className={textarea} />
-            <p className={hint}>One entry per line. Hard constraints that must never appear in this artist's work.</p>
+            <p className={hint}>One entry per line. Hard constraints that must never appear in this artist&apos;s work.</p>
           </div>
         </Section>
 

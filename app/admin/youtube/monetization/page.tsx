@@ -67,16 +67,16 @@ const HEAT: Record<0 | 1 | 2 | 3 | 4, string> = {
 
 // ─── Data source badge ────────────────────────────────────────────────────────
 
+function syncAge(syncedAt: string): string {
+  const ms = Date.now() - new Date(syncedAt).getTime()
+  const h  = Math.floor(ms / 3_600_000)
+  const m  = Math.floor((ms % 3_600_000) / 60_000)
+  return h > 0 ? `${h}h ago` : `${m}m ago`
+}
+
 function SourceBadge({ source, syncedAt, error }: { source: "real" | "estimated"; syncedAt: string | null; error?: string | null }) {
   if (source === "real") {
-    const age = syncedAt
-      ? (() => {
-          const ms = Date.now() - new Date(syncedAt).getTime()
-          const h  = Math.floor(ms / 3_600_000)
-          const m  = Math.floor((ms % 3_600_000) / 60_000)
-          return h > 0 ? `${h}h ago` : `${m}m ago`
-        })()
-      : null
+    const age = syncedAt ? syncAge(syncedAt) : null
     return (
       <span title={syncedAt ?? undefined} className="text-[9px] border border-emerald-500/30 text-emerald-400/70 px-1.5 py-0.5 rounded whitespace-nowrap">
         ✓ real{age ? ` · ${age}` : ""}

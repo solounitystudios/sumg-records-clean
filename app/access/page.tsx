@@ -84,7 +84,7 @@ export default function AccessPage() {
         <section className="py-24 border-b border-white/5">
           <div className="max-w-7xl mx-auto px-6 lg:px-10">
             <p className="text-[10px] tracking-[0.35em] uppercase text-white/25 mb-10">
-              What's Inside
+              What&apos;s Inside
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-white/5">
               {ACCESS_FEATURES.map((feature) => (
