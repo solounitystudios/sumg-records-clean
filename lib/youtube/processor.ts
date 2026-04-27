@@ -22,6 +22,41 @@ async function addLog(
   })
 }
 
+// ─── Recovery: unstick jobs frozen at "processing" ────────────────────────────
+// Jobs crash mid-upload (Vercel timeout, OOM, etc.) get stuck at "processing"
+// indefinitely — fetchReadyJobs only selects pending/scheduled, so they never
+// retry on their own. After 10 minutes we treat them as failed and let the
+// normal retry counter handle re-queuing.
+
+const PROCESSING_TIMEOUT_MS = 10 * 60 * 1000
+
+async function recoverStuckJobs(): Promise<number> {
+  const cutoff = new Date(Date.now() - PROCESSING_TIMEOUT_MS).toISOString()
+  const { data: stuck } = await supabase
+    .from("yt_upload_jobs")
+    .select("id, retry_count")
+    .eq("status", "processing")
+    .lt("updated_at", cutoff)
+
+  if (!stuck?.length) return 0
+
+  let recovered = 0
+  for (const job of stuck as Array<{ id: string; retry_count: number }>) {
+    const newRetryCount = (job.retry_count ?? 0) + 1
+    const newStatus = newRetryCount >= MAX_RETRIES ? "failed" : "pending"
+    await supabase.from("yt_upload_jobs").update({
+      status:        newStatus,
+      error_message: `Recovered from stuck processing state after ${PROCESSING_TIMEOUT_MS / 60000}min timeout`,
+      retry_count:   newRetryCount,
+      updated_at:    new Date().toISOString(),
+    }).eq("id", job.id).eq("status", "processing")
+    await addLog(job.id, null, "warn",
+      `Recovered stuck job → ${newStatus} (retry ${newRetryCount}/${MAX_RETRIES})`)
+    recovered++
+  }
+  return recovered
+}
+
 // ─── Job fetching ─────────────────────────────────────────────────────────────
 
 const MAX_RETRIES = 5
@@ -106,6 +141,13 @@ async function runJobReal(job: RawJob): Promise<ProcessResult> {
       error_message: null,
     }).eq("id", jobId)
 
+    // Close the inbox item — without this the uploaded count on the inbox page
+    // is always 0 because no code ever wrote the 'uploaded' status there.
+    await supabase.from("audio_inbox").update({
+      status:     "uploaded",
+      updated_at: new Date().toISOString(),
+    }).eq("yt_job_id", jobId)
+
     await addLog(jobId, chanId, "info", `Uploaded: ${result.videoUrl}`, { videoId: result.videoId })
     return { jobId, title, status: "uploaded", videoId: result.videoId, videoUrl: result.videoUrl, simulated: false }
 
@@ -176,6 +218,11 @@ export async function runProcessor(): Promise<ProcessSummary> {
     ? "[SAFE MODE] Processor triggered — OAuth not configured, simulating all jobs"
     : "Processor triggered",
   )
+
+  const recoveredCount = await recoverStuckJobs()
+  if (recoveredCount > 0) {
+    await addLog(null, null, "warn", `Recovered ${recoveredCount} stuck processing job${recoveredCount !== 1 ? "s" : ""}`)
+  }
 
   const jobs    = await fetchReadyJobs()
   const results: ProcessResult[] = []

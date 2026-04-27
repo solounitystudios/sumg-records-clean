@@ -24,16 +24,23 @@ export async function GET(req: NextRequest) {
     const tokens = await exchangeCode(code)
     const expiry  = new Date(Date.now() + tokens.expires_in * 1_000).toISOString()
 
+    // Google only returns refresh_token on first authorization or when prompt=consent
+    // is forced. Re-authorizing without forcing consent omits refresh_token — preserve
+    // the existing stored token rather than overwriting it with null.
+    const updatePayload: Record<string, unknown> = {
+      oauth_access_token:  tokens.access_token,
+      oauth_token_expiry:  expiry,
+      oauth_scope:         tokens.scope,
+      oauth_connected_at:  new Date().toISOString(),
+      updated_at:          new Date().toISOString(),
+    }
+    if (tokens.refresh_token) {
+      updatePayload.oauth_refresh_token = tokens.refresh_token
+    }
+
     const { error } = await supabase
       .from("yt_channels")
-      .update({
-        oauth_access_token:  tokens.access_token,
-        oauth_refresh_token: tokens.refresh_token ?? null,
-        oauth_token_expiry:  expiry,
-        oauth_scope:         tokens.scope,
-        oauth_connected_at:  new Date().toISOString(),
-        updated_at:          new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", channelId)
 
     if (error) throw new Error(error.message)

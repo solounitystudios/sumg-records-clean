@@ -105,11 +105,21 @@ export async function createYtJob(formData: FormData) {
 
   const scheduledAtRaw = formData.get("scheduled_at")?.toString().trim()
 
+  // Resolve status from asset MIME type — audio assets must render to MP4 first.
+  const { data: assetRow } = await supabase
+    .from("assets")
+    .select("mime_type")
+    .eq("id", assetId)
+    .single()
+  const mime    = (assetRow as { mime_type: string } | null)?.mime_type ?? ""
+  const isVideo = mime.startsWith("video/")
+  const status  = isVideo ? (scheduledAtRaw ? "scheduled" : "pending") : "needs_render"
+
   const { error } = await supabase.from("yt_upload_jobs").insert({
     producer_slug: producerSlug,
     asset_id: assetId,
     yt_channel_id: ytChannelId,
-    status: "pending",
+    status,
     title: formData.get("title")?.toString().trim() || null,
     description: formData.get("description")?.toString().trim() || null,
     tags: parseTags(formData.get("tags")?.toString() ?? ""),
