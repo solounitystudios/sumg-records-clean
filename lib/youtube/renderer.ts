@@ -227,25 +227,45 @@ export async function renderJobToMp4(opts: RenderOptions): Promise<RenderResult>
 
     const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(storagePath)
 
-    // 6 — Insert asset record
-    const { data: assetRow, error: dbErr } = await supabase
+    // 6 — Upsert asset record (idempotent re-renders reuse the same row)
+    // Storage already upserts the MP4 file above. Without this check, each re-render
+    // inserts a second asset row pointing to the same overwritten storage object,
+    // orphaning the previous row while both remain in the DB.
+    const renderFilename = `render_${opts.jobId}.mp4`
+
+    const { data: existing } = await supabase
       .from("assets")
-      .insert({
-        type:        "video",
-        url:         publicUrl,
-        filename:    `render_${opts.jobId}.mp4`,
-        mime_type:   "video/mp4",
-        size_bytes:  sizeBytes,
-        alt_text:    opts.title,
-        attached_to: null,
-        uploaded_by: "render_engine",
-      })
       .select("id")
-      .single()
+      .eq("filename", renderFilename)
+      .maybeSingle()
 
-    if (dbErr) throw new Error(`Asset DB record failed: ${dbErr.message}`)
+    let newAssetId: string
 
-    const newAssetId = (assetRow as { id: string }).id
+    if (existing) {
+      const { error: updErr } = await supabase
+        .from("assets")
+        .update({ url: publicUrl, size_bytes: sizeBytes, alt_text: opts.title })
+        .eq("id", (existing as { id: string }).id)
+      if (updErr) throw new Error(`Asset DB update failed: ${updErr.message}`)
+      newAssetId = (existing as { id: string }).id
+    } else {
+      const { data: assetRow, error: dbErr } = await supabase
+        .from("assets")
+        .insert({
+          type:        "video",
+          url:         publicUrl,
+          filename:    renderFilename,
+          mime_type:   "video/mp4",
+          size_bytes:  sizeBytes,
+          alt_text:    opts.title,
+          attached_to: null,
+          uploaded_by: "render_engine",
+        })
+        .select("id")
+        .single()
+      if (dbErr) throw new Error(`Asset DB record failed: ${dbErr.message}`)
+      newAssetId = (assetRow as { id: string }).id
+    }
 
     // 7 — Update job: swap to rendered video asset, advance status
     const { data: sched } = await supabase

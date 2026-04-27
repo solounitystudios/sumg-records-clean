@@ -160,16 +160,35 @@ export async function createInboxEntry(assetId: string): Promise<AudioInboxRow |
   return toRow(data)
 }
 
-export async function getInboxCounts(): Promise<Record<InboxStatus | "all", number>> {
-  const { data, error } = await supabase
-    .from("audio_inbox")
-    .select("status")
-  if (error) throw new Error(`getInboxCounts: ${error.message}`)
+const ALL_STATUSES: InboxStatus[] = [
+  "new_asset",
+  "analyzing",
+  "needs_review",
+  "needs_metadata",
+  "needs_thumbnail",
+  "needs_render",
+  "ready_to_schedule",
+  "scheduled",
+  "uploaded",
+  "failed",
+]
 
-  const counts: Record<string, number> = { all: 0 }
-  for (const row of data ?? []) {
-    counts.all = (counts.all ?? 0) + 1
-    counts[row.status] = (counts[row.status] ?? 0) + 1
-  }
+export async function getInboxCounts(): Promise<Record<InboxStatus | "all", number>> {
+  // Parallel HEAD COUNT queries — transfers zero row data regardless of table size.
+  // Each query resolves to a single integer via the Supabase count API.
+  const [allResult, ...perStatus] = await Promise.all([
+    supabase.from("audio_inbox").select("*", { count: "exact", head: true }),
+    ...ALL_STATUSES.map((s) =>
+      supabase.from("audio_inbox").select("*", { count: "exact", head: true }).eq("status", s),
+    ),
+  ])
+
+  if (allResult.error) throw new Error(`getInboxCounts: ${allResult.error.message}`)
+
+  const counts: Record<string, number> = { all: allResult.count ?? 0 }
+  ALL_STATUSES.forEach((s, i) => {
+    counts[s] = perStatus[i].count ?? 0
+  })
+
   return counts as Record<InboxStatus | "all", number>
 }
