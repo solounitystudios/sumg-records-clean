@@ -81,13 +81,17 @@ export async function uploadAssetFile(formData: FormData): Promise<AssetUploadRe
 
   const assetId = (row as { id: string }).id
 
-  // Auto-create inbox entry for audio assets and run signal analysis
+  // Auto-create inbox entry for audio assets and kick off signal analysis.
+  // Scoring fetches the full audio file and runs metadata parsing — don't block
+  // the upload response on it. Fire-and-forget so the user gets their result
+  // immediately; scoring completes in the background or fails silently.
   if (assetType === "audio") {
     const { createInboxEntry } = await import("@/lib/db/audioInbox")
     const entry = await createInboxEntry(assetId)
     if (entry) {
-      const { scoreAudioAsset } = await import("@/app/actions/audioInbox")
-      await scoreAudioAsset(entry.id)
+      import("@/app/actions/audioInbox").then(({ scoreAudioAsset }) => {
+        scoreAudioAsset(entry.id).catch(console.error)
+      })
     }
     revalidatePath("/admin/youtube/inbox")
   }
@@ -111,6 +115,10 @@ export async function deleteAssetFile(id: string): Promise<{ ok: boolean; error?
   if (pathMatch) {
     await supabase.storage.from(BUCKET).remove([pathMatch[1]])
   }
+
+  // Remove any audio_inbox entry that references this asset before deleting the
+  // asset row — otherwise the inbox retains a record with a broken asset reference.
+  await supabase.from("audio_inbox").delete().eq("asset_id", id)
 
   const { error: delErr } = await supabase.from("assets").delete().eq("id", id)
   if (delErr) return { ok: false, error: delErr.message }

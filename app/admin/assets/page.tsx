@@ -8,6 +8,7 @@ const TYPE_TABS: { label: string; value: AssetType | "all" }[] = [
   { label: "All",       value: "all" },
   { label: "Images",    value: "image" },
   { label: "Audio",     value: "audio" },
+  { label: "Video",     value: "video" },
   { label: "Documents", value: "document" },
 ]
 
@@ -85,6 +86,7 @@ export default async function AssetsPage({
     all:      assets.length,
     image:    assets.filter(a => a.type === "image").length,
     audio:    assets.filter(a => a.type === "audio").length,
+    video:    assets.filter(a => a.type === "video").length,
     document: assets.filter(a => a.type === "document").length,
   }
 
