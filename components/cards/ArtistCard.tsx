@@ -1,6 +1,19 @@
 import Link from "next/link";
 import { CMSArtist } from "@/lib/types";
 
+function placeholderGradient(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
+  }
+  const h1 = Math.abs(hash) % 360;
+  const h2 = (h1 + 45) % 360;
+  return [
+    `radial-gradient(ellipse 80% 60% at 25% 20%, hsla(${h1},55%,28%,0.55) 0%, transparent 65%)`,
+    `radial-gradient(ellipse 60% 70% at 75% 80%, hsla(${h2},45%,22%,0.40) 0%, transparent 60%)`,
+  ].join(", ");
+}
+
 interface ArtistCardProps {
   artist: CMSArtist;
   size?: "large" | "small";
@@ -26,15 +39,21 @@ export function ArtistCard({ artist, size = "large" }: ArtistCardProps) {
           className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-70 transition-opacity duration-500"
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center opacity-5 group-hover:opacity-[0.07] transition-opacity duration-500">
-          <span
-            className={`font-black tracking-tighter text-white select-none ${
-              isLarge ? "text-[12rem]" : "text-[8rem]"
-            }`}
-          >
-            {artist.name.charAt(0)}
-          </span>
-        </div>
+        <>
+          <div
+            className="absolute inset-0"
+            style={{ background: placeholderGradient(artist.name) }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center opacity-[0.06] group-hover:opacity-[0.09] transition-opacity duration-500">
+            <span
+              className={`font-black tracking-tighter text-white select-none ${
+                isLarge ? "text-[12rem]" : "text-[8rem]"
+              }`}
+            >
+              {artist.name.charAt(0)}
+            </span>
+          </div>
+        </>
       )}
 
       {/* Gradient overlay */}

@@ -50,6 +50,21 @@ export function FeaturedArtists({ artists }: Props) {
           </a>
         ))}
       </div>
+
+      {/* Scrolling name ticker */}
+      <div className="mt-16 overflow-hidden border-t border-b border-white/5 py-4">
+        <div className="flex whitespace-nowrap animate-marquee">
+          {[...visible, ...visible].map((artist, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-6 px-8 text-[10px] tracking-[0.35em] uppercase text-white/20"
+            >
+              {artist.name}
+              <span className="text-white/10">·</span>
+            </span>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
