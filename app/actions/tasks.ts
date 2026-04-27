@@ -44,7 +44,7 @@ export async function updateTaskStatus(id: string, status: string) {
 
   const { error } = await supabase
     .from("admin_tasks")
-    .update({ status })
+    .update({ status, updated_at: new Date().toISOString() })
     .eq("id", id)
   if (error) throw new Error(error.message)
 

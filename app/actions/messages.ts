@@ -34,7 +34,7 @@ export async function archiveThread(id: string) {
 
   const { error } = await supabase
     .from("message_threads")
-    .update({ is_archived: true })
+    .update({ is_archived: true, updated_at: new Date().toISOString() })
     .eq("id", id)
   if (error) throw new Error(error.message)
 

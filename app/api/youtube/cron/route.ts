@@ -20,17 +20,19 @@ async function handle(req: NextRequest) {
   }
 
   try {
-    // Analytics sync runs independently — failures there must not block upload pipeline
     const [schedulerSummary, processorSummary, analyticsSummary] = await Promise.all([
-      autoScheduleAllActiveChannels(),
-      runProcessor(),
-      runAnalyticsSync(200).catch((err) => ({
-        videosSynced:    0,
-        videosSkipped:   0,
-        channelsSynced:  0,
-        channelsSkipped: 0,
-        errors:          [err instanceof Error ? err.message : String(err)],
-      })),
+      autoScheduleAllActiveChannels().catch((err) => {
+        console.error("[cron] scheduler failed:", err)
+        return { channels: 0, totalScheduled: 0, results: [] }
+      }),
+      runProcessor().catch((err) => {
+        console.error("[cron] processor failed:", err)
+        return { processed: 0, uploaded: 0, failed: 0, skipped: 0, results: [], safeMode: false }
+      }),
+      runAnalyticsSync(200).catch((err) => {
+        console.error("[cron] analytics failed:", err)
+        return { videosSynced: 0, videosSkipped: 0, channelsSynced: 0, channelsSkipped: 0, errors: [String(err)] }
+      }),
     ])
 
     return NextResponse.json({

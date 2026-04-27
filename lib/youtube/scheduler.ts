@@ -57,6 +57,7 @@ export async function getScheduleStateForChannel(channelDbId: string): Promise<C
     .eq("id", channelDbId)
     .single()
 
+  if (error) console.error("[scheduler] yt_channels query:", error.message, error.details)
   if (error || !ch) return null
 
   const todayStart = utcStartOfDay()
@@ -123,6 +124,7 @@ export async function getAllChannelScheduleStates(): Promise<ChannelScheduleStat
     .select("id")
     .order("created_at", { ascending: true })
 
+  if (error) console.error("[scheduler] channels list:", error.message, error.details)
   if (error || !channels) return []
 
   const states = await Promise.all(
@@ -156,6 +158,7 @@ export async function autoScheduleChannel(channelDbId: string): Promise<AutoSche
     .order("created_at", { ascending: true })
     .limit(toSchedule)
 
+  if (error) console.error("[scheduler] jobs query:", error.message, error.details)
   if (error || !jobs?.length) return { channelDbId, handle, scheduled: 0, skippedReason: "No eligible jobs found" }
 
   // Spread uploads evenly across remaining time today. Guaranteed at least 60s gap.
@@ -174,6 +177,7 @@ export async function autoScheduleChannel(channelDbId: string): Promise<AutoSche
       .eq("id", (jobs as Array<{ id: string }>)[i].id)
       .eq("status", "pending")  // optimistic lock — skip if already claimed
 
+    if (updateErr) console.error("[scheduler] job update:", updateErr.message, updateErr.details)
     if (!updateErr) scheduledCount++
   }
 
@@ -193,6 +197,7 @@ export async function autoScheduleAllActiveChannels(): Promise<SchedulerSummary>
     .eq("status", "active")
     .not("oauth_refresh_token", "is", null)
 
+  if (error) console.error("[scheduler] active channels:", error.message, error.details)
   if (error || !channels) return { channels: 0, totalScheduled: 0, results: [] }
 
   const results       = await Promise.all((channels as Array<{ id: string }>).map((ch) => autoScheduleChannel(ch.id)))

@@ -125,8 +125,11 @@ export async function processDistroImport(formData: FormData): Promise<ImportRes
 
         if (song) {
           matched++
-          // Update streams if provided (additive — don't overwrite with less)
           if (row.streams !== null && row.streams > 0) {
+            await supabase
+              .from("songs")
+              .update({ streams: row.streams, updated_at: new Date().toISOString() })
+              .eq("id", song.id)
             updated++
           }
           continue

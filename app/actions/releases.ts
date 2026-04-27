@@ -29,7 +29,7 @@ export async function updateRelease(slug: string, formData: FormData) {
 
   const { error } = await supabase
     .from("releases")
-    .update({ status, release_date: releaseDate, accent_color: accentColor, dsp_links: dspLinks })
+    .update({ status, release_date: releaseDate, accent_color: accentColor, dsp_links: dspLinks, updated_at: new Date().toISOString() })
     .eq("slug", slug)
 
   if (error) throw new Error(error.message)

@@ -24,9 +24,12 @@ export default async function DashboardPage() {
     ? allRoyalties
     : allRoyalties.filter((r) => r.artistSlug === artistSlug)
 
-  const q1Royalties = royalties.filter((r) => r.period === "2026-Q1")
-  const totalQ1Revenue = q1Royalties.reduce((s, r) => s + r.revenue, 0)
-  const totalQ1Streams = q1Royalties.reduce((s, r) => s + r.streams, 0)
+  const now = new Date()
+  const currentQuarter = Math.ceil((now.getMonth() + 1) / 3)
+  const currentPeriod = `${now.getFullYear()}-Q${currentQuarter}`
+  const currentRoyalties = royalties.filter((r) => r.period === currentPeriod)
+  const totalQ1Revenue = currentRoyalties.reduce((s, r) => s + r.revenue, 0)
+  const totalQ1Streams = currentRoyalties.reduce((s, r) => s + r.streams, 0)
   const liveReleases = releases.filter((r) => r.status === "published")
   const scheduledReleases = releases.filter((r) => r.status === "scheduled")
 
@@ -67,11 +70,11 @@ export default async function DashboardPage() {
               Full breakdown →
             </Link>
           </div>
-          {q1Royalties.length === 0 ? (
+          {currentRoyalties.length === 0 ? (
             <p className="text-sm text-white/35">No royalty data yet for this period.</p>
           ) : (
             <div className="space-y-3">
-              {q1Royalties
+              {currentRoyalties
                 .sort((a, b) => b.revenue - a.revenue)
                 .map((record) => {
                   const artist = allArtists.find((a) => a.slug === record.artistSlug)

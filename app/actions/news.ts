@@ -50,7 +50,7 @@ export async function updateNewsItem(id: string, formData: FormData) {
 
   const { error } = await supabase
     .from("news")
-    .update({ title, excerpt, date, category, featured })
+    .update({ title, excerpt, date, category, featured, updated_at: new Date().toISOString() })
     .eq("id", id)
 
   if (error) throw new Error(error.message)

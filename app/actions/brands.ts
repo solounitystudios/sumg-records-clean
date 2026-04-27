@@ -45,7 +45,7 @@ export async function updateBrand(slug: string, formData: FormData) {
 
   const { error } = await supabase
     .from("brands")
-    .update({ name, tagline, descriptor, category })
+    .update({ name, tagline, descriptor, category, updated_at: new Date().toISOString() })
     .eq("slug", slug)
 
   if (error) throw new Error(error.message)

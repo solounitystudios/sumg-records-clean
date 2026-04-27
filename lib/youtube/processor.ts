@@ -32,12 +32,13 @@ const PROCESSING_TIMEOUT_MS = 10 * 60 * 1000
 
 async function recoverStuckJobs(): Promise<number> {
   const cutoff = new Date(Date.now() - PROCESSING_TIMEOUT_MS).toISOString()
-  const { data: stuck } = await supabase
+  const { data: stuck, error: stuckErr } = await supabase
     .from("yt_upload_jobs")
     .select("id, retry_count")
     .eq("status", "processing")
     .lt("updated_at", cutoff)
 
+  if (stuckErr) console.error("[processor] stuck jobs query:", stuckErr.message, stuckErr.details)
   if (!stuck?.length) return 0
 
   let recovered = 0
@@ -118,9 +119,10 @@ async function runJobReal(job: RawJob): Promise<ProcessResult> {
     }
 
     // Mark processing
-    await supabase.from("yt_upload_jobs").update({
+    const { error: markProcessingErr } = await supabase.from("yt_upload_jobs").update({
       status: "processing", updated_at: new Date().toISOString(),
     }).eq("id", jobId)
+    if (markProcessingErr) console.error("[processor] mark processing:", markProcessingErr.message, markProcessingErr.details)
     await addLog(jobId, chanId, "info", `Processing: "${title}" (${asset.filename})`)
 
     const token = await getValidToken(chanId!)
@@ -132,7 +134,7 @@ async function runJobReal(job: RawJob): Promise<ProcessResult> {
       tags:        job.tags ?? [],
     })
 
-    await supabase.from("yt_upload_jobs").update({
+    const { error: markUploadedErr } = await supabase.from("yt_upload_jobs").update({
       status:        "uploaded",
       yt_video_id:   result.videoId,
       yt_video_url:  result.videoUrl,
@@ -140,13 +142,13 @@ async function runJobReal(job: RawJob): Promise<ProcessResult> {
       updated_at:    new Date().toISOString(),
       error_message: null,
     }).eq("id", jobId)
+    if (markUploadedErr) console.error("[processor] mark uploaded:", markUploadedErr.message, markUploadedErr.details)
 
-    // Close the inbox item — without this the uploaded count on the inbox page
-    // is always 0 because no code ever wrote the 'uploaded' status there.
-    await supabase.from("audio_inbox").update({
+    const { error: inboxErr } = await supabase.from("audio_inbox").update({
       status:     "uploaded",
       updated_at: new Date().toISOString(),
     }).eq("yt_job_id", jobId)
+    if (inboxErr) console.error("[processor] inbox status update:", inboxErr.message, inboxErr.details)
 
     await addLog(jobId, chanId, "info", `Uploaded: ${result.videoUrl}`, { videoId: result.videoId })
     return { jobId, title, status: "uploaded", videoId: result.videoId, videoUrl: result.videoUrl, simulated: false }
@@ -154,12 +156,13 @@ async function runJobReal(job: RawJob): Promise<ProcessResult> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     const newRetryCount = (job.retry_count ?? 0) + 1
-    await supabase.from("yt_upload_jobs").update({
+    const { error: markFailedErr } = await supabase.from("yt_upload_jobs").update({
       status:        "failed",
       error_message: message,
       retry_count:   newRetryCount,
       updated_at:    new Date().toISOString(),
     }).eq("id", jobId)
+    if (markFailedErr) console.error("[processor] mark failed:", markFailedErr.message, markFailedErr.details)
     const exhausted = newRetryCount >= MAX_RETRIES
     await addLog(jobId, chanId, "error",
       exhausted
