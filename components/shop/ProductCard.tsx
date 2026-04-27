@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useCart } from "@/lib/shopify/cartContext"
 import type { ShopifyProduct } from "@/lib/shopify/types"
 
@@ -74,9 +75,12 @@ export function ProductCard({ product, featured = false }: Props) {
         <p className="text-[9px] tracking-[0.25em] uppercase text-white/25">
           {product.productType}{product.vendor ? ` · ${product.vendor}` : ""}
         </p>
-        <p className={`font-semibold text-white/80 group-hover:text-white transition-colors leading-snug ${featured ? "text-base" : "text-sm"}`}>
+        <Link
+          href={`/shop/${product.handle}`}
+          className={`block font-semibold text-white/80 hover:text-white transition-colors leading-snug ${featured ? "text-base" : "text-sm"}`}
+        >
           {product.title}
-        </p>
+        </Link>
         {product.description && (
           <p className="text-xs text-white/30 leading-relaxed line-clamp-2">
             {product.description}

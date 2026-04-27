@@ -22,12 +22,12 @@ const PRODUCTS_QUERY = `
           compareAtPriceRange {
             minVariantPrice { amount }
           }
-          images(first: 1) {
-            edges { node { url } }
+          images(first: 4) {
+            edges { node { url altText } }
           }
           totalInventory
-          variants(first: 1) {
-            edges { node { id } }
+          variants(first: 10) {
+            edges { node { id title availableForSale price { amount currencyCode } } }
           }
           createdAt
           updatedAt
@@ -37,18 +37,42 @@ const PRODUCTS_QUERY = `
   }
 `
 
+export interface ShopifyVariant {
+  id: string
+  title: string
+  available: boolean
+  price: number
+  currency: string
+}
+
+export interface ShopifyProductDetail extends ShopifyProduct {
+  images: string[]
+  variants: ShopifyVariant[]
+  usingFallback: boolean
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function normalizeProduct(node: any): ShopifyProduct {
+function normalizeProduct(node: any): ShopifyProductDetail {
   const price = parseFloat(node.priceRange?.minVariantPrice?.amount ?? "0")
   const compareRaw = node.compareAtPriceRange?.minVariantPrice?.amount
   const compareAtPrice = compareRaw ? parseFloat(compareRaw) : undefined
   const currency: string = node.priceRange?.minVariantPrice?.currencyCode ?? "USD"
-  const imageUrl: string | undefined = node.images?.edges?.[0]?.node?.url ?? undefined
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const images: string[] = (node.images?.edges ?? []).map((e: any) => e.node.url as string)
+  const imageUrl = images[0]
   const rawStatus: string = (node.status as string).toLowerCase()
   const status = (["active", "archived", "draft"].includes(rawStatus)
     ? rawStatus
     : "draft") as ShopifyProductStatus
   const brandSlug = (node.vendor as string).toLowerCase().replace(/\s+/g, "-")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const variants: ShopifyVariant[] = (node.variants?.edges ?? []).map((e: any) => ({
+    id: e.node.id as string,
+    title: e.node.title as string,
+    available: e.node.availableForSale as boolean,
+    price: parseFloat(e.node.price?.amount ?? "0"),
+    currency: e.node.price?.currencyCode ?? "USD",
+  }))
 
   return {
     id:             node.id,
@@ -63,22 +87,38 @@ function normalizeProduct(node: any): ShopifyProduct {
     compareAtPrice,
     currency,
     imageUrl,
+    images,
+    variants,
     inventory:      node.totalInventory ?? 0,
-    variantsCount:  node.variants?.edges?.length ?? 0,
-    variantId:      node.variants?.edges?.[0]?.node?.id ?? undefined,
+    variantsCount:  variants.length,
+    variantId:      variants[0]?.id,
     brandSlug,
     shopifyGid:     node.id,
     lastSynced:     new Date().toISOString(),
     createdAt:      node.createdAt,
     updatedAt:      node.updatedAt,
+    usingFallback:  false,
   }
 }
 
-async function fetchStorefrontProducts(): Promise<ShopifyProduct[]> {
+let _storefrontWarned = false
+
+async function fetchStorefrontProducts(): Promise<{ products: ShopifyProductDetail[]; usingFallback: boolean }> {
   const domain = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN
   const token  = process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN
 
-  if (!domain || !token) return fallbackProducts
+  const hasDomain = !!domain
+  const hasToken  = !!token
+
+  if (!hasDomain || !hasToken) {
+    if (!_storefrontWarned) {
+      console.warn(
+        `[shopify] Storefront API not configured — domain:${hasDomain} token:${hasToken}. Using fallback products.`
+      )
+      _storefrontWarned = true
+    }
+    return { products: fallbackProducts.map(toDetail), usingFallback: true }
+  }
 
   const url = `https://${domain}/api/${STOREFRONT_API_VERSION}/graphql.json`
 
@@ -94,31 +134,64 @@ async function fetchStorefrontProducts(): Promise<ShopifyProduct[]> {
     })
 
     if (!res.ok) {
-      console.error(`[shopify] storefront API error: ${res.status}`)
-      return fallbackProducts
+      console.warn(
+        `[shopify] Storefront API ${res.status} — domain:${hasDomain} token:${hasToken}. Verify the Storefront Access Token in Shopify admin → Sales Channels → Headless. Falling back.`
+      )
+      return { products: fallbackProducts.map(toDetail), usingFallback: true }
     }
 
     const json = await res.json()
     if (json.errors?.length) {
-      console.error("[shopify] GraphQL errors:", json.errors)
-      return fallbackProducts
+      console.warn("[shopify] GraphQL errors:", json.errors)
+      return { products: fallbackProducts.map(toDetail), usingFallback: true }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const edges: any[] = json.data?.products?.edges ?? []
-    return edges.map((e: { node: unknown }) => normalizeProduct(e.node))
+    return { products: edges.map((e: { node: unknown }) => normalizeProduct(e.node)), usingFallback: false }
   } catch (err) {
-    console.error("[shopify] fetch failed:", err)
-    return fallbackProducts
+    console.warn("[shopify] fetch failed:", err)
+    return { products: fallbackProducts.map(toDetail), usingFallback: true }
   }
 }
 
-export async function getPublicProducts(): Promise<ShopifyProduct[]> {
-  const products = await fetchStorefrontProducts()
+function toDetail(p: ShopifyProduct): ShopifyProductDetail {
+  return {
+    ...p,
+    images:       p.imageUrl ? [p.imageUrl] : [],
+    variants:     p.variantId
+      ? [{ id: p.variantId, title: "Default", available: p.inventory > 0, price: p.price, currency: p.currency }]
+      : [],
+    usingFallback: true,
+  }
+}
+
+export async function getPublicProducts(): Promise<ShopifyProductDetail[]> {
+  const { products } = await fetchStorefrontProducts()
   return products.filter((p) => p.status === "active")
 }
 
-export async function getProductsByBrand(brandSlug: string): Promise<ShopifyProduct[]> {
+export async function getProductByHandle(handle: string): Promise<ShopifyProductDetail | null> {
+  const { products, usingFallback } = await fetchStorefrontProducts()
+  const product = products.find((p) => p.handle === handle) ?? null
+  if (product) product.usingFallback = usingFallback
+  return product
+}
+
+export async function getShopifyStatus(): Promise<{ connected: boolean; usingFallback: boolean; domain: string | null; hasDomain: boolean; hasToken: boolean }> {
+  const domain   = process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN ?? null
+  const hasDomain = !!domain
+  const hasToken  = !!process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN
+
+  if (!hasDomain || !hasToken) {
+    return { connected: false, usingFallback: true, domain, hasDomain, hasToken }
+  }
+
+  const { usingFallback } = await fetchStorefrontProducts()
+  return { connected: !usingFallback, usingFallback, domain, hasDomain, hasToken }
+}
+
+export async function getProductsByBrand(brandSlug: string): Promise<ShopifyProductDetail[]> {
   const products = await getPublicProducts()
   return products.filter((p) => p.brandSlug === brandSlug)
 }
