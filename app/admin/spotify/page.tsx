@@ -57,6 +57,15 @@ async function LinkedArtistRow({ artist }: { artist: Artist & { spotifyId: strin
             <span className="text-xs font-medium text-white/60">
               {formatFollowers(followers)} followers
             </span>
+            {artist.monthlyListeners > 0 && (
+              <>
+                <span className="text-[10px] text-white/20">·</span>
+                <span className="text-xs text-white/40">
+                  {formatFollowers(artist.monthlyListeners)}{" "}
+                  <span className="text-white/25">monthly</span>
+                </span>
+              </>
+            )}
             <span className="text-[10px] text-white/20">·</span>
             <span className="text-xs text-white/40">
               Pop.{" "}

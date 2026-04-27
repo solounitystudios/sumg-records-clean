@@ -23,6 +23,7 @@ export function rowToArtist(r: any): CMSArtist {
     spotifyId: r.spotify_id ?? undefined,
     appleMusicId: r.apple_music_id ?? undefined,
     appleMusicUrl: r.apple_music_url ?? undefined,
+    pressPhotos: Array.isArray(r.press_photos) ? r.press_photos : [],
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

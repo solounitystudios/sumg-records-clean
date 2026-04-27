@@ -212,6 +212,8 @@ export interface CMSArtist {
   /** Numeric Apple Music artist ID */
   appleMusicId?: string;
   appleMusicUrl?: string;
+  /** Ordered array of press/media gallery image URLs for the artist page gallery section */
+  pressPhotos?: string[];
   createdAt: string;
   updatedAt: string;
 }
