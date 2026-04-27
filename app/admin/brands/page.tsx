@@ -34,7 +34,7 @@ export default async function BrandsAdminPage() {
         {[
           { label: "Total Brands", value: brands.length },
           { label: "Categories", value: categories.length },
-          { label: "Active", value: brands.length },
+          { label: "Active", value: brands.filter((b) => b.isActive).length },
         ].map(({ label, value }) => (
           <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <div className="text-xs uppercase tracking-[0.2em] text-white/35 mb-2">{label}</div>
