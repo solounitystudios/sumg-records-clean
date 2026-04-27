@@ -26,7 +26,7 @@ const PRODUCTS_QUERY = `
             edges { node { url } }
           }
           totalInventory
-          variants(first: 250) {
+          variants(first: 1) {
             edges { node { id } }
           }
           createdAt
@@ -65,6 +65,7 @@ function normalizeProduct(node: any): ShopifyProduct {
     imageUrl,
     inventory:      node.totalInventory ?? 0,
     variantsCount:  node.variants?.edges?.length ?? 0,
+    variantId:      node.variants?.edges?.[0]?.node?.id ?? undefined,
     brandSlug,
     shopifyGid:     node.id,
     lastSynced:     new Date().toISOString(),

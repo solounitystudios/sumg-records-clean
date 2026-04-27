@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
-import { getPublicProducts, getProductBuyUrl } from "@/lib/shopify/server";
+import { ProductCard } from "@/components/shop/ProductCard";
+import { getPublicProducts } from "@/lib/shopify/server";
 import Link from "next/link";
 
 export const metadata = { title: "Shop — SUMG Records" };
@@ -16,6 +17,17 @@ export default async function ShopPage({ searchParams }: Props) {
     ? allProducts.filter((p) => p.brandSlug === brand)
     : allProducts;
   const brands = Array.from(new Set(allProducts.map((p) => p.brandSlug))).sort();
+
+  // Featured drops: tagged "featured" first, then newest, capped at 4
+  const featured = allProducts
+    .filter((p) => p.inventory > 0)
+    .sort((a, b) => {
+      const aFeat = a.tags?.includes("featured") ? 1 : 0;
+      const bFeat = b.tags?.includes("featured") ? 1 : 0;
+      if (bFeat !== aFeat) return bFeat - aFeat;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    })
+    .slice(0, 4);
 
   return (
     <>
@@ -35,6 +47,25 @@ export default async function ShopPage({ searchParams }: Props) {
             </p>
           </div>
         </section>
+
+        {/* Featured drops */}
+        {!brand && featured.length > 0 && (
+          <section className="py-20 border-b border-white/5">
+            <div className="max-w-7xl mx-auto px-6 lg:px-10">
+              <div className="flex items-end justify-between mb-10">
+                <div>
+                  <p className="text-[9px] tracking-[0.4em] uppercase text-white/20 mb-2">New &amp; Now</p>
+                  <h2 className="text-3xl font-black tracking-tight text-white leading-none">Featured Drops</h2>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/[0.04]">
+                {featured.map((p) => (
+                  <ProductCard key={p.id} product={p} featured />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Brand filters */}
         <section className="py-5 border-b border-white/5 sticky top-16 bg-black/95 backdrop-blur-xl z-10">
@@ -74,69 +105,9 @@ export default async function ShopPage({ searchParams }: Props) {
               <p className="text-sm text-white/30">No products available.</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-px bg-white/[0.04]">
-                {products.map((product) => {
-                  const buyUrl = getProductBuyUrl(product);
-                  const isExternal = buyUrl.startsWith("https://");
-                  return (
-                    <div
-                      key={product.id}
-                      className="bg-black p-6 flex flex-col gap-4 group"
-                    >
-                      {/* Cover image or initial */}
-                      <div className="aspect-square bg-white/[0.02] flex items-center justify-center border border-white/5 overflow-hidden">
-                        {product.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={product.imageUrl}
-                            alt={product.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-[6rem] font-black text-white/[0.04] select-none leading-none">
-                            {product.title.charAt(0)}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 space-y-1">
-                        <p className="text-[9px] tracking-[0.25em] uppercase text-white/25">
-                          {product.productType} · {product.vendor}
-                        </p>
-                        <p className="text-sm font-semibold text-white/80 group-hover:text-white transition-colors leading-snug">
-                          {product.title}
-                        </p>
-                        {product.description && (
-                          <p className="text-xs text-white/30 leading-relaxed line-clamp-2">
-                            {product.description}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Price + CTA */}
-                      <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                        <p className="text-base font-black text-white">
-                          ${product.price.toFixed(2)}
-                        </p>
-                        <a
-                          href={buyUrl}
-                          target={isExternal ? "_blank" : undefined}
-                          rel={isExternal ? "noopener noreferrer" : undefined}
-                          className="bg-white text-black text-[10px] tracking-[0.2em] uppercase px-5 py-2 hover:bg-white/90 transition-colors"
-                        >
-                          {isExternal ? "Buy Now ↗" : "Enquire →"}
-                        </a>
-                      </div>
-
-                      {/* Low-stock warning */}
-                      {product.inventory > 0 && product.inventory < 5 && (
-                        <p className="text-[9px] tracking-[0.15em] uppercase text-yellow-400/60">
-                          Only {product.inventory} left
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
+                {products.map((p) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
               </div>
             )}
           </div>

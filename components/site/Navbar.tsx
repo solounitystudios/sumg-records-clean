@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useCart } from "@/lib/shopify/cartContext";
 
 const navLinks = [
   { label: "Artists", href: "/artists" },
@@ -27,6 +28,7 @@ const mobileLinks = [
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const { itemCount, openCart } = useCart();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40);
@@ -95,6 +97,23 @@ export function Navbar() {
           >
             Contact
           </a>
+          {/* Cart icon */}
+          <button
+            onClick={openCart}
+            aria-label={`Open cart${itemCount > 0 ? ` (${itemCount} items)` : ""}`}
+            className="relative text-white/35 hover:text-white transition-colors duration-300 p-1"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+              <path d="M1 1h2.5l1.8 9h9l1.7-6H5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="7.5" cy="14.5" r="1" fill="currentColor"/>
+              <circle cx="13.5" cy="14.5" r="1" fill="currentColor"/>
+            </svg>
+            {itemCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-white text-black text-[8px] font-bold rounded-full flex items-center justify-center leading-none">
+                {itemCount > 9 ? "9+" : itemCount}
+              </span>
+            )}
+          </button>
           <a
             href="/releases"
             className="inline-flex items-center gap-2 text-[10px] tracking-[0.25em] uppercase text-black bg-white hover:bg-white/90 px-5 py-2.5 transition-all duration-300"

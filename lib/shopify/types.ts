@@ -23,6 +23,8 @@ export interface ShopifyProduct {
   variantsCount: number;
   brandSlug: string;
   collectionHandle?: string;
+  /** GID of the first/default variant — used as merchandiseId for cart mutations */
+  variantId?: string;
   /** Shopify GID — populated when live-synced via Shopify API */
   shopifyGid?: string;
   /** ISO timestamp of last Shopify sync */

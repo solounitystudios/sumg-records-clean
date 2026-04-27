@@ -2,8 +2,10 @@ import { notFound } from "next/navigation";
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { BrandHero } from "@/components/brand-themes/BrandHero";
+import { ProductCard } from "@/components/shop/ProductCard";
 import { getAllBrands, getBrandBySlug } from "@/lib/cms";
 import { getBrandTheme } from "@/lib/brands";
+import { getProductsByBrand } from "@/lib/shopify/server";
 import Link from "next/link";
 
 interface Props { params: Promise<{ slug: string }> }
@@ -32,9 +34,10 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function BrandPage({ params }: Props) {
   const { slug } = await params;
-  const [brand, allBrands] = await Promise.all([
+  const [brand, allBrands, brandProducts] = await Promise.all([
     getBrandBySlug(slug),
     getAllBrands(),
+    getProductsByBrand(slug),
   ]);
   if (!brand || !brand.isActive) notFound();
 
@@ -114,6 +117,34 @@ export default async function BrandPage({ params }: Props) {
           </div>
         </div>
       </section>
+
+      {/* Brand products */}
+      {brandProducts.length > 0 && (
+        <section className={`py-20 border-t ${theme.borderStyle}`}>
+          <div className="max-w-7xl mx-auto px-6 lg:px-10">
+            <div className="flex items-end justify-between mb-10">
+              <div>
+                <p className="text-[9px] tracking-[0.4em] uppercase mb-2" style={{ color: theme.accentColorHex, opacity: 0.5 }}>
+                  Collection
+                </p>
+                <h2 className={`text-3xl ${theme.headingClassName}`}>Shop {brand.name}</h2>
+              </div>
+              <Link
+                href={`/shop?brand=${slug}`}
+                className="text-[10px] tracking-[0.2em] uppercase transition-all"
+                style={{ color: theme.accentColorHex, opacity: 0.4 }}
+              >
+                View All →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/[0.04]">
+              {brandProducts.slice(0, 4).map((p) => (
+                <ProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Brand navigation to other brands */}
       <section className={`py-12 border-t ${theme.borderStyle}`}>
