@@ -66,12 +66,26 @@ export interface AudioInboxRow {
   assetMimeType: string | null
 }
 
+interface CreateInboxEntryResult {
+  row: AudioInboxRow
+  created: boolean
+}
+
 interface AssetSnippet {
   id: string
   filename: string
   url: string
   size_bytes: number | null
   mime_type: string
+}
+
+interface InboxAssetProducer {
+  producer_slug: string | null
+}
+
+interface DbErrorWithCode {
+  code?: string
+  message: string
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -172,22 +186,73 @@ export async function getInboxByAssetId(assetId: string): Promise<AudioInboxRow 
   return toRow(withAsset)
 }
 
-export async function createInboxEntry(assetId: string): Promise<AudioInboxRow | null> {
+export async function createInboxEntryResult(assetId: string): Promise<CreateInboxEntryResult | null> {
+  const { data: asset } = await supabase
+    .from("assets")
+    .select("producer_slug")
+    .eq("id", assetId)
+    .maybeSingle()
+
+  const producerSlug = (asset as InboxAssetProducer | null)?.producer_slug ?? null
+
+  const { data: existingRows, error: existingError } = await supabase
+    .from("audio_inbox")
+    .select("*")
+    .eq("asset_id", assetId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+
+  if (existingError) {
+    console.error("[audio_inbox] createInboxEntry existing lookup failed:", existingError.message)
+    return null
+  }
+
+  const existing = existingRows?.[0] ?? null
+  if (existing) {
+    let row = existing
+    if (producerSlug && !existing.producer_slug) {
+      const { data: updated, error: updateError } = await supabase
+        .from("audio_inbox")
+        .update({ producer_slug: producerSlug, updated_at: new Date().toISOString() })
+        .eq("id", existing.id)
+        .select("*")
+        .single()
+
+      if (updateError) {
+        console.error("[audio_inbox] createInboxEntry producer sync failed:", updateError.message)
+      } else if (updated) {
+        row = updated
+      }
+    }
+
+    const [withAsset] = await attachAssets([row])
+    return { row: toRow(withAsset), created: false }
+  }
+
   const { data, error } = await supabase
     .from("audio_inbox")
     .insert({
-      asset_id:   assetId,
-      status:     "new_asset",
-      action_log: [{ action: "created", detail: "Audio asset uploaded", at: new Date().toISOString() }],
+      asset_id:       assetId,
+      producer_slug:  producerSlug,
+      status:         "new_asset",
+      action_log:     [{ action: "created", detail: "Audio asset uploaded", at: new Date().toISOString() }],
     })
     .select("*")
     .single()
   if (error) {
+    if ((error as DbErrorWithCode).code === "23505") {
+      return createInboxEntryResult(assetId)
+    }
     console.error("[audio_inbox] createInboxEntry failed:", error.message)
     return null
   }
   const [withAsset] = await attachAssets([data])
-  return toRow(withAsset)
+  return { row: toRow(withAsset), created: true }
+}
+
+export async function createInboxEntry(assetId: string): Promise<AudioInboxRow | null> {
+  const result = await createInboxEntryResult(assetId)
+  return result?.row ?? null
 }
 
 const ALL_STATUSES: InboxStatus[] = [

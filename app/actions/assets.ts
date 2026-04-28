@@ -280,16 +280,16 @@ export async function bulkSendToInbox(
   const audioIds = (data ?? []).map((r: { id: string }) => r.id)
   if (audioIds.length === 0) return { queued: 0, errors: ["No audio assets in selection."] }
 
-  const { createInboxEntry } = await import("@/lib/db/audioInbox")
+  const { createInboxEntryResult } = await import("@/lib/db/audioInbox")
   const errors: string[] = []
   let queued = 0
 
   for (const assetId of audioIds) {
-    const entry = await createInboxEntry(assetId)
-    if (entry) {
-      queued++
+    const result = await createInboxEntryResult(assetId)
+    if (result) {
+      if (result.created) queued++
       import("@/app/actions/audioInbox").then(({ scoreAudioAsset }) => {
-        scoreAudioAsset(entry.id).catch(console.error)
+        scoreAudioAsset(result.row.id).catch(console.error)
       })
     } else {
       errors.push(`Failed to queue asset ${assetId}`)
@@ -344,7 +344,15 @@ export async function bulkAssignProducer(
     .update({ producer_slug: producerSlug || null })
     .in("id", ids)
 
+  if (!error) {
+    await supabase
+      .from("audio_inbox")
+      .update({ producer_slug: producerSlug || null, updated_at: new Date().toISOString() })
+      .in("asset_id", ids)
+  }
+
   revalidatePath("/admin/assets")
+  revalidatePath("/admin/youtube/inbox")
   if (error) return { ok: false, error: error.message }
   return { ok: true }
 }
