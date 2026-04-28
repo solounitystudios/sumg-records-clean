@@ -184,7 +184,7 @@ export interface ArtistTimelineItem {
  *   editor          → can edit content (text, metadata) but cannot publish, delete, or manage media
  */
 export type UserRole = "admin" | "editor" | "media_manager" | "release_manager";
-export type AssetType = "image" | "video" | "audio" | "document";
+export type AssetType = "image" | "video" | "audio" | "document" | "design" | "archive";
 export type HeroStyle = "editorial" | "minimal" | "mystic" | "industrial" | "coastal";
 
 export interface CMSArtist {

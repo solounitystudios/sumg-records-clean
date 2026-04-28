@@ -20,6 +20,8 @@ function typeFolder(type: AssetType): string {
     case "video":    return "videos";
     case "audio":    return "audio";
     case "document": return "documents";
+    case "design":   return "design";
+    case "archive":  return "archives";
   }
 }
 

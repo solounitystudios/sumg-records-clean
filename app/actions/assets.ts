@@ -6,28 +6,124 @@ import { requireAdmin } from "@/lib/auth"
 import type { AssetType } from "@/lib/types"
 
 const BUCKET = "sumg-assets"
-const MAX_BYTES = 100 * 1024 * 1024 // 100 MB
+
+// Per-type size limits
+const SIZE_LIMIT: Record<AssetType, number> = {
+  audio:    500 * 1024 * 1024, // 500 MB — stems, masters
+  video:    500 * 1024 * 1024, // 500 MB
+  archive:  500 * 1024 * 1024, // 500 MB — zip packs
+  image:     50 * 1024 * 1024, //  50 MB
+  design:   100 * 1024 * 1024, // 100 MB — PSD, AI
+  document:  50 * 1024 * 1024, //  50 MB
+}
+const DEFAULT_SIZE_LIMIT = 200 * 1024 * 1024 // 200 MB fallback
 
 const MIME_TO_TYPE: Record<string, AssetType> = {
-  "image/jpeg":      "image",
-  "image/jpg":       "image",
-  "image/png":       "image",
-  "image/webp":      "image",
-  "image/avif":      "image",
-  "image/gif":       "image",
-  "audio/mpeg":      "audio",
-  "audio/mp3":       "audio",
-  "audio/wav":       "audio",
-  "audio/flac":      "audio",
-  "audio/aac":       "audio",
-  "audio/ogg":       "audio",
-  "video/mp4":       "video",
-  "video/quicktime": "video",
-  "video/webm":      "video",
-  "application/pdf": "document",
-  "text/plain":      "document",
-  "application/msword": "document",
+  // ── Images ──────────────────────────────────────────────────────────────────
+  "image/jpeg":              "image",
+  "image/jpg":               "image",
+  "image/png":               "image",
+  "image/webp":              "image",
+  "image/avif":              "image",
+  "image/gif":               "image",
+  "image/svg+xml":           "image",
+  "image/tiff":              "image",
+  "image/heic":              "image",
+  "image/heif":              "image",
+  // ── Audio ───────────────────────────────────────────────────────────────────
+  "audio/mpeg":              "audio",
+  "audio/mp3":               "audio",
+  "audio/wav":               "audio",
+  "audio/x-wav":             "audio",
+  "audio/flac":              "audio",
+  "audio/x-flac":            "audio",
+  "audio/aiff":              "audio",
+  "audio/x-aiff":            "audio",
+  "audio/m4a":               "audio",
+  "audio/x-m4a":             "audio",
+  "audio/mp4":               "audio",
+  "audio/aac":               "audio",
+  "audio/ogg":               "audio",
+  // ── Video ───────────────────────────────────────────────────────────────────
+  "video/mp4":               "video",
+  "video/quicktime":         "video",
+  "video/webm":              "video",
+  "video/x-matroska":        "video",
+  "video/x-msvideo":         "video",
+  "video/x-m4v":             "video",
+  // ── Documents ───────────────────────────────────────────────────────────────
+  "application/pdf":         "document",
+  "text/plain":              "document",
+  "text/csv":                "document",
+  "application/msword":      "document",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "document",
+  "application/vnd.ms-excel":"document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "document",
+  "application/vnd.ms-powerpoint": "document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "document",
+  // ── Design ──────────────────────────────────────────────────────────────────
+  "image/vnd.adobe.photoshop": "design",
+  "application/illustrator":   "design",
+  "application/postscript":    "design",
+  "application/eps":           "design",
+  "application/x-eps":         "design",
+  // ── Archives ────────────────────────────────────────────────────────────────
+  "application/zip":             "archive",
+  "application/x-zip-compressed":"archive",
+  "application/x-zip":           "archive",
+  "application/octet-stream":    "archive", // .aif / unknown binaries — reclassify by ext below
+}
+
+// Extension fallback when MIME is ambiguous
+const EXT_TO_TYPE: Record<string, AssetType> = {
+  aif: "audio", aiff: "audio", m4a: "audio",
+  mkv: "video", avi: "video",  m4v: "video", mov: "video",
+  psd: "design", ai: "design",  eps: "design",
+  zip: "archive",
+  svg: "image",  tiff: "image", tif: "image", heic: "image", heif: "image",
+  csv: "document", xlsx: "document", docx: "document", pptx: "document",
+}
+
+function classifyFile(mimeType: string, filename: string): AssetType {
+  const fromMime = MIME_TO_TYPE[mimeType]
+  if (fromMime && fromMime !== "archive") return fromMime
+  const ext = filename.split(".").pop()?.toLowerCase() ?? ""
+  return EXT_TO_TYPE[ext] ?? fromMime ?? "document"
+}
+
+// Suggest subcategory from filename patterns
+function suggestSubcategory(filename: string, type: AssetType): string | null {
+  const lf = filename.toLowerCase()
+  if (type === "audio") {
+    if (/\bbeat|_beat/.test(lf))           return "beat"
+    if (/\bmaster(ed)?\b/.test(lf))        return "master"
+    if (/\bstem/.test(lf))                 return "stem"
+    if (/\bvocal|vox\b/.test(lf))          return "vocal"
+    if (/\bloop\b/.test(lf))               return "loop"
+    if (/\bhook\b/.test(lf))               return "hook"
+    if (/\bref(erence)?\b/.test(lf))       return "reference"
+  }
+  if (type === "image") {
+    if (/thumb(nail)?/.test(lf))           return "thumbnail"
+    if (/\bcover\b/.test(lf))              return "cover"
+    if (/\bmerch\b/.test(lf))              return "merch"
+    if (/\bmockup\b/.test(lf))             return "mockup"
+    if (/artist.*(photo|pic)|photo.*artist/.test(lf)) return "artist_photo"
+    if (/\bbrand\b/.test(lf))             return "brand"
+  }
+  if (type === "video") {
+    if (/visuali[sz]er/.test(lf))         return "visualizer"
+    if (/\bshort\b/.test(lf))             return "short"
+    if (/\bpromo\b/.test(lf))             return "promo"
+    if (/music.?video|[\b_]mv\b/.test(lf)) return "music_video"
+    if (/\breel\b/.test(lf))              return "reel"
+    if (/render/.test(lf))               return "render"
+  }
+  if (type === "archive") {
+    if (/stem/.test(lf))                  return "stems_pack"
+    if (/\bkit\b/.test(lf))              return "sample_kit"
+  }
+  return null
 }
 
 export type AssetUploadResult = { id: string; url: string; type: AssetType } | { error: string }
@@ -38,11 +134,20 @@ export async function uploadAssetFile(formData: FormData): Promise<AssetUploadRe
   const file = formData.get("file")
   if (!(file instanceof File)) return { error: "No file provided." }
   if (file.size === 0) return { error: "File is empty." }
-  if (file.size > MAX_BYTES) return { error: "File must be under 100 MB." }
 
-  const assetType: AssetType = MIME_TO_TYPE[file.type] ?? "document"
+  const assetType = classifyFile(file.type, file.name)
+  const limit = SIZE_LIMIT[assetType] ?? DEFAULT_SIZE_LIMIT
+  if (file.size > limit) {
+    const mb = Math.round(limit / (1024 * 1024))
+    return { error: `${assetType} files must be under ${mb} MB.` }
+  }
+
+  const FOLDER_MAP: Record<AssetType, string> = {
+    image: "images", audio: "audio", video: "videos",
+    document: "documents", design: "design", archive: "archives",
+  }
   const explicitFolder = formData.get("folder")?.toString()
-  const folder = explicitFolder || (assetType === "image" ? "images" : assetType === "audio" ? "audio" : assetType === "video" ? "videos" : "documents")
+  const folder = explicitFolder || (FOLDER_MAP[assetType] ?? "misc")
   const id = crypto.randomUUID()
   const ext = file.name.split(".").pop() ?? "bin"
   const path = `${folder}/${id}.${ext}`
@@ -58,6 +163,8 @@ export async function uploadAssetFile(formData: FormData): Promise<AssetUploadRe
   const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path)
   const url = urlData.publicUrl
 
+  const subcategory = suggestSubcategory(file.name, assetType)
+
   const { data: row, error: dbError } = await supabase
     .from("assets")
     .insert({
@@ -66,6 +173,7 @@ export async function uploadAssetFile(formData: FormData): Promise<AssetUploadRe
       filename: file.name,
       mime_type: file.type,
       size_bytes: file.size,
+      subcategory,
       attached_to: null,
       uploaded_by: "admin",
     })

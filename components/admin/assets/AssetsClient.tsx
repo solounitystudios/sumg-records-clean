@@ -32,6 +32,8 @@ const TYPE_TABS = [
   { value: "audio",    label: "Audio" },
   { value: "video",    label: "Video" },
   { value: "document", label: "Docs" },
+  { value: "design",   label: "Design" },
+  { value: "archive",  label: "Archives" },
 ] as const
 
 const SUBCATS: Record<string, { value: string; label: string }[]> = {
@@ -63,7 +65,18 @@ const SUBCATS: Record<string, { value: string; label: string }[]> = {
   document: [
     { value: "lyrics",   label: "Lyrics" },
     { value: "contract", label: "Contracts" },
-    { value: "zip",      label: "Zip Packs" },
+  ],
+  design: [
+    { value: "artwork",      label: "Artwork" },
+    { value: "brand",        label: "Brand" },
+    { value: "merch_design", label: "Merch Design" },
+    { value: "thumbnail",    label: "Thumbnail" },
+    { value: "template",     label: "Templates" },
+  ],
+  archive: [
+    { value: "stems_pack",  label: "Stems Pack" },
+    { value: "sample_kit",  label: "Sample Kit" },
+    { value: "project_zip", label: "Project" },
   ],
 }
 
@@ -87,7 +100,7 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 const TYPE_ICON: Record<string, string> = {
-  image: "▣", audio: "♫", document: "▤", video: "▶",
+  image: "▣", audio: "♫", document: "▤", video: "▶", design: "✦", archive: "⊟",
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -127,18 +140,24 @@ function isWithinDays(dateStr: string, days: number): boolean {
 function AssetCard({
   asset,
   selected,
+  producers,
   onToggle,
   onDelete,
   onSendToInbox,
+  onAssignProducer,
 }: {
   asset: AssetRow
   selected: boolean
+  producers: Producer[]
   onToggle: () => void
   onDelete: () => void
   onSendToInbox: () => void
+  onAssignProducer: (slug: string) => void
 }) {
   const [copied, setCopied] = useState(false)
   const isImage = asset.type === "image"
+  const isAudio = asset.type === "audio"
+  const hasProducer = !!asset.producer_slug
 
   async function copyUrl() {
     await navigator.clipboard.writeText(asset.url)
@@ -200,9 +219,22 @@ function AssetCard({
             {formatBytes(asset.size_bytes)}
           </span>
         </div>
-        {asset.producer_slug && (
-          <p className="text-[9px] text-white/30 mt-0.5 truncate">{asset.producer_slug}</p>
-        )}
+
+        {/* Producer assign — inline select */}
+        <div className="mt-1.5">
+          <select
+            value={asset.producer_slug ?? ""}
+            onChange={(e) => onAssignProducer(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full rounded border border-white/[0.08] bg-transparent px-1.5 py-0.5 text-[9px] text-white/40 focus:outline-none focus:border-white/20 transition appearance-none cursor-pointer hover:border-white/15"
+          >
+            <option value="">No producer</option>
+            {producers.map((p) => (
+              <option key={p.slug} value={p.slug}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+
         {asset.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1.5">
             {asset.tags.slice(0, 3).map((t) => (
@@ -216,8 +248,18 @@ function AssetCard({
           </div>
         )}
 
-        {/* Actions */}
-        <div className="mt-2 flex items-center gap-2 flex-wrap">
+        {/* YT Inbox CTA — prominent when audio + producer set */}
+        {isAudio && hasProducer && (
+          <button
+            onClick={onSendToInbox}
+            className="mt-2 w-full rounded-lg border border-violet-500/30 py-1 text-[10px] font-medium text-violet-400/80 hover:text-violet-300 hover:border-violet-500/50 transition-colors"
+          >
+            → Send to YouTube Inbox
+          </button>
+        )}
+
+        {/* Actions row */}
+        <div className="mt-2 flex items-center gap-2">
           <a
             href={asset.url}
             target="_blank"
@@ -230,12 +272,12 @@ function AssetCard({
             onClick={copyUrl}
             className="text-[9px] text-white/20 hover:text-white/50 transition-colors"
           >
-            {copied ? "Copied!" : "Copy URL"}
+            {copied ? "Copied!" : "Copy"}
           </button>
-          {asset.type === "audio" && (
+          {isAudio && !hasProducer && (
             <button
               onClick={onSendToInbox}
-              className="text-[9px] text-violet-400/50 hover:text-violet-400 transition-colors ml-auto"
+              className="text-[9px] text-violet-400/40 hover:text-violet-400 transition-colors"
               title="Send to YouTube Inbox"
             >
               → Inbox
@@ -259,17 +301,22 @@ function AssetCard({
 function AssetTableRow({
   asset,
   selected,
+  producers,
   onToggle,
   onDelete,
   onSendToInbox,
+  onAssignProducer,
 }: {
   asset: AssetRow
   selected: boolean
+  producers: Producer[]
   onToggle: () => void
   onDelete: () => void
   onSendToInbox: () => void
+  onAssignProducer: (slug: string) => void
 }) {
   const [copied, setCopied] = useState(false)
+  const isAudio = asset.type === "audio"
 
   async function copyUrl() {
     await navigator.clipboard.writeText(asset.url)
@@ -297,8 +344,18 @@ function AssetTableRow({
           {asset.subcategory ?? asset.type}
         </span>
       </td>
-      <td className="py-2.5 pr-3 w-28 hidden md:table-cell">
-        <span className="text-[10px] text-white/40 font-mono">{asset.producer_slug ?? "—"}</span>
+      {/* Producer — inline assign select */}
+      <td className="py-2 pr-3 w-36 hidden md:table-cell">
+        <select
+          value={asset.producer_slug ?? ""}
+          onChange={(e) => onAssignProducer(e.target.value)}
+          className="w-full rounded border border-white/[0.07] bg-transparent px-1.5 py-0.5 text-[10px] text-white/50 focus:outline-none focus:border-white/20 transition appearance-none cursor-pointer hover:border-white/15"
+        >
+          <option value="">— producer</option>
+          {producers.map((p) => (
+            <option key={p.slug} value={p.slug}>{p.name}</option>
+          ))}
+        </select>
       </td>
       <td className="py-2.5 pr-3 w-20">
         <span className={`text-[9px] uppercase tracking-wide border px-1.5 py-0.5 rounded ${STATUS_COLOR[asset.status] ?? ""}`}>
@@ -311,17 +368,25 @@ function AssetTableRow({
       <td className="py-2.5 pr-3 w-20 hidden xl:table-cell">
         <span className="text-[10px] text-white/25">{formatRelativeTime(asset.created_at)}</span>
       </td>
-      <td className="py-2.5 pr-4 w-32">
-        <div className="flex items-center gap-3">
-          <button onClick={copyUrl} className="text-[9px] text-white/25 hover:text-white/60 transition-colors">
+      <td className="py-2.5 pr-4 w-40">
+        <div className="flex items-center gap-2">
+          <button onClick={copyUrl} className="text-[9px] text-white/25 hover:text-white/60 transition-colors whitespace-nowrap">
             {copied ? "Copied!" : "Copy"}
           </button>
           <a href={asset.url} target="_blank" rel="noopener noreferrer" className="text-[9px] text-white/25 hover:text-white/60 transition-colors">
             Open ↗
           </a>
-          {asset.type === "audio" && (
-            <button onClick={onSendToInbox} className="text-[9px] text-violet-400/40 hover:text-violet-400 transition-colors" title="Send to YouTube Inbox">
-              Inbox
+          {isAudio && (
+            <button
+              onClick={onSendToInbox}
+              className={`text-[9px] transition-colors whitespace-nowrap ${
+                asset.producer_slug
+                  ? "text-violet-400/70 hover:text-violet-300 font-medium"
+                  : "text-violet-400/30 hover:text-violet-400"
+              }`}
+              title="Send to YouTube Inbox"
+            >
+              → Inbox
             </button>
           )}
           <button onClick={onDelete} className="text-[9px] text-white/15 hover:text-red-400/60 transition-colors">
@@ -431,6 +496,14 @@ export function AssetsClient({ assets, producers }: Props) {
   function handleSingleDelete(id: string) {
     startTransition(async () => {
       await deleteAssetFile(id)
+      refresh()
+    })
+  }
+
+  // Single-asset producer assign
+  function handleAssignProducer(id: string, slug: string) {
+    startTransition(async () => {
+      await bulkAssignProducer([id], slug)
       refresh()
     })
   }
@@ -697,9 +770,11 @@ export function AssetsClient({ assets, producers }: Props) {
               key={asset.id}
               asset={asset}
               selected={selected.has(asset.id)}
+              producers={producers}
               onToggle={() => toggle(asset.id)}
               onDelete={() => handleSingleDelete(asset.id)}
               onSendToInbox={() => handleSingleInbox(asset.id)}
+              onAssignProducer={(slug) => handleAssignProducer(asset.id, slug)}
             />
           ))}
         </div>
@@ -714,7 +789,7 @@ export function AssetsClient({ assets, producers }: Props) {
                 <th className="pl-4 py-2.5 w-8" />
                 <th className="py-2.5 pr-3 text-left text-[9px] uppercase tracking-[0.2em] text-white/25 font-normal">File</th>
                 <th className="py-2.5 pr-3 text-left text-[9px] uppercase tracking-[0.2em] text-white/25 font-normal hidden sm:table-cell">Type</th>
-                <th className="py-2.5 pr-3 text-left text-[9px] uppercase tracking-[0.2em] text-white/25 font-normal hidden md:table-cell">Producer</th>
+                <th className="py-2.5 pr-3 text-left text-[9px] uppercase tracking-[0.2em] text-white/25 font-normal hidden md:table-cell w-36">Producer</th>
                 <th className="py-2.5 pr-3 text-left text-[9px] uppercase tracking-[0.2em] text-white/25 font-normal">Status</th>
                 <th className="py-2.5 pr-3 text-left text-[9px] uppercase tracking-[0.2em] text-white/25 font-normal hidden lg:table-cell">Size</th>
                 <th className="py-2.5 pr-3 text-left text-[9px] uppercase tracking-[0.2em] text-white/25 font-normal hidden xl:table-cell">Date</th>
@@ -727,9 +802,11 @@ export function AssetsClient({ assets, producers }: Props) {
                   key={asset.id}
                   asset={asset}
                   selected={selected.has(asset.id)}
+                  producers={producers}
                   onToggle={() => toggle(asset.id)}
                   onDelete={() => handleSingleDelete(asset.id)}
                   onSendToInbox={() => handleSingleInbox(asset.id)}
+                  onAssignProducer={(slug) => handleAssignProducer(asset.id, slug)}
                 />
               ))}
             </tbody>
