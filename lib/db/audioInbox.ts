@@ -59,11 +59,19 @@ export interface AudioInboxRow {
   commercialScore: number | null
   ctrScore: number | null
   signalData: Record<string, unknown> | null
-  // Joined from assets
+  // Joined from assets (nullable — asset may not exist yet)
   assetFilename: string | null
   assetUrl: string | null
   assetSizeBytes: number | null
   assetMimeType: string | null
+}
+
+interface AssetSnippet {
+  id: string
+  filename: string
+  url: string
+  size_bytes: number | null
+  mime_type: string
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -102,17 +110,36 @@ function toRow(r: any): AudioInboxRow {
     commercialScore:      r.commercial_score ?? null,
     ctrScore:             r.ctr_score ?? null,
     signalData:           r.signal_data ?? null,
-    assetFilename:        r.assets?.filename ?? null,
-    assetUrl:             r.assets?.url ?? null,
-    assetSizeBytes:       r.assets?.size_bytes ?? null,
-    assetMimeType:        r.assets?.mime_type ?? null,
+    assetFilename:        r._asset?.filename ?? null,
+    assetUrl:             r._asset?.url ?? null,
+    assetSizeBytes:       r._asset?.size_bytes ?? null,
+    assetMimeType:        r._asset?.mime_type ?? null,
   }
+}
+
+// Fetches asset metadata for a batch of inbox rows without relying on a FK embed.
+// Works regardless of whether the audio_inbox → assets FK constraint exists.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function attachAssets(rows: any[]): Promise<any[]> {
+  if (rows.length === 0) return rows
+  const ids = [...new Set<string>(rows.map((r) => r.asset_id).filter(Boolean))]
+  if (ids.length === 0) return rows.map((r) => ({ ...r, _asset: null }))
+
+  const { data } = await supabase
+    .from("assets")
+    .select("id, filename, url, size_bytes, mime_type")
+    .in("id", ids)
+
+  const byId: Record<string, AssetSnippet> = {}
+  for (const a of (data ?? []) as AssetSnippet[]) byId[a.id] = a
+
+  return rows.map((r) => ({ ...r, _asset: byId[r.asset_id] ?? null }))
 }
 
 export async function getAllInboxItems(status?: InboxStatus): Promise<AudioInboxRow[]> {
   let q = supabase
     .from("audio_inbox")
-    .select("*, assets(filename, url, size_bytes, mime_type)")
+    .select("*")
     .order("created_at", { ascending: false })
     .limit(500)
 
@@ -120,27 +147,29 @@ export async function getAllInboxItems(status?: InboxStatus): Promise<AudioInbox
 
   const { data, error } = await q
   if (error) throw new Error(`getAllInboxItems: ${error.message}`)
-  return (data ?? []).map(toRow)
+  return (await attachAssets(data ?? [])).map(toRow)
 }
 
 export async function getInboxItemById(id: string): Promise<AudioInboxRow | null> {
   const { data, error } = await supabase
     .from("audio_inbox")
-    .select("*, assets(filename, url, size_bytes, mime_type)")
+    .select("*")
     .eq("id", id)
     .single()
   if (error) return null
-  return toRow(data)
+  const [withAsset] = await attachAssets([data])
+  return toRow(withAsset)
 }
 
 export async function getInboxByAssetId(assetId: string): Promise<AudioInboxRow | null> {
   const { data, error } = await supabase
     .from("audio_inbox")
-    .select("*, assets(filename, url, size_bytes, mime_type)")
+    .select("*")
     .eq("asset_id", assetId)
     .maybeSingle()
   if (error || !data) return null
-  return toRow(data)
+  const [withAsset] = await attachAssets([data])
+  return toRow(withAsset)
 }
 
 export async function createInboxEntry(assetId: string): Promise<AudioInboxRow | null> {
@@ -151,13 +180,14 @@ export async function createInboxEntry(assetId: string): Promise<AudioInboxRow |
       status:     "new_asset",
       action_log: [{ action: "created", detail: "Audio asset uploaded", at: new Date().toISOString() }],
     })
-    .select("*, assets(filename, url, size_bytes, mime_type)")
+    .select("*")
     .single()
   if (error) {
     console.error("[audio_inbox] createInboxEntry failed:", error.message)
     return null
   }
-  return toRow(data)
+  const [withAsset] = await attachAssets([data])
+  return toRow(withAsset)
 }
 
 const ALL_STATUSES: InboxStatus[] = [
@@ -175,7 +205,6 @@ const ALL_STATUSES: InboxStatus[] = [
 
 export async function getInboxCounts(): Promise<Record<InboxStatus | "all", number>> {
   // Parallel HEAD COUNT queries — transfers zero row data regardless of table size.
-  // Each query resolves to a single integer via the Supabase count API.
   const [allResult, ...perStatus] = await Promise.all([
     supabase.from("audio_inbox").select("*", { count: "exact", head: true }),
     ...ALL_STATUSES.map((s) =>
