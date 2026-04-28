@@ -126,3 +126,134 @@ export async function deleteAssetFile(id: string): Promise<{ ok: boolean; error?
   revalidatePath("/admin/assets")
   return { ok: true }
 }
+
+export async function bulkDeleteAssets(
+  ids: string[],
+): Promise<{ deleted: number; errors: string[] }> {
+  await requireAdmin()
+  if (ids.length === 0) return { deleted: 0, errors: [] }
+
+  const { data } = await supabase
+    .from("assets")
+    .select("id, url")
+    .in("id", ids)
+
+  const rows = (data ?? []) as { id: string; url: string }[]
+  const storagePaths = rows
+    .map((r) => r.url.match(/\/sumg-assets\/(.+)$/)?.[1])
+    .filter((p): p is string => !!p)
+
+  if (storagePaths.length > 0) {
+    await supabase.storage.from(BUCKET).remove(storagePaths)
+  }
+
+  await supabase.from("audio_inbox").delete().in("asset_id", ids)
+
+  const { error } = await supabase.from("assets").delete().in("id", ids)
+  revalidatePath("/admin/assets")
+  revalidatePath("/admin/youtube/inbox")
+
+  if (error) return { deleted: 0, errors: [error.message] }
+  return { deleted: rows.length, errors: [] }
+}
+
+export async function bulkSendToInbox(
+  ids: string[],
+): Promise<{ queued: number; errors: string[] }> {
+  await requireAdmin()
+  if (ids.length === 0) return { queued: 0, errors: [] }
+
+  const { data } = await supabase
+    .from("assets")
+    .select("id, type")
+    .in("id", ids)
+    .eq("type", "audio")
+
+  const audioIds = (data ?? []).map((r: { id: string }) => r.id)
+  if (audioIds.length === 0) return { queued: 0, errors: ["No audio assets in selection."] }
+
+  const { createInboxEntry } = await import("@/lib/db/audioInbox")
+  const errors: string[] = []
+  let queued = 0
+
+  for (const assetId of audioIds) {
+    const entry = await createInboxEntry(assetId)
+    if (entry) {
+      queued++
+      import("@/app/actions/audioInbox").then(({ scoreAudioAsset }) => {
+        scoreAudioAsset(entry.id).catch(console.error)
+      })
+    } else {
+      errors.push(`Failed to queue asset ${assetId}`)
+    }
+  }
+
+  revalidatePath("/admin/youtube/inbox")
+  revalidatePath("/admin/assets")
+  return { queued, errors }
+}
+
+export async function bulkTagAssets(
+  ids: string[],
+  tags: string[],
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin()
+  if (ids.length === 0 || tags.length === 0) return { ok: true }
+
+  const cleanTags = tags.map((t) => t.trim().toLowerCase()).filter(Boolean)
+  if (cleanTags.length === 0) return { ok: true }
+
+  // Append tags without duplicates using Postgres array union
+  const { error } = await supabase.rpc("append_asset_tags", {
+    p_ids: ids,
+    p_tags: cleanTags,
+  })
+
+  // Fallback if the RPC doesn't exist: fetch-merge-update in TypeScript
+  if (error?.message?.includes("Could not find")) {
+    const { data } = await supabase.from("assets").select("id, tags").in("id", ids)
+    for (const row of (data ?? []) as { id: string; tags: string[] }[]) {
+      const merged = [...new Set([...(row.tags ?? []), ...cleanTags])]
+      await supabase.from("assets").update({ tags: merged }).eq("id", row.id)
+    }
+  } else if (error) {
+    return { ok: false, error: error.message }
+  }
+
+  revalidatePath("/admin/assets")
+  return { ok: true }
+}
+
+export async function bulkAssignProducer(
+  ids: string[],
+  producerSlug: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin()
+  if (ids.length === 0) return { ok: true }
+
+  const { error } = await supabase
+    .from("assets")
+    .update({ producer_slug: producerSlug || null })
+    .in("id", ids)
+
+  revalidatePath("/admin/assets")
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function bulkUpdateStatus(
+  ids: string[],
+  status: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin()
+  if (ids.length === 0) return { ok: true }
+
+  const { error } = await supabase
+    .from("assets")
+    .update({ status })
+    .in("id", ids)
+
+  revalidatePath("/admin/assets")
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
