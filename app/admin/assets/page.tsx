@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/auth"
 import { getAssets, formatBytes } from "@/lib/db/assets"
 import type { AssetType } from "@/lib/types"
 import { AssetUploader } from "./AssetUploader"
+import { AssetsClient } from "@/components/admin/assets/AssetsClient"
 import Link from "next/link"
 
 const TYPE_TABS: { label: string; value: AssetType | "all" }[] = [
@@ -11,63 +12,6 @@ const TYPE_TABS: { label: string; value: AssetType | "all" }[] = [
   { label: "Video",     value: "video" },
   { label: "Documents", value: "document" },
 ]
-
-const TYPE_ICON: Record<string, string> = {
-  image:    "▣",
-  audio:    "♫",
-  document: "▤",
-  video:    "▶",
-}
-
-function AssetCard({ asset }: { asset: Awaited<ReturnType<typeof getAssets>>[number] }) {
-  const isImage = asset.type === "image"
-  return (
-    <div className="rounded-xl border border-white/[0.07] bg-[#0d1016] overflow-hidden group">
-      {/* Preview */}
-      <div className="aspect-square bg-white/[0.03] flex items-center justify-center overflow-hidden">
-        {isImage ? (
-          <img
-            src={asset.url}
-            alt={asset.alt_text ?? asset.filename}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <span className="text-3xl text-white/15">{TYPE_ICON[asset.type] ?? "▤"}</span>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="px-3 py-2.5">
-        <p className="text-xs font-medium truncate text-white/70" title={asset.filename}>
-          {asset.filename}
-        </p>
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-[9px] text-white/25 uppercase tracking-wide">{asset.type}</span>
-          <span className="text-[9px] text-white/25 tabular-nums">{formatBytes(asset.size_bytes)}</span>
-        </div>
-        <div className="mt-2 flex gap-2">
-          <a
-            href={asset.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[9px] text-white/30 hover:text-white/60 transition-colors"
-          >
-            Open ↗
-          </a>
-          <button
-            className="text-[9px] text-white/20 hover:text-white/40 transition-colors"
-            onClick={async () => {
-              await navigator.clipboard.writeText(asset.url)
-            }}
-          >
-            Copy URL
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export default async function AssetsPage({
   searchParams,
@@ -133,17 +77,7 @@ export default async function AssetsPage({
       </div>
 
       {/* Grid */}
-      {assets.length === 0 ? (
-        <div className="rounded-xl border border-white/[0.06] bg-[#0d1016] px-6 py-10 text-center">
-          <p className="text-sm text-white/30">No assets yet. Upload your first file above.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {assets.map(asset => (
-            <AssetCard key={asset.id} asset={asset} />
-          ))}
-        </div>
-      )}
+      <AssetsClient assets={assets} />
 
       {/* Architecture note */}
       <div className="mt-10 border-t border-white/[0.05] pt-6">
