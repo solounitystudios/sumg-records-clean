@@ -10,7 +10,9 @@ const navLinks = [
   { label: "Producers", href: "/producers" },
   { label: "Brands", href: "/brands" },
   { label: "About", href: "/about" },
+  { label: "News", href: "/news" },
   { label: "Shop", href: "/shop" },
+  { label: "Membership", href: "/membership" },
 ];
 
 const mobileLinks = [
@@ -21,7 +23,9 @@ const mobileLinks = [
   { label: "Producers", href: "/producers" },
   { label: "Brands", href: "/brands" },
   { label: "About", href: "/about" },
+  { label: "News", href: "/news" },
   { label: "Shop", href: "/shop" },
+  { label: "Membership", href: "/membership" },
   { label: "Contact", href: "/contact" },
 ];
 

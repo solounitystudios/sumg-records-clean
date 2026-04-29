@@ -166,18 +166,27 @@ export async function renderJobToMp4(opts: RenderOptions): Promise<RenderResult>
   await mkdir(tmpDir, { recursive: true })
 
   try {
-    // 1 — Fetch audio asset for this job
+    // 1 — Fetch audio asset for this job (two-step: no FK required in schema cache)
     const { data: jobRow, error: jobErr } = await supabase
       .from("yt_upload_jobs")
-      .select("asset_id, assets(url, mime_type, filename)")
+      .select("asset_id")
       .eq("id", opts.jobId)
       .single()
 
     if (jobErr || !jobRow) throw new Error("Job not found")
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const audioAsset = (jobRow as any).assets
-    if (!audioAsset?.url) throw new Error("Audio asset has no storage URL")
+    const rawJob = jobRow as { asset_id: string | null }
+    if (!rawJob.asset_id) throw new Error("Job has no audio asset assigned")
+
+    const { data: audioRow, error: audioErr } = await supabase
+      .from("assets")
+      .select("url, mime_type, filename")
+      .eq("id", rawJob.asset_id)
+      .single()
+
+    if (audioErr || !audioRow) throw new Error(`Audio asset ${rawJob.asset_id} not found`)
+    const audioAsset = audioRow as { url: string; mime_type: string | null; filename: string | null }
+    if (!audioAsset.url) throw new Error("Audio asset has no storage URL")
 
     // Download audio
     const audioRes = await fetch(audioAsset.url, { cache: "no-store" })

@@ -20,6 +20,10 @@ const config = [
       // window.location.href assignment is used for post-delete navigation in
       // a few pages.  The pattern is intentional; downgrade to warning.
       "react-hooks/immutability": "warn",
+      // Date.now() is used in async server components to compute elapsed time
+      // from a stored timestamp.  Server components do not re-render, so the
+      // impurity concern does not apply.  Downgrade to warning.
+      "react-hooks/purity": "warn",
     },
   },
 ];

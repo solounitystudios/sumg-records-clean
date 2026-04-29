@@ -3,7 +3,7 @@ import { supabase } from "./supabase"
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type YtChannelStatus = "active" | "paused" | "revoked"
-export type YtJobStatus = "needs_asset" | "needs_render" | "scheduled" | "pending" | "processing" | "uploaded" | "failed" | "cancelled"
+export type YtJobStatus = "needs_asset" | "needs_render" | "rendering" | "scheduled" | "pending" | "processing" | "uploaded" | "failed" | "cancelled"
 export type EngineLogLevel = "info" | "warn" | "error"
 
 export interface YtChannel {
@@ -46,6 +46,9 @@ export interface YtUploadJob {
   retryCount: number
   createdAt: string
   updatedAt: string
+  // Render config (consumed by external render worker)
+  thumbnailAssetId?: string | null
+  accentColor?: string | null
   // Joined
   channelHandle?: string | null
   assetFilename?: string | null
@@ -108,9 +111,11 @@ function toJob(r: any): YtUploadJob {
     retryCount:   r.retry_count ?? 0,
     createdAt:    r.created_at,
     updatedAt:    r.updated_at,
-    channelHandle:  r.yt_channels?.channel_handle ?? null,
-    assetFilename:  r.assets?.filename ?? null,
-    assetMimeType:  r.assets?.mime_type ?? null,
+    thumbnailAssetId: r.thumbnail_asset_id ?? null,
+    accentColor:      r.accent_color ?? null,
+    channelHandle:    r.yt_channels?.channel_handle ?? null,
+    assetFilename:    r.assets?.filename ?? null,
+    assetMimeType:    r.assets?.mime_type ?? null,
   }
 }
 
@@ -174,7 +179,7 @@ export async function getQueuedJobs(): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
     .select("*, yt_channels(channel_handle), assets(filename, mime_type)")
-    .in("status", ["needs_asset", "needs_render", "scheduled", "pending", "processing"])
+    .in("status", ["needs_asset", "needs_render", "rendering", "scheduled", "pending", "processing"])
     .order("created_at", { ascending: false })
   if (error) throw new Error(`getQueuedJobs: ${error.message}`)
   return (data ?? []).map(toJob)
@@ -186,6 +191,16 @@ export async function getJobsNeedingRender(): Promise<YtUploadJob[]> {
     .select("*, yt_channels(channel_handle), assets(filename, mime_type)")
     .eq("status", "needs_render")
     .order("created_at", { ascending: true })
+  if (error) return []
+  return (data ?? []).map(toJob)
+}
+
+export async function getJobsRendering(): Promise<YtUploadJob[]> {
+  const { data, error } = await supabase
+    .from("yt_upload_jobs")
+    .select("*, yt_channels(channel_handle), assets(filename, mime_type)")
+    .eq("status", "rendering")
+    .order("updated_at", { ascending: false })
   if (error) return []
   return (data ?? []).map(toJob)
 }
@@ -226,7 +241,7 @@ export async function getJobCounts(): Promise<Record<YtJobStatus, number>> {
     .from("yt_upload_jobs")
     .select("status")
   if (error) throw new Error(`getJobCounts: ${error.message}`)
-  const counts: Record<YtJobStatus, number> = { needs_asset: 0, needs_render: 0, scheduled: 0, pending: 0, processing: 0, uploaded: 0, failed: 0, cancelled: 0 }
+  const counts: Record<YtJobStatus, number> = { needs_asset: 0, needs_render: 0, rendering: 0, scheduled: 0, pending: 0, processing: 0, uploaded: 0, failed: 0, cancelled: 0 }
   for (const row of data ?? []) counts[row.status as YtJobStatus] = (counts[row.status as YtJobStatus] ?? 0) + 1
   return counts
 }
