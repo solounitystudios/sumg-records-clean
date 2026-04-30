@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchAppleMusic } from "@/lib/appleMusic";
-import { isAppleMusicConfigured } from "@/lib/appleMusic";
+import { searchAppleMusic, isAppleMusicConfigured } from "@/lib/appleMusic";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   if (!isAppleMusicConfigured()) {
