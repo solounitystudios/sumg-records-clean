@@ -110,7 +110,9 @@ export default async function AudioInboxPage({
       {/* Inbox table */}
       <InboxClient
         items={items}
-        producers={producers.map((p) => ({ slug: p.slug, name: p.name }))}
+        producers={producers
+          .filter((p) => !p.status || p.status === "active")
+          .map((p) => ({ slug: p.slug, name: p.name }))}
         counts={counts}
         activeFilter={activeFilter === "all" ? "all" : activeFilter}
       />

@@ -18,6 +18,7 @@ import {
   selectThumbnailVariant,
   setLockedTitle,
   setLockedMetadata,
+  assignProducer,
 } from "@/app/actions/audioInbox"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -140,14 +141,17 @@ function InboxRow({
   const [saving, setSaving] = useState(false)
   const [acting, setActing] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  const [msgIsError, setMsgIsError] = useState(false)
 
-  const showMessage = (m: string) => {
+  const showMessage = (m: string, isError = false) => {
     setMsg(m)
-    setTimeout(() => setMsg(null), 3000)
+    setMsgIsError(isError)
+    if (!isError) setTimeout(() => setMsg(null), 4000)
   }
 
   async function handleSave() {
     setSaving(true)
+    const wasUnclassified = !item.producerSlug
     const fd = new FormData()
     fd.set("id", item.id)
     fd.set("override_title", edit.overrideTitle)
@@ -159,8 +163,29 @@ function InboxRow({
     fd.set("cta_copy", edit.ctaCopy)
     const r = await updateInboxMetadata(fd)
     setSaving(false)
-    if (r.ok) { setEditing(false); onRefresh(); showMessage("Saved") }
-    else showMessage(r.error ?? "Save failed")
+    if (r.ok) {
+      setEditing(false)
+      onRefresh()
+      if (wasUnclassified && edit.producerSlug) {
+        showMessage("Producer assigned — click Approve to run pipeline")
+      } else {
+        showMessage("Saved")
+      }
+    } else {
+      showMessage(r.error ?? "Save failed")
+    }
+  }
+
+  async function handleAssignProducer(slug: string) {
+    setActing(true)
+    const r = await assignProducer(item.id, slug)
+    setActing(false)
+    if (r.ok) {
+      onRefresh()
+      showMessage(slug ? `Producer: ${slug}` : "Producer cleared")
+    } else {
+      showMessage(r.error ?? "Failed to assign producer", true)
+    }
   }
 
   async function handleClassify() {
@@ -173,10 +198,16 @@ function InboxRow({
 
   async function handleApprove() {
     setActing(true)
+    setMsg(null)
     const r = await approveInboxItem(item.id)
     setActing(false)
-    if (r.ok) { onRefresh(); showMessage("Pipeline complete") }
-    else showMessage(r.error ?? "Approve failed")
+    if (r.ok) {
+      onRefresh()
+      showMessage("Pipeline complete — job queued for render worker")
+    } else {
+      setExpanded(true)
+      showMessage(r.error ?? "Approve failed", true)
+    }
   }
 
   async function handleReset() {
@@ -211,6 +242,12 @@ function InboxRow({
   const displayTitle = item.overrideTitle || item.generatedTitle
   const hasJob = !!item.ytJobId
 
+  // Classify: only when new and no producer detected yet.
+  // Approve: whenever producer is set and item isn't in a terminal state.
+  const TERMINAL_STATUSES = new Set(["scheduled", "uploaded", "cancelled"])
+  const canClassify = item.status === "new_asset" && !item.producerSlug && !acting
+  const canApprove  = !!item.producerSlug && !TERMINAL_STATUSES.has(item.status) && !acting
+
   return (
     <div
       className={`border-b border-white/[0.05] transition-colors ${
@@ -243,13 +280,19 @@ function InboxRow({
           </div>
         </div>
 
-        {/* Producer */}
+        {/* Producer — inline select for quick assignment */}
         <div className="w-28 flex-none hidden sm:block">
-          {item.producerSlug ? (
-            <span className="text-xs text-white/55 font-mono">{item.producerSlug}</span>
-          ) : (
-            <span className="text-[10px] text-orange-400/50 italic">unclassified</span>
-          )}
+          <select
+            value={item.producerSlug ?? ""}
+            onChange={(e) => handleAssignProducer(e.target.value)}
+            disabled={acting}
+            className="w-full rounded border border-white/10 bg-[#0d1016] px-1.5 py-0.5 text-[10px] font-mono text-white/55 focus:border-white/25 focus:outline-none cursor-pointer hover:border-white/20 transition-colors disabled:opacity-40"
+          >
+            <option value="">— unclassified —</option>
+            {producers.map((p) => (
+              <option key={p.slug} value={p.slug}>{p.name}</option>
+            ))}
+          </select>
         </div>
 
         {/* Score badges */}
@@ -284,10 +327,10 @@ function InboxRow({
         {/* Actions */}
         <div className="flex items-center gap-1.5 flex-none">
           {msg && (
-            <span className="text-[9px] text-emerald-400/70 whitespace-nowrap">{msg}</span>
+            <span className={`text-[9px] whitespace-nowrap max-w-[200px] truncate ${msgIsError ? "text-red-400/80" : "text-emerald-400/70"}`} title={msg}>{msg}</span>
           )}
 
-          {item.status === "new_asset" && !acting && (
+          {canClassify && (
             <button
               onClick={handleClassify}
               className="text-[9px] border border-white/15 px-2 py-1 rounded-lg text-white/45 hover:text-white hover:border-white/30 transition-colors whitespace-nowrap"
@@ -296,12 +339,12 @@ function InboxRow({
             </button>
           )}
 
-          {item.status === "needs_review" && !acting && (
+          {canApprove && (
             <button
               onClick={handleApprove}
               className="text-[9px] border border-orange-500/30 px-2 py-1 rounded-lg text-orange-400/70 hover:text-orange-400 hover:border-orange-500/50 transition-colors whitespace-nowrap"
             >
-              Approve
+              {item.status === "failed" ? "Retry" : "Approve"}
             </button>
           )}
 

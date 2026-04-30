@@ -228,6 +228,38 @@ export async function classifyAsset(inboxId: string): Promise<{ ok: boolean; slu
   }
 }
 
+// ─── Assign producer (quick single-field write) ───────────────────────────────
+
+export async function assignProducer(
+  inboxId: string,
+  producerSlug: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin()
+
+  const item = await getInboxItemById(inboxId)
+  if (!item) return { ok: false, error: "Inbox item not found" }
+
+  const slug = producerSlug.trim() || null
+  const updates: Record<string, unknown> = {
+    producer_slug: slug,
+    updated_at:    new Date().toISOString(),
+  }
+
+  // Advance past new_asset so the Approve button becomes available immediately.
+  if (slug && item.status === "new_asset") updates.status = "needs_review"
+
+  const { error } = await supabase.from("audio_inbox").update(updates).eq("id", inboxId)
+  if (error) return { ok: false, error: error.message }
+
+  await appendLog(
+    inboxId,
+    "assign_producer",
+    slug ? `Manual assignment: ${slug}` : "Producer cleared",
+  )
+  revalidateInbox()
+  return { ok: true }
+}
+
 // ─── Match variation ──────────────────────────────────────────────────────────
 
 export async function matchVariation(inboxId: string): Promise<{ ok: boolean; variationId?: string; error?: string }> {
