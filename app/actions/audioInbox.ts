@@ -5,8 +5,8 @@ import { requireAdmin } from "@/lib/auth"
 import { supabase } from "@/lib/db/supabase"
 import { getInboxItemById } from "@/lib/db/audioInbox"
 import { getDNABySlug } from "@/lib/db/dna"
-import { renderJobToMp4 } from "@/lib/youtube/renderer"
 import { autoScheduleAllActiveChannels } from "@/lib/youtube/scheduler"
+import { enhanceMetadataWithOpenAI } from "@/lib/youtube/openaiEnhancer"
 import type { InboxActionLogEntry, InboxStatus, TitleVariant } from "@/lib/db/audioInbox"
 import type { ProducerVariation } from "@/lib/db/dnaPacks"
 
@@ -206,14 +206,20 @@ export async function classifyAsset(inboxId: string): Promise<{ ok: boolean; slu
   const filename = item.assetFilename ?? ""
   const slug = classifyFilename(filename)
 
-  if (slug) {
+  // Preserve a manually-assigned producer — auto-classification must not overwrite it.
+  const effectiveSlug = item.producerSlug ?? slug
+
+  if (effectiveSlug) {
     await supabase
       .from("audio_inbox")
-      .update({ producer_slug: slug, status: "needs_review", updated_at: new Date().toISOString() })
+      .update({ producer_slug: effectiveSlug, status: "needs_review", updated_at: new Date().toISOString() })
       .eq("id", inboxId)
-    await appendLog(inboxId, "classify_done", `Matched producer: ${slug} (confidence: high)`)
+    const source = item.producerSlug
+      ? `Kept manual producer: ${effectiveSlug}`
+      : `Matched producer: ${effectiveSlug} (confidence: high)`
+    await appendLog(inboxId, "classify_done", source)
     revalidateInbox()
-    return { ok: true, slug }
+    return { ok: true, slug: effectiveSlug }
   } else {
     await setStatus(inboxId, "needs_review")
     await appendLog(inboxId, "classify_done", "No producer match in filename — manual review required")
@@ -300,13 +306,13 @@ export async function generateMetadata(inboxId: string): Promise<{ ok: boolean; 
     tag_bank: [],
   } as unknown as ProducerVariation)
 
-  const generatedDescription = buildDescription(
+  const localDescription = buildDescription(
     producerName,
     fallbackVariation,
     dna?.identity_summary ?? null,
     genreCore,
   )
-  const generatedTags = [
+  const localTags = [
     ...(variation?.tag_bank ?? []),
     ...(dna?.metadata_keywords ?? []),
     `${item.producerSlug} type beat`,
@@ -315,6 +321,22 @@ export async function generateMetadata(inboxId: string): Promise<{ ok: boolean; 
   ].filter(Boolean).slice(0, 30)
 
   const ctaCopy = buildCtaCopy(producerName)
+
+  // Optional OpenAI enhancement — falls back silently to local templates on any failure.
+  const enhanced = await enhanceMetadataWithOpenAI({
+    producerName,
+    trackName,
+    genre,
+    genreCore,
+    soundDirection:  fallbackVariation.sound_direction ?? null,
+    identitySummary: dna?.identity_summary ?? null,
+  })
+
+  const generatedDescription = enhanced?.description ?? localDescription
+  const generatedTags = enhanced
+    ? [...new Set([...enhanced.tags, ...localTags])].slice(0, 30)
+    : localTags
+  const metaSource = enhanced ? "openai" : "template"
 
   const dbUpdate: Record<string, unknown> = {
     generated_description: generatedDescription,
@@ -326,7 +348,9 @@ export async function generateMetadata(inboxId: string): Promise<{ ok: boolean; 
 
   // Respect locked_title: skip title variant generation if locked
   if (!item.lockedTitle) {
-    const titleVariants = buildTitleVariants(variation?.yt_title_formula ?? null, producerName, trackName, genre)
+    const titleVariants: TitleVariant[] = enhanced?.titles.length
+      ? enhanced.titles.map(text => ({ text, ctrScore: scoreTitleCtr(text) }))
+      : buildTitleVariants(variation?.yt_title_formula ?? null, producerName, trackName, genre)
     const bestIdx = titleVariants.reduce(
       (best, v, i) => v.ctrScore > titleVariants[best].ctrScore ? i : best,
       0,
@@ -341,7 +365,7 @@ export async function generateMetadata(inboxId: string): Promise<{ ok: boolean; 
   const activeTitle = item.lockedTitle
     ? (item.overrideTitle ?? item.generatedTitle ?? "—")
     : (dbUpdate.generated_title as string)
-  await appendLog(inboxId, "generate_metadata", `Title: "${activeTitle}" | Tags: ${generatedTags.length}${item.lockedTitle ? " (title locked)" : ""}`)
+  await appendLog(inboxId, "generate_metadata", `[${metaSource}] Title: "${activeTitle}" | Tags: ${generatedTags.length}${item.lockedTitle ? " (title locked)" : ""}`)
   revalidateInbox()
   return { ok: true }
 }
@@ -669,6 +693,15 @@ export async function updateInboxMetadata(formData: FormData): Promise<{ ok: boo
   updates.pinned_comment       = pinnedComment
   updates.cta_copy             = ctaCopy
 
+  // Advance to needs_review when a producer is assigned so the Approve button
+  // becomes visible immediately — without requiring a separate Classify step.
+  if (producerSlug) {
+    const current = await getInboxItemById(id)
+    if (current?.status === "new_asset") {
+      updates.status = "needs_review"
+    }
+  }
+
   const { error } = await supabase.from("audio_inbox").update(updates).eq("id", id)
   if (error) return { ok: false, error: error.message }
 
@@ -818,6 +851,8 @@ export async function bulkCreateJobs(inboxIds: string[]): Promise<{ processed: n
 }
 
 // ─── Bulk: render ─────────────────────────────────────────────────────────────
+// Queues yt_upload_jobs for the external render worker — does NOT invoke ffmpeg
+// in-process. The worker polls for status='needs_render' and claims each job.
 
 export async function bulkRender(inboxIds: string[]): Promise<{ processed: number; errors: string[] }> {
   await requireAdmin()
@@ -828,24 +863,24 @@ export async function bulkRender(inboxIds: string[]): Promise<{ processed: numbe
   for (const id of inboxIds) {
     const item = await getInboxItemById(id)
     if (!item) { errors.push(`${id}: not found`); continue }
-    if (!item.ytJobId) { errors.push(`${id}: no YT job`); continue }
+    if (!item.ytJobId) { errors.push(`${id}: no YT job — run Approve first`); continue }
 
-    try {
-      const title = item.overrideTitle || item.generatedTitle || "Untitled Beat"
-      await renderJobToMp4({
-        jobId:    item.ytJobId,
-        title,
-        producer: item.producerSlug ?? "unknown",
-      })
-      await setStatus(id, "ready_to_schedule")
-      await appendLog(id, "render_done", `Rendered job ${item.ytJobId}`)
-      processed++
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      await setStatus(id, "failed", msg)
-      await appendLog(id, "render_failed", msg)
-      errors.push(`${id}: ${msg}`)
+    // Reset the yt_upload_job to needs_render so the worker picks it up.
+    // Only touch jobs that are in a restartable state (failed or already needs_render).
+    const { error } = await supabase
+      .from("yt_upload_jobs")
+      .update({ status: "needs_render", error_message: null, updated_at: new Date().toISOString() })
+      .eq("id", item.ytJobId)
+      .in("status", ["failed", "needs_render"])
+
+    if (error) {
+      errors.push(`${id}: ${error.message}`)
+      continue
     }
+
+    await setStatus(id, "needs_render")
+    await appendLog(id, "queued_render", `Job ${item.ytJobId} queued for render worker`)
+    processed++
   }
 
   revalidateInbox()
@@ -856,7 +891,10 @@ export async function bulkRender(inboxIds: string[]): Promise<{ processed: numbe
 
 // ─── Signal intelligence: score audio asset ───────────────────────────────────
 
-export async function scoreAudioAsset(inboxId: string): Promise<{ ok: boolean; error?: string }> {
+export async function scoreAudioAsset(
+  inboxId: string,
+  options: { revalidate?: boolean } = {},
+): Promise<{ ok: boolean; error?: string }> {
   await requireAdmin()
 
   const item = await getInboxItemById(inboxId)
@@ -971,7 +1009,10 @@ export async function scoreAudioAsset(inboxId: string): Promise<{ ok: boolean; e
       "signal_analysis",
       `Q:${quality} C:${commercial} CTR:${ctr} | ${durFmt} | ${bpm ? `${Math.round(bpm)}bpm` : "no bpm"} | ${key ?? "no key"}`
     )
-    revalidateInbox()
+    // Skip revalidation when called fire-and-forget from a server action — the
+    // calling action already revalidates, and running revalidatePath outside a
+    // live request context throws in production.
+    if (options.revalidate !== false) revalidateInbox()
     return { ok: true }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)

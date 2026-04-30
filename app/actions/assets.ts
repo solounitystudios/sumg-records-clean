@@ -198,7 +198,10 @@ export async function uploadAssetFile(formData: FormData): Promise<AssetUploadRe
     const entry = await createInboxEntry(assetId)
     if (entry) {
       import("@/app/actions/audioInbox").then(({ scoreAudioAsset }) => {
-        scoreAudioAsset(entry.id).catch(console.error)
+        // revalidate: false — this action already calls revalidatePath below,
+        // and fire-and-forget tasks must not call revalidatePath outside the
+        // live request context (throws in production).
+        scoreAudioAsset(entry.id, { revalidate: false }).catch(console.error)
       })
     }
     revalidatePath("/admin/youtube/inbox")
@@ -289,7 +292,7 @@ export async function bulkSendToInbox(
     if (entry) {
       queued++
       import("@/app/actions/audioInbox").then(({ scoreAudioAsset }) => {
-        scoreAudioAsset(entry.id).catch(console.error)
+        scoreAudioAsset(entry.id, { revalidate: false }).catch(console.error)
       })
     } else {
       errors.push(`Failed to queue asset ${assetId}`)
