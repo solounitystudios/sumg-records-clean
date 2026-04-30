@@ -237,27 +237,92 @@ export async function matchVariation(inboxId: string): Promise<{ ok: boolean; va
   if (!item) return { ok: false, error: "Inbox item not found" }
   if (!item.producerSlug) return { ok: false, error: "No producer assigned" }
 
-  // Use existing variation or pick first for this producer
-  const { data: variations } = await supabase
-    .from("producer_variations")
-    .select("id, variation_name, sort_order")
-    .eq("producer_slug", item.producerSlug)
-    .order("sort_order", { ascending: true })
-    .limit(1)
-
-  const variation = variations?.[0] as { id: string; variation_name: string } | undefined
-  if (!variation) {
-    await appendLog(inboxId, "match_variation", `No variations found for ${item.producerSlug}`)
-    return { ok: false, error: `No variations for producer ${item.producerSlug}` }
+  interface VRow {
+    id:               string
+    variation_name:   string
+    sound_direction:  string | null
+    tag_bank:         string[]
+    is_default:       boolean
+    routing_priority: number
   }
 
-  await supabase
-    .from("audio_inbox")
-    .update({ variation_id: variation.id, updated_at: new Date().toISOString() })
-    .eq("id", inboxId)
-  await appendLog(inboxId, "match_variation", `Matched variation: ${variation.variation_name} (id: ${variation.id})`)
+  const { data: rows } = await supabase
+    .from("producer_variations")
+    .select("id, variation_name, sound_direction, tag_bank, is_default, routing_priority")
+    .eq("producer_slug", item.producerSlug)
+    .order("sort_order", { ascending: true })
+
+  const variations = (rows ?? []) as VRow[]
+
+  const assignVariation = async (v: VRow) => {
+    await supabase
+      .from("audio_inbox")
+      .update({ variation_id: v.id, updated_at: new Date().toISOString() })
+      .eq("id", inboxId)
+  }
+
+  // ── Level 1: best signal match by genre + BPM style keywords ─────────────
+  const dna   = await getDNABySlug("producer", item.producerSlug)
+  const genre = (dna?.genre_core ?? [])[0]?.toLowerCase() ?? ""
+  const bpm   = item.bpm ?? null
+
+  const bpmKeywords: string[] = []
+  if (bpm !== null) {
+    if      (bpm >= 130 && bpm <= 145) bpmKeywords.push("trap")
+    else if (bpm >  145 && bpm <= 175) bpmKeywords.push("drill")
+    else if (bpm >=  85 && bpm <  130) bpmKeywords.push("boom bap")
+    else if (bpm >=  60 && bpm <   85) bpmKeywords.push("lo-fi", "lofi")
+  }
+
+  let best: VRow | null = null
+  let bestScore = 0
+
+  for (const v of variations) {
+    const haystack = [v.sound_direction ?? "", ...v.tag_bank].join(" ").toLowerCase()
+    let score = 0
+    if (genre && haystack.includes(genre)) score += 20
+    for (const kw of bpmKeywords) {
+      if (haystack.includes(kw)) { score += 10; break }
+    }
+    if (score > bestScore) { bestScore = score; best = v }
+  }
+
+  if (best && bestScore > 0) {
+    await assignVariation(best)
+    await appendLog(inboxId, "match_variation",
+      `exact_match: "${best.variation_name}" (score:${bestScore} genre:${genre || "?"} bpm:${bpm ?? "?"})`)
+    revalidateInbox()
+    return { ok: true, variationId: best.id }
+  }
+
+  // ── Level 2: explicit default variation for this producer ─────────────────
+  const defaultVar = variations.find(v => v.is_default)
+  if (defaultVar) {
+    await assignVariation(defaultVar)
+    await appendLog(inboxId, "match_variation",
+      `default_variation: "${defaultVar.variation_name}"`)
+    revalidateInbox()
+    return { ok: true, variationId: defaultVar.id }
+  }
+
+  // ── Level 3: highest routing_priority among all variations ────────────────
+  const priorityVar = variations.reduce<VRow | null>(
+    (top, v) => !top || v.routing_priority > top.routing_priority ? v : top,
+    null,
+  )
+  if (priorityVar) {
+    await assignVariation(priorityVar)
+    await appendLog(inboxId, "match_variation",
+      `priority_fallback: "${priorityVar.variation_name}" (priority:${priorityVar.routing_priority})`)
+    revalidateInbox()
+    return { ok: true, variationId: priorityVar.id }
+  }
+
+  // ── Level 4: no variations exist — pipeline continues with safe defaults ──
+  await appendLog(inboxId, "match_variation",
+    `generic_fallback: no variations found for ${item.producerSlug}`)
   revalidateInbox()
-  return { ok: true, variationId: variation.id }
+  return { ok: true }
 }
 
 // ─── Generate metadata ────────────────────────────────────────────────────────
@@ -401,21 +466,29 @@ export async function generateThumbnailPrompt(inboxId: string): Promise<{ ok: bo
     variation = (first as ProducerVariation[] | null)?.[0] ?? null
   }
 
-  if (!variation) {
-    await appendLog(inboxId, "generate_thumbnail", "No variation found — skipped")
-    await setStatus(inboxId, "needs_render")
-    revalidateInbox()
-    return { ok: true }
-  }
-
   const genreCore = dna?.genre_core ?? ["Hip Hop"]
   const genre = genreCore[0] ?? "Hip Hop"
   const producerName = item.producerSlug!
     .replace(/(^\w|-\w)/g, (m) => m.replace("-", " ").toUpperCase())
     .replace(/_/g, " ")
 
-  const thumbnailVariants = buildThumbnailVariants(variation, dna?.visual_dna ?? null, genre)
-  const primaryPrompt = thumbnailVariants[0]
+  let thumbnailVariants: string[]
+  let primaryPrompt: string
+
+  if (!variation) {
+    // generic_fallback: no producer_variations rows exist — build safe generic prompts
+    primaryPrompt = `${producerName} type beat music producer thumbnail, professional studio aesthetic, dark high-contrast color grading. No text, no faces.`
+    thumbnailVariants = [
+      primaryPrompt,
+      `Dynamic ${genre} music producer aesthetic, cinematic wide composition, dark high-contrast lighting. Professional music thumbnail, no text, no faces.`,
+      `Minimal abstract ${genre} music art, dark palette, geometric forms, premium dark background. No text, no faces.`,
+    ]
+    await appendLog(inboxId, "generate_thumbnail",
+      `generic_fallback: no variation for ${item.producerSlug} — using generic prompt (${primaryPrompt.length} chars)`)
+  } else {
+    thumbnailVariants = buildThumbnailVariants(variation, dna?.visual_dna ?? null, genre)
+    primaryPrompt = thumbnailVariants[0]
+  }
 
   const effectiveTitle =
     item.titleVariants[item.selectedTitleIndex]?.text ??
