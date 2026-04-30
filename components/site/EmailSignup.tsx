@@ -1,31 +1,23 @@
 "use client";
 
-/**
- * components/site/EmailSignup.tsx
- *
- * "Stay in the loop" email capture CTA.
- * Self-contained client component — renders a minimal dark-aesthetic email
- * input and shows an inline success state when submitted.
- *
- * No external service is wired here; swap the TODO comment for a real API
- * call (Mailchimp, Klaviyo, a Next.js route handler, etc.) when ready.
- */
-
 import { useState } from "react";
+import { subscribeEmail } from "@/app/actions/subscribe";
 
 export function EmailSignup() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "done">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!email.trim()) return;
     setStatus("loading");
-
-    // TODO: replace with a real POST to /api/newsletter or your ESP SDK.
-    await new Promise((resolve) => setTimeout(resolve, 600));
-
-    setStatus("done");
+    const fd = new FormData(e.currentTarget);
+    const result = await subscribeEmail(fd);
+    if (result.success) {
+      setStatus("done");
+    } else {
+      setErrorMsg(result.error ?? "Something went wrong.");
+      setStatus("error");
+    }
   }
 
   return (
@@ -51,9 +43,13 @@ export function EmailSignup() {
           ) : (
             <form onSubmit={handleSubmit} className="flex gap-0">
               <input
+                type="hidden"
+                name="source"
+                value="site"
+              />
+              <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                name="email"
                 placeholder="your@email.com"
                 required
                 className="flex-1 bg-white/[0.04] border border-white/10 border-r-0 px-4 py-3 text-sm text-white/80 placeholder-white/20 outline-none focus:border-white/25 transition-colors"
@@ -66,6 +62,10 @@ export function EmailSignup() {
                 {status === "loading" ? "…" : "Subscribe"}
               </button>
             </form>
+          )}
+
+          {status === "error" && (
+            <p className="mt-3 text-xs text-red-400/80">{errorMsg}</p>
           )}
         </div>
       </div>
