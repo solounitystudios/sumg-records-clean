@@ -13,8 +13,10 @@ export interface ProducerVariation {
   best_artist_pairings: string[]
   sound_direction: string | null
   forbidden_elements: string[]
-  sort_order: number
-  created_at: string
+  sort_order:       number
+  is_default:       boolean
+  routing_priority: number
+  created_at:       string
 }
 
 export interface DNAPack {
