@@ -3,6 +3,8 @@
 import { useState, useMemo, useTransition, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import type { AssetRow } from "@/lib/db/assets"
+import { PlayButton } from "@/components/admin/player/PlayButton"
+import type { AudioTrack } from "@/lib/player/context"
 import {
   deleteAssetFile,
   bulkDeleteAssets,
@@ -141,6 +143,7 @@ function AssetCard({
   asset,
   selected,
   producers,
+  audioQueue,
   onToggle,
   onDelete,
   onSendToInbox,
@@ -149,6 +152,7 @@ function AssetCard({
   asset: AssetRow
   selected: boolean
   producers: Producer[]
+  audioQueue: AudioTrack[]
   onToggle: () => void
   onDelete: () => void
   onSendToInbox: () => void
@@ -193,7 +197,7 @@ function AssetCard({
       )}
 
       {/* Preview */}
-      <div className="aspect-square bg-white/[0.03] flex items-center justify-center overflow-hidden">
+      <div className="aspect-square bg-white/[0.03] flex items-center justify-center overflow-hidden relative">
         {isImage ? (
           <img
             src={asset.url}
@@ -203,6 +207,21 @@ function AssetCard({
           />
         ) : (
           <span className="text-3xl text-white/15">{TYPE_ICON[asset.type] ?? "▤"}</span>
+        )}
+        {isAudio && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <PlayButton
+              size="md"
+              track={{
+                id:       asset.id,
+                url:      asset.url,
+                title:    asset.filename,
+                producer: asset.producer_slug,
+                source:   "asset",
+              }}
+              queue={audioQueue}
+            />
+          </div>
         )}
       </div>
 
@@ -302,6 +321,7 @@ function AssetTableRow({
   asset,
   selected,
   producers,
+  audioQueue,
   onToggle,
   onDelete,
   onSendToInbox,
@@ -310,6 +330,7 @@ function AssetTableRow({
   asset: AssetRow
   selected: boolean
   producers: Producer[]
+  audioQueue: AudioTrack[]
   onToggle: () => void
   onDelete: () => void
   onSendToInbox: () => void
@@ -370,6 +391,18 @@ function AssetTableRow({
       </td>
       <td className="py-2.5 pr-4 w-40">
         <div className="flex items-center gap-2">
+          {isAudio && (
+            <PlayButton
+              track={{
+                id:       asset.id,
+                url:      asset.url,
+                title:    asset.filename,
+                producer: asset.producer_slug,
+                source:   "asset",
+              }}
+              queue={audioQueue}
+            />
+          )}
           <button onClick={copyUrl} className="text-[9px] text-white/25 hover:text-white/60 transition-colors whitespace-nowrap">
             {copied ? "Copied!" : "Copy"}
           </button>
@@ -575,6 +608,19 @@ export function AssetsClient({ assets, producers }: Props) {
 
   const allSelected = filtered.length > 0 && selected.size === filtered.length
 
+  const audioQueue = useMemo<AudioTrack[]>(() =>
+    filtered
+      .filter((a) => a.type === "audio")
+      .map((a) => ({
+        id:       a.id,
+        url:      a.url,
+        title:    a.filename,
+        producer: a.producer_slug,
+        source:   "asset" as const,
+      })),
+    [filtered],
+  )
+
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -771,6 +817,7 @@ export function AssetsClient({ assets, producers }: Props) {
               asset={asset}
               selected={selected.has(asset.id)}
               producers={producers}
+              audioQueue={audioQueue}
               onToggle={() => toggle(asset.id)}
               onDelete={() => handleSingleDelete(asset.id)}
               onSendToInbox={() => handleSingleInbox(asset.id)}
@@ -803,6 +850,7 @@ export function AssetsClient({ assets, producers }: Props) {
                   asset={asset}
                   selected={selected.has(asset.id)}
                   producers={producers}
+                  audioQueue={audioQueue}
                   onToggle={() => toggle(asset.id)}
                   onDelete={() => handleSingleDelete(asset.id)}
                   onSendToInbox={() => handleSingleInbox(asset.id)}
@@ -816,7 +864,7 @@ export function AssetsClient({ assets, producers }: Props) {
 
       {/* ── Bulk action bar ───────────────────────────────────────────────────── */}
       {selected.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-3rem)] max-w-3xl rounded-2xl border border-white/[0.12] bg-[#0d1016]/95 backdrop-blur shadow-2xl shadow-black/60 overflow-hidden">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-[calc(100vw-3rem)] max-w-3xl rounded-2xl border border-white/[0.12] bg-[#0d1016]/95 backdrop-blur shadow-2xl shadow-black/60 overflow-hidden">
 
           {/* Inline sub-panels */}
           {bulkAction === "tag" && (

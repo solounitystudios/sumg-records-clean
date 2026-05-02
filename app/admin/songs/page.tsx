@@ -5,6 +5,7 @@ import Link from "next/link"
 import { getAllSongs } from "@/lib/db/songs"
 import { getArtists } from "@/lib/db/artists"
 import { createSong, archiveSong, restoreSong, deleteSong } from "@/app/actions/songs"
+import { PlayButton } from "@/components/admin/player/PlayButton"
 
 const STATUS_CLS: Record<string, string> = {
   published: "bg-emerald-500/15 text-emerald-400",
@@ -100,6 +101,17 @@ export default async function SongsAdminPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
+                        {song.audioUrl && (
+                          <PlayButton
+                            track={{
+                              id:       song.id,
+                              url:      song.audioUrl,
+                              title:    song.title,
+                              producer: song.artistName,
+                              source:   "song",
+                            }}
+                          />
+                        )}
                         <Link
                           href={`/admin/songs/${song.id}/edit`}
                           className="text-xs text-white/30 hover:text-white transition px-3 py-1.5 rounded-lg border border-white/10 hover:border-white/20"

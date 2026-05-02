@@ -6,6 +6,7 @@ import { getProducerAssets } from "@/lib/db/producerAssets"
 import { getAssets, formatBytes } from "@/lib/db/assets"
 import { assignAsset, updateAssetStatus, unassignAsset } from "@/app/actions/producers"
 import type { ProducerAssetStatus } from "@/lib/db/producerAssets"
+import { PlayButton } from "@/components/admin/player/PlayButton"
 
 interface Props { params: Promise<{ slug: string }> }
 
@@ -37,8 +38,9 @@ export default async function ProducerAssetsPage({ params }: Props) {
   ])
   if (!producer) notFound()
 
-  const assignedIds = new Set(assigned.map((a) => a.assetId))
+  const assignedIds  = new Set(assigned.map((a) => a.assetId))
   const availableAudio = allAudio.filter((a) => !assignedIds.has(a.id))
+  const audioUrlMap  = new Map(allAudio.map((a) => [a.id, a.url]))
 
   return (
     <div className="px-6 py-8 max-w-4xl">
@@ -97,11 +99,33 @@ export default async function ProducerAssetsPage({ params }: Props) {
               className={`grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-5 py-3.5 ${i < assigned.length - 1 ? "border-b border-white/[0.04]" : ""}`}
             >
               {/* Filename */}
-              <div className="min-w-0">
-                <p className="text-sm text-white/70 truncate">{item.assetFilename ?? item.assetId}</p>
-                {item.notes && (
-                  <p className="text-[10px] text-white/25 mt-0.5 truncate">{item.notes}</p>
+              <div className="min-w-0 flex items-center gap-2">
+                {audioUrlMap.get(item.assetId) && (
+                  <PlayButton
+                    track={{
+                      id:       item.assetId,
+                      url:      audioUrlMap.get(item.assetId)!,
+                      title:    item.assetFilename ?? item.assetId,
+                      producer: slug,
+                      source:   "producer-bin",
+                    }}
+                    queue={assigned
+                      .filter((a) => !!audioUrlMap.get(a.assetId))
+                      .map((a) => ({
+                        id:       a.assetId,
+                        url:      audioUrlMap.get(a.assetId)!,
+                        title:    a.assetFilename ?? a.assetId,
+                        producer: slug,
+                        source:   "producer-bin" as const,
+                      }))}
+                  />
                 )}
+                <div className="min-w-0">
+                  <p className="text-sm text-white/70 truncate">{item.assetFilename ?? item.assetId}</p>
+                  {item.notes && (
+                    <p className="text-[10px] text-white/25 mt-0.5 truncate">{item.notes}</p>
+                  )}
+                </div>
               </div>
 
               {/* Status selector */}

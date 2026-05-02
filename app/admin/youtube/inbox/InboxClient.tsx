@@ -1,8 +1,10 @@
 "use client"
 
-import { useState, useTransition, useCallback } from "react"
+import { useState, useTransition, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import type { AudioInboxRow, InboxStatus } from "@/lib/db/audioInbox"
+import { PlayButton } from "@/components/admin/player/PlayButton"
+import type { AudioTrack } from "@/lib/player/context"
 import {
   bulkAutoProcess,
   bulkApprove,
@@ -128,12 +130,14 @@ function InboxRow({
   onToggle,
   producers,
   onRefresh,
+  audioQueue,
 }: {
   item: AudioInboxRow
   selected: boolean
   onToggle: (id: string) => void
   producers: Producer[]
   onRefresh: () => void
+  audioQueue: AudioTrack[]
 }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -263,6 +267,20 @@ function InboxRow({
           onChange={() => onToggle(item.id)}
           className="w-4 h-4 rounded border-white/20 bg-transparent accent-white flex-none cursor-pointer"
         />
+
+        {/* Play button */}
+        {item.assetUrl && (
+          <PlayButton
+            track={{
+              id: item.assetId,
+              url: item.assetUrl,
+              title: item.overrideTitle || item.generatedTitle || item.assetFilename || item.assetId,
+              producer: item.producerSlug,
+              source: "inbox",
+            }}
+            queue={audioQueue}
+          />
+        )}
 
         {/* File info */}
         <div className="min-w-0 flex-1">
@@ -711,6 +729,19 @@ export function InboxClient({ items, producers, counts, activeFilter }: Props) {
     ? items
     : items.filter((i) => i.status === activeFilter)
 
+  const audioQueue = useMemo<AudioTrack[]>(() =>
+    filteredItems
+      .filter((i) => !!i.assetUrl)
+      .map((i) => ({
+        id:       i.assetId,
+        url:      i.assetUrl!,
+        title:    i.overrideTitle || i.generatedTitle || i.assetFilename || i.assetId,
+        producer: i.producerSlug,
+        source:   "inbox" as const,
+      })),
+    [filteredItems],
+  )
+
   function toggleAll() {
     if (selected.size === filteredItems.length && filteredItems.length > 0) {
       setSelected(new Set())
@@ -811,6 +842,7 @@ export function InboxClient({ items, producers, counts, activeFilter }: Props) {
               onToggle={toggle}
               producers={producers}
               onRefresh={refresh}
+              audioQueue={audioQueue}
             />
           ))
         )}
@@ -818,7 +850,7 @@ export function InboxClient({ items, producers, counts, activeFilter }: Props) {
 
       {/* Floating bulk action bar */}
       {selected.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-2xl border border-white/[0.12] bg-[#0d1016]/95 backdrop-blur px-4 py-3 shadow-2xl shadow-black/60">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-2xl border border-white/[0.12] bg-[#0d1016]/95 backdrop-blur px-4 py-3 shadow-2xl shadow-black/60">
           <span className="text-[10px] text-white/40 font-mono tabular-nums mr-1">
             {selected.size} selected
           </span>
