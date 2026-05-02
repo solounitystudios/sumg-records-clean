@@ -1,0 +1,340 @@
+"use client"
+
+import { useState, useTransition } from "react"
+import { ThumbnailQueue }        from "@/components/admin/youtube/thumbnails/ThumbnailQueue"
+import { ThumbnailCanvas }       from "@/components/admin/youtube/thumbnails/ThumbnailCanvas"
+import { ThumbnailPromptPanel }  from "@/components/admin/youtube/thumbnails/ThumbnailPromptPanel"
+import { ThumbnailVersionGrid }  from "@/components/admin/youtube/thumbnails/ThumbnailVersionGrid"
+import { ThumbnailPresetPicker } from "@/components/admin/youtube/thumbnails/ThumbnailPresetPicker"
+import {
+  getOrCreateProject,
+  getProjectVersions,
+  getPresetsFromDb,
+  getPromptsFromLibrary,
+  saveProjectDraft,
+  approveProject,
+  skipThumbnail,
+} from "@/lib/youtube/thumbnails/actions"
+import { getPresetsForProducer } from "@/lib/youtube/thumbnails/presets"
+import type {
+  UploadJobForStudio,
+  ThumbnailProject,
+  ThumbnailVersion,
+  ThumbnailPreset,
+  ThumbnailPromptRow,
+  CanvasConfig,
+} from "@/lib/youtube/thumbnails/types"
+
+const DEFAULT_CANVAS: CanvasConfig = {
+  titleText:     "",
+  titlePosition: "bottom-left",
+  logoPosition:  "bottom-right",
+  overlay:       "soft-black-gradient",
+  fontSize:      52,
+  textColor:     "#ffffff",
+  strokeColor:   "#000000",
+  shadowEnabled: true,
+}
+
+interface Props {
+  initialJobs: UploadJobForStudio[]
+}
+
+export function ThumbnailStudioClient({ initialJobs }: Props) {
+  const [jobs, setJobs] = useState(initialJobs)
+  const [selectedJob, setSelectedJob]             = useState<UploadJobForStudio | null>(null)
+  const [project, setProject]                     = useState<ThumbnailProject | null>(null)
+  const [versions, setVersions]                   = useState<ThumbnailVersion[]>([])
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null)
+  const [canvasConfig, setCanvasConfig]           = useState<CanvasConfig>(DEFAULT_CANVAS)
+  const [presets, setPresets]                     = useState<ThumbnailPreset[]>([])
+  const [savedPrompts, setSavedPrompts]           = useState<ThumbnailPromptRow[]>([])
+  const [selectedPreset, setSelectedPreset]       = useState<ThumbnailPreset | null>(null)
+  const [builtPrompt, setBuiltPrompt]             = useState("")
+  const [loadingProject, setLoadingProject]       = useState(false)
+  const [isPending, startTransition]              = useTransition()
+  const [statusMsg, setStatusMsg]                 = useState<string | null>(null)
+  const [error, setError]                         = useState<string | null>(null)
+
+  const selectedVersion = versions.find((v) => v.id === selectedVersionId) ?? null
+
+  async function handleSelectJob(job: UploadJobForStudio) {
+    setSelectedJob(job)
+    setProject(null)
+    setVersions([])
+    setSelectedVersionId(null)
+    setSelectedPreset(null)
+    setStatusMsg(null)
+    setError(null)
+    setLoadingProject(true)
+
+    try {
+      const [projectResult, dbPresets, libPrompts] = await Promise.all([
+        getOrCreateProject(job.id),
+        getPresetsFromDb(job.producer_slug ?? ""),
+        getPromptsFromLibrary(job.producer_slug ?? ""),
+      ])
+
+      if ("error" in projectResult) {
+        setError(projectResult.error)
+        return
+      }
+
+      const proj = projectResult
+      setProject(proj)
+
+      const localPresets = getPresetsForProducer(job.producer_slug ?? "")
+      const merged = dbPresets.length > 0 ? dbPresets : localPresets
+      setPresets(merged)
+      setSavedPrompts(libPrompts)
+
+      // Pre-apply canvas_json if saved
+      if (proj.canvas_json && Object.keys(proj.canvas_json).length > 0) {
+        setCanvasConfig({ ...DEFAULT_CANVAS, ...(proj.canvas_json as CanvasConfig) })
+      } else {
+        setCanvasConfig({ ...DEFAULT_CANVAS, titleText: job.title ?? "" })
+      }
+
+      // Load presets
+      if (proj.preset_slug) {
+        const ps = merged.find((p) => p.preset_slug === proj.preset_slug)
+        if (ps) applyPreset(ps, false)
+      }
+
+      // Load versions
+      const vers = await getProjectVersions(proj.id)
+      setVersions(vers)
+      const sel = vers.find((v) => v.selected)
+      if (sel) setSelectedVersionId(sel.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unknown error")
+    } finally {
+      setLoadingProject(false)
+    }
+  }
+
+  function applyPreset(preset: ThumbnailPreset, updateState = true) {
+    const newConfig: CanvasConfig = {
+      ...DEFAULT_CANVAS,
+      ...preset.canvas_defaults,
+      titleText: selectedJob?.title ?? "",
+    }
+    setCanvasConfig(newConfig)
+    if (updateState) setSelectedPreset(preset)
+  }
+
+  function handlePresetSelect(preset: ThumbnailPreset) {
+    setSelectedPreset(preset)
+    applyPreset(preset)
+  }
+
+  function handleSaveDraft() {
+    if (!project) return
+    startTransition(async () => {
+      const result = await saveProjectDraft(
+        project.id,
+        canvasConfig,
+        selectedPreset?.preset_slug,
+      )
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setStatusMsg("Draft saved")
+        setTimeout(() => setStatusMsg(null), 2500)
+      }
+    })
+  }
+
+  function handleApprove() {
+    if (!project || !selectedJob) return
+    if (!selectedVersion) {
+      setError("Select a version before approving")
+      return
+    }
+    startTransition(async () => {
+      const result = await approveProject(
+        project.id,
+        selectedVersion.id,
+        selectedVersion.image_url,
+        selectedJob.id,
+        selectedJob.producer_slug,
+        selectedJob.title,
+        "generated",
+      )
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setStatusMsg("✓ Approved — thumbnail will be used for render")
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === selectedJob.id
+              ? { ...j, thumbnail_status: "approved", thumbnail_mode: "generated" }
+              : j,
+          ),
+        )
+        setTimeout(() => setStatusMsg(null), 4000)
+      }
+    })
+  }
+
+  function handleSkip() {
+    if (!selectedJob) return
+    startTransition(async () => {
+      const result = await skipThumbnail(selectedJob.id)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setStatusMsg("Skipped — auto placeholder will be used")
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === selectedJob.id
+              ? { ...j, thumbnail_status: "skipped", thumbnail_mode: "auto" }
+              : j,
+          ),
+        )
+        setTimeout(() => setStatusMsg(null), 3000)
+      }
+    })
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-8rem)] gap-0 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#08090d]">
+
+      {/* ── Left panel: Queue ───────────────────────────────── */}
+      <div className="w-56 shrink-0 flex flex-col border-r border-white/[0.06]">
+        <div className="px-4 py-3 border-b border-white/[0.06] shrink-0">
+          <p className="text-[9px] uppercase tracking-[0.2em] text-white/30">
+            Jobs ({jobs.length})
+          </p>
+        </div>
+        <ThumbnailQueue
+          jobs={jobs}
+          selectedJobId={selectedJob?.id ?? null}
+          onSelect={handleSelectJob}
+        />
+      </div>
+
+      {/* ── Center panel: Canvas ────────────────────────────── */}
+      <div className="flex-1 min-w-0 flex flex-col border-r border-white/[0.06] overflow-y-auto">
+        {loadingProject ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-white/30 text-sm">Loading project…</p>
+          </div>
+        ) : !selectedJob ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-white/20 text-sm">Select a job from the queue</p>
+              <p className="text-white/10 text-xs mt-1">to open the thumbnail studio</p>
+            </div>
+          </div>
+        ) : (
+          <div className="p-5 space-y-4">
+            {/* Job header */}
+            <div>
+              <h2 className="text-sm font-semibold">{selectedJob.title ?? "Untitled"}</h2>
+              <p className="text-xs text-white/35 mt-0.5">
+                {selectedJob.producer_slug ?? "No producer"} · {selectedJob.status}
+              </p>
+            </div>
+
+            {/* Status / error */}
+            {error && (
+              <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-400">
+                {error}
+                <button onClick={() => setError(null)} className="ml-2 text-red-400/60 hover:text-red-400">×</button>
+              </div>
+            )}
+            {statusMsg && (
+              <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-xs text-emerald-400">
+                {statusMsg}
+              </div>
+            )}
+
+            {/* Canvas editor */}
+            {project && (
+              <ThumbnailCanvas
+                config={canvasConfig}
+                selectedImageUrl={selectedVersion?.image_url}
+                preset={selectedPreset}
+                onChange={setCanvasConfig}
+              />
+            )}
+
+            {/* Presets */}
+            {presets.length > 0 && (
+              <ThumbnailPresetPicker
+                presets={presets}
+                selectedSlug={selectedPreset?.preset_slug ?? null}
+                onSelect={handlePresetSelect}
+              />
+            )}
+
+            {/* Action buttons */}
+            {project && (
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={isPending}
+                  className="flex-1 py-2.5 rounded-xl border border-white/[0.1] text-xs text-white/60 hover:text-white hover:border-white/20 disabled:opacity-40 transition-colors"
+                >
+                  Save Draft
+                </button>
+                <button
+                  onClick={handleApprove}
+                  disabled={isPending || !selectedVersionId}
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 disabled:opacity-40 text-xs font-medium transition-colors"
+                >
+                  {isPending ? "Approving…" : "Approve →"}
+                </button>
+                <button
+                  onClick={handleSkip}
+                  disabled={isPending}
+                  className="px-4 py-2.5 rounded-xl border border-white/[0.06] text-xs text-white/25 hover:text-white/50 disabled:opacity-40 transition-colors"
+                  title="Use auto-generated placeholder instead"
+                >
+                  Skip
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Right panel: Prompts + Versions ─────────────────── */}
+      <div className="w-72 shrink-0 flex flex-col overflow-y-auto">
+        {selectedJob && project ? (
+          <div className="p-4 space-y-5">
+            {/* Prompt builder */}
+            <div>
+              <p className="text-[9px] uppercase tracking-[0.2em] text-white/30 mb-3">
+                Prompt Builder
+              </p>
+              <ThumbnailPromptPanel
+                producerSlug={selectedJob.producer_slug ?? "nightwire"}
+                jobTitle={selectedJob.title}
+                preset={selectedPreset}
+                savedPrompts={savedPrompts}
+                onPromptBuilt={setBuiltPrompt}
+              />
+            </div>
+
+            <div className="border-t border-white/[0.06]" />
+
+            {/* Version grid */}
+            <ThumbnailVersionGrid
+              projectId={project.id}
+              versions={versions}
+              selectedVersionId={selectedVersionId}
+              onVersionsChange={setVersions}
+              onVersionSelect={(v) => setSelectedVersionId(v.id)}
+            />
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center p-6">
+            <p className="text-white/15 text-xs text-center">Select a job to see prompts and versions</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
