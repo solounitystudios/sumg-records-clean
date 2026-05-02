@@ -129,4 +129,5 @@ export interface BuildPromptOptions {
   sceneType?: string
   cameraStyle?: string
   presetSlug?: string
+  rawIdea?: string
 }

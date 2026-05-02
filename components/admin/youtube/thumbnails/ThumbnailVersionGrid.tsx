@@ -2,7 +2,12 @@
 
 import { useState, useTransition } from "react"
 import type { ThumbnailVersion } from "@/lib/youtube/thumbnails/types"
-import { addVersionByUrl, selectVersion, rejectVersion } from "@/lib/youtube/thumbnails/actions"
+import {
+  addVersionByUrl,
+  selectVersion,
+  rejectVersion,
+  getImageAssetsForPicker,
+} from "@/lib/youtube/thumbnails/actions"
 
 interface Props {
   projectId: string
@@ -12,6 +17,8 @@ interface Props {
   onVersionSelect: (version: ThumbnailVersion) => void
 }
 
+type AddMode = "url" | "assets"
+
 export function ThumbnailVersionGrid({
   projectId,
   versions,
@@ -20,10 +27,13 @@ export function ThumbnailVersionGrid({
   onVersionSelect,
 }: Props) {
   const [isPending, startTransition] = useTransition()
-  const [addUrl, setAddUrl] = useState("")
+  const [addUrl, setAddUrl]     = useState("")
   const [addPrompt, setAddPrompt] = useState("")
-  const [adding, setAdding] = useState(false)
+  const [adding, setAdding]     = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
+  const [addMode, setAddMode]   = useState<AddMode>("url")
+  const [imageAssets, setImageAssets] = useState<Array<{ id: string; url: string; filename: string }>>([])
+  const [loadingAssets, setLoadingAssets] = useState(false)
 
   function handleSelect(v: ThumbnailVersion) {
     startTransition(async () => {
@@ -77,7 +87,44 @@ export function ThumbnailVersionGrid({
     setShowAddForm(false)
   }
 
-  const active = versions.filter((v) => !v.rejected)
+  async function handlePickAsset(asset: { id: string; url: string; filename: string }) {
+    setAdding(true)
+    const result = await addVersionByUrl(projectId, asset.url, `Asset: ${asset.filename}`)
+    setAdding(false)
+    if ("error" in result) {
+      alert(result.error)
+      return
+    }
+    const newVer: ThumbnailVersion = {
+      id:             result.id,
+      project_id:     projectId,
+      asset_id:       asset.id,
+      image_url:      asset.url,
+      prompt:         `Asset: ${asset.filename}`,
+      provider:       "assets",
+      style_bucket:   null,
+      version_number: versions.length + 1,
+      selected:       false,
+      rejected:       false,
+      ctr_score:      null,
+      notes:          null,
+      created_at:     new Date().toISOString(),
+    }
+    onVersionsChange([...versions, newVer])
+    setShowAddForm(false)
+  }
+
+  async function handleSwitchToAssets() {
+    setAddMode("assets")
+    if (imageAssets.length === 0) {
+      setLoadingAssets(true)
+      const assets = await getImageAssetsForPicker()
+      setImageAssets(assets)
+      setLoadingAssets(false)
+    }
+  }
+
+  const active   = versions.filter((v) => !v.rejected)
   const rejected = versions.filter((v) => v.rejected)
 
   return (
@@ -85,7 +132,7 @@ export function ThumbnailVersionGrid({
       <div className="flex items-center justify-between mb-2">
         <p className="text-[9px] uppercase tracking-[0.18em] text-white/30">Versions</p>
         <button
-          onClick={() => setShowAddForm((p) => !p)}
+          onClick={() => { setShowAddForm((p) => !p); setAddMode("url") }}
           className="text-[10px] text-violet-400/70 hover:text-violet-400 transition"
         >
           + Add
@@ -94,35 +141,99 @@ export function ThumbnailVersionGrid({
 
       {showAddForm && (
         <div className="mb-3 space-y-2 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
-          <input
-            type="url"
-            placeholder="Image URL (Midjourney, etc.)"
-            value={addUrl}
-            onChange={(e) => setAddUrl(e.target.value)}
-            className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/25 focus:outline-none focus:border-violet-500/50"
-          />
-          <input
-            type="text"
-            placeholder="Prompt used (optional)"
-            value={addPrompt}
-            onChange={(e) => setAddPrompt(e.target.value)}
-            className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/25 focus:outline-none focus:border-violet-500/50"
-          />
-          <div className="flex gap-2">
+          {/* Mode tabs */}
+          <div className="flex gap-1 mb-1">
             <button
-              onClick={handleAddByUrl}
-              disabled={adding || !addUrl.trim()}
-              className="flex-1 py-1.5 rounded-lg bg-violet-600/80 hover:bg-violet-600 disabled:opacity-40 text-xs font-medium transition"
+              onClick={() => setAddMode("url")}
+              className={`flex-1 py-1 rounded-lg text-[10px] transition-colors ${
+                addMode === "url"
+                  ? "bg-violet-600/40 text-white"
+                  : "text-white/40 hover:text-white/60"
+              }`}
             >
-              {adding ? "Adding…" : "Add Version"}
+              Paste URL
             </button>
             <button
-              onClick={() => setShowAddForm(false)}
-              className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-white/40 hover:text-white/60 text-xs transition"
+              onClick={handleSwitchToAssets}
+              className={`flex-1 py-1 rounded-lg text-[10px] transition-colors ${
+                addMode === "assets"
+                  ? "bg-violet-600/40 text-white"
+                  : "text-white/40 hover:text-white/60"
+              }`}
             >
-              Cancel
+              From Assets
             </button>
           </div>
+
+          {addMode === "url" && (
+            <>
+              <input
+                type="url"
+                placeholder="Image URL (Midjourney, external…)"
+                value={addUrl}
+                onChange={(e) => setAddUrl(e.target.value)}
+                className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/25 focus:outline-none focus:border-violet-500/50"
+              />
+              <input
+                type="text"
+                placeholder="Prompt used (optional)"
+                value={addPrompt}
+                onChange={(e) => setAddPrompt(e.target.value)}
+                className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/25 focus:outline-none focus:border-violet-500/50"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAddByUrl}
+                  disabled={adding || !addUrl.trim()}
+                  className="flex-1 py-1.5 rounded-lg bg-violet-600/80 hover:bg-violet-600 disabled:opacity-40 text-xs font-medium transition"
+                >
+                  {adding ? "Adding…" : "Add Version"}
+                </button>
+                <button
+                  onClick={() => setShowAddForm(false)}
+                  className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-white/40 hover:text-white/60 text-xs transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
+
+          {addMode === "assets" && (
+            <>
+              {loadingAssets ? (
+                <p className="text-[10px] text-white/30 text-center py-3">Loading assets…</p>
+              ) : imageAssets.length === 0 ? (
+                <p className="text-[10px] text-white/30 text-center py-3">No uploaded images found</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-1.5 max-h-48 overflow-y-auto">
+                  {imageAssets.map((asset) => (
+                    <button
+                      key={asset.id}
+                      onClick={() => handlePickAsset(asset)}
+                      disabled={adding}
+                      title={asset.filename}
+                      className="aspect-square rounded-lg overflow-hidden border border-white/[0.08] hover:border-violet-500/50 transition-colors disabled:opacity-40"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={asset.url}
+                        alt={asset.filename}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setShowAddForm(false)}
+                className="w-full py-1.5 rounded-lg border border-white/[0.08] text-white/40 hover:text-white/60 text-xs transition"
+              >
+                Cancel
+              </button>
+            </>
+          )}
         </div>
       )}
 

@@ -6,11 +6,14 @@ import { ThumbnailCanvas }       from "@/components/admin/youtube/thumbnails/Thu
 import { ThumbnailPromptPanel }  from "@/components/admin/youtube/thumbnails/ThumbnailPromptPanel"
 import { ThumbnailVersionGrid }  from "@/components/admin/youtube/thumbnails/ThumbnailVersionGrid"
 import { ThumbnailPresetPicker } from "@/components/admin/youtube/thumbnails/ThumbnailPresetPicker"
+import { AudioPlayer }           from "@/components/admin/youtube/thumbnails/AudioPlayer"
+import { VideoPreview }          from "@/components/admin/youtube/thumbnails/VideoPreview"
 import {
   getOrCreateProject,
   getProjectVersions,
   getPresetsFromDb,
   getPromptsFromLibrary,
+  getJobMediaAssets,
   saveProjectDraft,
   approveProject,
   skipThumbnail,
@@ -51,6 +54,8 @@ export function ThumbnailStudioClient({ initialJobs }: Props) {
   const [savedPrompts, setSavedPrompts]           = useState<ThumbnailPromptRow[]>([])
   const [selectedPreset, setSelectedPreset]       = useState<ThumbnailPreset | null>(null)
   const [builtPrompt, setBuiltPrompt]             = useState("")
+  const [audioUrl, setAudioUrl]                   = useState<string | null>(null)
+  const [renderUrl, setRenderUrl]                 = useState<string | null>(null)
   const [loadingProject, setLoadingProject]       = useState(false)
   const [isPending, startTransition]              = useTransition()
   const [statusMsg, setStatusMsg]                 = useState<string | null>(null)
@@ -66,13 +71,16 @@ export function ThumbnailStudioClient({ initialJobs }: Props) {
     setSelectedPreset(null)
     setStatusMsg(null)
     setError(null)
+    setAudioUrl(null)
+    setRenderUrl(null)
     setLoadingProject(true)
 
     try {
-      const [projectResult, dbPresets, libPrompts] = await Promise.all([
+      const [projectResult, dbPresets, libPrompts, mediaAssets] = await Promise.all([
         getOrCreateProject(job.id),
         getPresetsFromDb(job.producer_slug ?? ""),
         getPromptsFromLibrary(job.producer_slug ?? ""),
+        getJobMediaAssets(job.id),
       ])
 
       if ("error" in projectResult) {
@@ -82,26 +90,25 @@ export function ThumbnailStudioClient({ initialJobs }: Props) {
 
       const proj = projectResult
       setProject(proj)
+      setAudioUrl(mediaAssets.audioUrl)
+      setRenderUrl(mediaAssets.renderUrl)
 
       const localPresets = getPresetsForProducer(job.producer_slug ?? "")
       const merged = dbPresets.length > 0 ? dbPresets : localPresets
       setPresets(merged)
       setSavedPrompts(libPrompts)
 
-      // Pre-apply canvas_json if saved
       if (proj.canvas_json && Object.keys(proj.canvas_json).length > 0) {
         setCanvasConfig({ ...DEFAULT_CANVAS, ...(proj.canvas_json as CanvasConfig) })
       } else {
         setCanvasConfig({ ...DEFAULT_CANVAS, titleText: job.title ?? "" })
       }
 
-      // Load presets
       if (proj.preset_slug) {
         const ps = merged.find((p) => p.preset_slug === proj.preset_slug)
         if (ps) applyPreset(ps, false)
       }
 
-      // Load versions
       const vers = await getProjectVersions(proj.id)
       setVersions(vers)
       const sel = vers.find((v) => v.selected)
@@ -197,6 +204,8 @@ export function ThumbnailStudioClient({ initialJobs }: Props) {
     })
   }
 
+  const hasJob = !!selectedJob && !loadingProject
+
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-0 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#08090d]">
 
@@ -214,7 +223,7 @@ export function ThumbnailStudioClient({ initialJobs }: Props) {
         />
       </div>
 
-      {/* ── Center panel: Canvas ────────────────────────────── */}
+      {/* ── Center panel: Audio → Video → Canvas ────────────── */}
       <div className="flex-1 min-w-0 flex flex-col border-r border-white/[0.06] overflow-y-auto">
         {loadingProject ? (
           <div className="flex-1 flex items-center justify-center">
@@ -236,6 +245,12 @@ export function ThumbnailStudioClient({ initialJobs }: Props) {
                 {selectedJob.producer_slug ?? "No producer"} · {selectedJob.status}
               </p>
             </div>
+
+            {/* Audio player */}
+            {audioUrl && <AudioPlayer url={audioUrl} />}
+
+            {/* Video preview */}
+            {renderUrl && <VideoPreview url={renderUrl} />}
 
             {/* Status / error */}
             {error && (
@@ -259,51 +274,28 @@ export function ThumbnailStudioClient({ initialJobs }: Props) {
                 onChange={setCanvasConfig}
               />
             )}
-
-            {/* Presets */}
-            {presets.length > 0 && (
-              <ThumbnailPresetPicker
-                presets={presets}
-                selectedSlug={selectedPreset?.preset_slug ?? null}
-                onSelect={handlePresetSelect}
-              />
-            )}
-
-            {/* Action buttons */}
-            {project && (
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={handleSaveDraft}
-                  disabled={isPending}
-                  className="flex-1 py-2.5 rounded-xl border border-white/[0.1] text-xs text-white/60 hover:text-white hover:border-white/20 disabled:opacity-40 transition-colors"
-                >
-                  Save Draft
-                </button>
-                <button
-                  onClick={handleApprove}
-                  disabled={isPending || !selectedVersionId}
-                  className="flex-1 py-2.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 disabled:opacity-40 text-xs font-medium transition-colors"
-                >
-                  {isPending ? "Approving…" : "Approve →"}
-                </button>
-                <button
-                  onClick={handleSkip}
-                  disabled={isPending}
-                  className="px-4 py-2.5 rounded-xl border border-white/[0.06] text-xs text-white/25 hover:text-white/50 disabled:opacity-40 transition-colors"
-                  title="Use auto-generated placeholder instead"
-                >
-                  Skip
-                </button>
-              </div>
-            )}
           </div>
         )}
       </div>
 
-      {/* ── Right panel: Prompts + Versions ─────────────────── */}
+      {/* ── Right panel: Presets → Prompt → Versions → Actions ── */}
       <div className="w-72 shrink-0 flex flex-col overflow-y-auto">
-        {selectedJob && project ? (
+        {hasJob && project ? (
           <div className="p-4 space-y-5">
+
+            {/* Preset picker */}
+            {presets.length > 0 && (
+              <div>
+                <ThumbnailPresetPicker
+                  presets={presets}
+                  selectedSlug={selectedPreset?.preset_slug ?? null}
+                  onSelect={handlePresetSelect}
+                />
+              </div>
+            )}
+
+            {presets.length > 0 && <div className="border-t border-white/[0.06]" />}
+
             {/* Prompt builder */}
             <div>
               <p className="text-[9px] uppercase tracking-[0.2em] text-white/30 mb-3">
@@ -314,6 +306,7 @@ export function ThumbnailStudioClient({ initialJobs }: Props) {
                 jobTitle={selectedJob.title}
                 preset={selectedPreset}
                 savedPrompts={savedPrompts}
+                projectId={project.id}
                 onPromptBuilt={setBuiltPrompt}
               />
             </div>
@@ -328,10 +321,40 @@ export function ThumbnailStudioClient({ initialJobs }: Props) {
               onVersionsChange={setVersions}
               onVersionSelect={(v) => setSelectedVersionId(v.id)}
             />
+
+            <div className="border-t border-white/[0.06]" />
+
+            {/* Action buttons */}
+            <div className="flex gap-2 pb-2">
+              <button
+                onClick={handleSaveDraft}
+                disabled={isPending}
+                className="flex-1 py-2.5 rounded-xl border border-white/[0.1] text-xs text-white/60 hover:text-white hover:border-white/20 disabled:opacity-40 transition-colors"
+              >
+                Save Draft
+              </button>
+              <button
+                onClick={handleApprove}
+                disabled={isPending || !selectedVersionId}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 disabled:opacity-40 text-xs font-medium transition-colors"
+              >
+                {isPending ? "Approving…" : "Approve →"}
+              </button>
+              <button
+                onClick={handleSkip}
+                disabled={isPending}
+                className="px-4 py-2.5 rounded-xl border border-white/[0.06] text-xs text-white/25 hover:text-white/50 disabled:opacity-40 transition-colors"
+                title="Use auto-generated placeholder instead"
+              >
+                Skip
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center p-6">
-            <p className="text-white/15 text-xs text-center">Select a job to see prompts and versions</p>
+            <p className="text-white/15 text-xs text-center">
+              Select a job to see prompts and versions
+            </p>
           </div>
         )}
       </div>

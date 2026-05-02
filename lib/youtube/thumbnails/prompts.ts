@@ -144,13 +144,17 @@ export function routeTitleToStyleBucket(title: string): string {
 const BASE_SUFFIX = 'Black culture energy, jazz psychedelic trap atmosphere, cinematic realism, high CTR YouTube thumbnail, sharp focus, premium composition, emotional realism, designed to stop scrolling, mobile optimized --ar 16:9'
 
 export function buildThumbnailPrompt(opts: BuildPromptOptions): string {
-  const { producerSlug, title, mood, sceneType, cameraStyle, presetSlug } = opts
+  const { producerSlug, title, mood, sceneType, cameraStyle, presetSlug, rawIdea } = opts
 
   if (producerSlug === 'nightwire') {
-    return buildNightWirePrompt({ title, mood, sceneType, cameraStyle, presetSlug })
+    return buildNightWirePrompt({ title, mood, sceneType, cameraStyle, presetSlug, rawIdea })
   }
 
-  // Generic fallback formula
+  if (rawIdea) {
+    const camera = cameraStyle ?? 'cinematic'
+    return `${rawIdea.trim()}, captured in ${camera}, ${BASE_SUFFIX}`
+  }
+
   const subject = 'music producer'
   const location = sceneType ?? 'studio'
   const camera = cameraStyle ?? 'cinematic'
@@ -164,28 +168,20 @@ function buildNightWirePrompt(opts: {
   sceneType?: string
   cameraStyle?: string
   presetSlug?: string
+  rawIdea?: string
 }): string {
-  const { title, mood, sceneType, cameraStyle, presetSlug } = opts
+  const { title, mood, sceneType, cameraStyle, presetSlug, rawIdea } = opts
 
   const styleBucket = title ? routeTitleToStyleBucket(title) : 'MindLoft Sessions'
+  const camera = cameraStyle ?? bucketToDefaultCamera(styleBucket, presetSlug)
+  const emotion = mood ?? bucketToDefaultMood(styleBucket)
+
+  if (rawIdea) {
+    return `${rawIdea.trim()}, captured in ${camera}, mood of ${emotion}, ${BASE_SUFFIX}`
+  }
 
   const subject = NW_SUBJECTS[Math.floor(Math.random() * NW_SUBJECTS.length)]
-
-  let location: string
-  if (sceneType) {
-    location = sceneType
-  } else {
-    location = bucketToDefaultLocation(styleBucket)
-  }
-
-  let camera: string
-  if (cameraStyle) {
-    camera = cameraStyle
-  } else {
-    camera = bucketToDefaultCamera(styleBucket, presetSlug)
-  }
-
-  const emotion = mood ?? bucketToDefaultMood(styleBucket)
+  const location = sceneType ?? bucketToDefaultLocation(styleBucket)
   const details = bucketToDefaultDetails(styleBucket)
 
   return `${subject} in ${location}, captured in ${camera}, mood of ${emotion}, with ${details}, ${BASE_SUFFIX}`

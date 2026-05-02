@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { buildThumbnailPrompt } from "@/lib/youtube/thumbnails/prompts"
-import { savePromptToLibrary } from "@/lib/youtube/thumbnails/actions"
+import { savePromptToLibrary, savePromptToProject } from "@/lib/youtube/thumbnails/actions"
 import type { ThumbnailPreset, ThumbnailPromptRow } from "@/lib/youtube/thumbnails/types"
 
 const MOODS = [
@@ -51,6 +51,7 @@ interface Props {
   jobTitle: string | null
   preset: ThumbnailPreset | null
   savedPrompts: ThumbnailPromptRow[]
+  projectId?: string
   onPromptBuilt: (prompt: string) => void
 }
 
@@ -59,15 +60,20 @@ export function ThumbnailPromptPanel({
   jobTitle,
   preset,
   savedPrompts,
+  projectId,
   onPromptBuilt,
 }: Props) {
-  const [mood, setMood]   = useState(preset?.prompt_defaults.mood?.[0] ?? "")
-  const [scene, setScene] = useState("")
-  const [camera, setCamera] = useState(preset?.prompt_defaults.camera ?? "")
+  const [rawIdea, setRawIdea]   = useState("")
+  const [mood, setMood]         = useState(preset?.prompt_defaults.mood?.[0] ?? "")
+  const [scene, setScene]       = useState("")
+  const [camera, setCamera]     = useState(preset?.prompt_defaults.camera ?? "")
   const [builtPrompt, setBuiltPrompt] = useState("")
   const [copied, setCopied]           = useState(false)
   const [saving, setSaving]           = useState(false)
   const [saved, setSaved]             = useState(false)
+  const [savingProject, setSavingProject] = useState(false)
+  const [savedProject, setSavedProject]   = useState(false)
+  const [showRefiners, setShowRefiners]   = useState(false)
 
   function handleBuild() {
     const prompt = buildThumbnailPrompt({
@@ -77,10 +83,12 @@ export function ThumbnailPromptPanel({
       sceneType:   scene || undefined,
       cameraStyle: camera || undefined,
       presetSlug:  preset?.preset_slug,
+      rawIdea:     rawIdea.trim() || undefined,
     })
     setBuiltPrompt(prompt)
     onPromptBuilt(prompt)
     setSaved(false)
+    setSavedProject(false)
   }
 
   async function handleCopy() {
@@ -89,7 +97,7 @@ export function ThumbnailPromptPanel({
     setTimeout(() => setCopied(false), 2000)
   }
 
-  async function handleSave() {
+  async function handleSaveToLibrary() {
     if (!builtPrompt) return
     setSaving(true)
     await savePromptToLibrary(
@@ -102,64 +110,89 @@ export function ThumbnailPromptPanel({
     setSaved(true)
   }
 
+  async function handleSaveToProject() {
+    if (!builtPrompt || !projectId) return
+    setSavingProject(true)
+    await savePromptToProject(projectId, builtPrompt)
+    setSavingProject(false)
+    setSavedProject(true)
+  }
+
   function handleUseLibraryPrompt(p: ThumbnailPromptRow) {
     setBuiltPrompt(p.prompt)
     onPromptBuilt(p.prompt)
     setSaved(false)
+    setSavedProject(false)
   }
 
   return (
-    <div className="space-y-4">
-      {/* Dropdowns */}
-      <div className="space-y-2.5">
-        <div>
-          <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1">
-            Mood
-          </label>
-          <select
-            value={mood}
-            onChange={(e) => setMood(e.target.value)}
-            className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500/50 appearance-none"
-          >
-            <option value="">— Auto —</option>
-            {MOODS.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1">
-            Scene
-          </label>
-          <select
-            value={scene}
-            onChange={(e) => setScene(e.target.value)}
-            className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500/50 appearance-none"
-          >
-            <option value="">— Auto from title —</option>
-            {SCENE_TYPES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1">
-            Camera Style
-          </label>
-          <select
-            value={camera}
-            onChange={(e) => setCamera(e.target.value)}
-            className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500/50 appearance-none"
-          >
-            <option value="">— Auto from preset —</option>
-            {CAMERA_STYLES.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </div>
+    <div className="space-y-3">
+      {/* Visual idea free-text input */}
+      <div>
+        <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">
+          Visual Idea
+        </label>
+        <textarea
+          value={rawIdea}
+          onChange={(e) => setRawIdea(e.target.value)}
+          placeholder="Black creative in a bar, purple neon, jazz smoke, hidden luxury…"
+          rows={3}
+          className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50 resize-none leading-relaxed"
+        />
       </div>
+
+      {/* Optional refiners */}
+      <button
+        type="button"
+        onClick={() => setShowRefiners((p) => !p)}
+        className="text-[9px] uppercase tracking-[0.18em] text-white/25 hover:text-white/50 transition-colors"
+      >
+        {showRefiners ? "▾ Refiners" : "▸ Refiners (mood / scene / camera)"}
+      </button>
+
+      {showRefiners && (
+        <div className="space-y-2">
+          <div>
+            <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1">Mood</label>
+            <select
+              value={mood}
+              onChange={(e) => setMood(e.target.value)}
+              className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500/50 appearance-none"
+            >
+              <option value="">— Auto —</option>
+              {MOODS.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1">Scene</label>
+            <select
+              value={scene}
+              onChange={(e) => setScene(e.target.value)}
+              className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500/50 appearance-none"
+            >
+              <option value="">— Auto from title —</option>
+              {SCENE_TYPES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1">Camera</label>
+            <select
+              value={camera}
+              onChange={(e) => setCamera(e.target.value)}
+              className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500/50 appearance-none"
+            >
+              <option value="">— Auto from preset —</option>
+              {CAMERA_STYLES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       <button
         onClick={handleBuild}
@@ -168,11 +201,11 @@ export function ThumbnailPromptPanel({
         Build Prompt
       </button>
 
-      {/* Built prompt display */}
+      {/* Built prompt output */}
       {builtPrompt && (
         <div className="space-y-2">
           <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block">
-            Generated Prompt
+            Enhanced Prompt
           </label>
           <textarea
             value={builtPrompt}
@@ -180,7 +213,7 @@ export function ThumbnailPromptPanel({
             rows={5}
             className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white/80 focus:outline-none focus:border-violet-500/50 resize-none font-mono leading-relaxed"
           />
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <button
               onClick={handleCopy}
               className="flex-1 py-1.5 rounded-lg border border-white/[0.08] text-xs text-white/50 hover:text-white hover:border-white/20 transition-colors"
@@ -188,15 +221,24 @@ export function ThumbnailPromptPanel({
               {copied ? "Copied!" : "Copy"}
             </button>
             <button
-              onClick={handleSave}
+              onClick={handleSaveToLibrary}
               disabled={saving || saved}
               className="flex-1 py-1.5 rounded-lg border border-white/[0.08] text-xs text-white/50 hover:text-white hover:border-white/20 disabled:opacity-40 transition-colors"
             >
-              {saving ? "Saving…" : saved ? "Saved ✓" : "Save to Library"}
+              {saving ? "Saving…" : saved ? "Saved ✓" : "Library"}
             </button>
+            {projectId && (
+              <button
+                onClick={handleSaveToProject}
+                disabled={savingProject || savedProject}
+                className="flex-1 py-1.5 rounded-lg border border-white/[0.08] text-xs text-white/50 hover:text-white hover:border-white/20 disabled:opacity-40 transition-colors"
+              >
+                {savingProject ? "…" : savedProject ? "Saved ✓" : "Project"}
+              </button>
+            )}
           </div>
-          <p className="text-[10px] text-white/25 text-center">
-            Paste into Midjourney / DALL-E → download → add URL below
+          <p className="text-[10px] text-white/20 text-center">
+            Copy → paste into Midjourney → download → add URL below
           </p>
         </div>
       )}
@@ -207,7 +249,7 @@ export function ThumbnailPromptPanel({
           <p className="text-[9px] uppercase tracking-[0.18em] text-white/30 mb-2">
             Saved Library
           </p>
-          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+          <div className="space-y-1.5 max-h-40 overflow-y-auto">
             {savedPrompts.slice(0, 8).map((p) => (
               <button
                 key={p.id}

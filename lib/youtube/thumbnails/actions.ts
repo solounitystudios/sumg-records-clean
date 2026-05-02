@@ -285,6 +285,83 @@ export async function skipThumbnail(jobId: string): Promise<{ error?: string }> 
   return {}
 }
 
+export async function getJobMediaAssets(jobId: string): Promise<{
+  audioUrl: string | null
+  renderUrl: string | null
+}> {
+  const supabase = await createClient()
+
+  // Audio URL via audio_inbox → assets
+  const { data: inboxRow } = await supabase
+    .from("audio_inbox")
+    .select("asset_id")
+    .eq("yt_job_id", jobId)
+    .maybeSingle()
+
+  let audioUrl: string | null = null
+  const inboxAssetId = (inboxRow as { asset_id: string } | null)?.asset_id
+  if (inboxAssetId) {
+    const { data: audioAsset } = await supabase
+      .from("assets")
+      .select("url, mime_type")
+      .eq("id", inboxAssetId)
+      .maybeSingle()
+    const av = audioAsset as { url: string; mime_type: string } | null
+    if (av?.url && av.mime_type?.startsWith("audio/")) {
+      audioUrl = av.url
+    }
+  }
+
+  // Rendered video URL via yt_upload_jobs.asset_id (only if mime is video)
+  const { data: jobRow } = await supabase
+    .from("yt_upload_jobs")
+    .select("asset_id")
+    .eq("id", jobId)
+    .maybeSingle()
+
+  let renderUrl: string | null = null
+  const jobAssetId = (jobRow as { asset_id: string | null } | null)?.asset_id
+  if (jobAssetId) {
+    const { data: renderAsset } = await supabase
+      .from("assets")
+      .select("url, mime_type")
+      .eq("id", jobAssetId)
+      .maybeSingle()
+    const rv = renderAsset as { url: string; mime_type: string } | null
+    if (rv?.url && rv.mime_type?.startsWith("video/")) {
+      renderUrl = rv.url
+    }
+  }
+
+  return { audioUrl, renderUrl }
+}
+
+export async function savePromptToProject(
+  projectId: string,
+  prompt: string,
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("thumbnail_projects")
+    .update({ notes: prompt, updated_at: new Date().toISOString() })
+    .eq("id", projectId)
+  revalidatePath("/admin/youtube/thumbnail-studio")
+  if (error) return { error: error.message }
+  return {}
+}
+
+export async function getImageAssetsForPicker(): Promise<Array<{ id: string; url: string; filename: string }>> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from("assets")
+    .select("id, url, filename")
+    .eq("type", "image")
+    .not("status", "eq", "archived")
+    .order("created_at", { ascending: false })
+    .limit(48)
+  return (data ?? []) as Array<{ id: string; url: string; filename: string }>
+}
+
 export async function savePromptToLibrary(
   producerSlug: string,
   prompt: string,
