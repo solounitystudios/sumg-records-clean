@@ -21,7 +21,7 @@ export async function getJobsForStudio(): Promise<UploadJobForStudio[]> {
     .select(
       "id, title, producer_slug, status, thumbnail_mode, thumbnail_status, thumbnail_asset_id, thumbnail_project_id, scheduled_at, created_at, yt_channel_id",
     )
-    .not("status", "in", '("uploaded","cancelled")')
+    .neq("status", "cancelled")
     .order("created_at", { ascending: false })
     .limit(100)
 
