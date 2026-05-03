@@ -137,6 +137,39 @@ function isWithinDays(dateStr: string, days: number): boolean {
   return Date.now() - new Date(dateStr).getTime() < days * 86400000
 }
 
+// ─── VideoModal ───────────────────────────────────────────────────────────────
+
+function VideoModal({ url, filename, onClose }: { url: string; filename: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-2xl w-full rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl shadow-black"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.08]">
+          <p className="text-xs text-white/55 truncate pr-2">{filename}</p>
+          <button
+            onClick={onClose}
+            className="text-white/35 hover:text-white/80 transition-colors text-sm flex-none"
+          >
+            ✕
+          </button>
+        </div>
+        <video
+          src={url}
+          controls
+          playsInline
+          preload="metadata"
+          className="w-full max-h-[65vh] bg-black"
+        />
+      </div>
+    </div>
+  )
+}
+
 // ─── AssetCard ────────────────────────────────────────────────────────────────
 
 function AssetCard({
@@ -148,6 +181,7 @@ function AssetCard({
   onDelete,
   onSendToInbox,
   onAssignProducer,
+  onPreviewVideo,
 }: {
   asset: AssetRow
   selected: boolean
@@ -157,10 +191,12 @@ function AssetCard({
   onDelete: () => void
   onSendToInbox: () => void
   onAssignProducer: (slug: string) => void
+  onPreviewVideo: () => void
 }) {
   const [copied, setCopied] = useState(false)
   const isImage = asset.type === "image"
   const isAudio = asset.type === "audio"
+  const isVideo = asset.type === "video"
   const hasProducer = !!asset.producer_slug
 
   async function copyUrl() {
@@ -222,6 +258,17 @@ function AssetCard({
               queue={audioQueue}
             />
           </div>
+        )}
+        {isVideo && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onPreviewVideo() }}
+            className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors group"
+            title="Preview video"
+          >
+            <span className="w-10 h-10 flex items-center justify-center rounded-full bg-white/15 group-hover:bg-white/25 text-white text-base backdrop-blur transition-colors">
+              ▶
+            </span>
+          </button>
         )}
       </div>
 
@@ -326,6 +373,7 @@ function AssetTableRow({
   onDelete,
   onSendToInbox,
   onAssignProducer,
+  onPreviewVideo,
 }: {
   asset: AssetRow
   selected: boolean
@@ -335,9 +383,11 @@ function AssetTableRow({
   onDelete: () => void
   onSendToInbox: () => void
   onAssignProducer: (slug: string) => void
+  onPreviewVideo: () => void
 }) {
   const [copied, setCopied] = useState(false)
   const isAudio = asset.type === "audio"
+  const isVideo = asset.type === "video"
 
   async function copyUrl() {
     await navigator.clipboard.writeText(asset.url)
@@ -403,6 +453,14 @@ function AssetTableRow({
               queue={audioQueue}
             />
           )}
+          {isVideo && (
+            <button
+              onClick={onPreviewVideo}
+              className="text-[9px] border border-sky-500/25 text-sky-400/60 hover:text-sky-400 hover:border-sky-500/45 px-1.5 py-0.5 rounded transition-colors whitespace-nowrap"
+            >
+              ▶ Preview
+            </button>
+          )}
           <button onClick={copyUrl} className="text-[9px] text-white/25 hover:text-white/60 transition-colors whitespace-nowrap">
             {copied ? "Copied!" : "Copy"}
           </button>
@@ -436,6 +494,9 @@ function AssetTableRow({
 export function AssetsClient({ assets, producers }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+
+  // Video preview modal
+  const [videoPreview, setVideoPreview] = useState<{ url: string; filename: string } | null>(null)
 
   // Filter state
   const [typeFilter,   setTypeFilter]   = useState("all")
@@ -625,6 +686,15 @@ export function AssetsClient({ assets, producers }: Props) {
 
   return (
     <div className="pb-32">
+
+      {/* Video preview modal */}
+      {videoPreview && (
+        <VideoModal
+          url={videoPreview.url}
+          filename={videoPreview.filename}
+          onClose={() => setVideoPreview(null)}
+        />
+      )}
 
       {/* ── Filter bar ───────────────────────────────────────────────────────── */}
       <div className="space-y-2 mb-5">
@@ -822,6 +892,7 @@ export function AssetsClient({ assets, producers }: Props) {
               onDelete={() => handleSingleDelete(asset.id)}
               onSendToInbox={() => handleSingleInbox(asset.id)}
               onAssignProducer={(slug) => handleAssignProducer(asset.id, slug)}
+              onPreviewVideo={() => setVideoPreview({ url: asset.url, filename: asset.filename })}
             />
           ))}
         </div>
@@ -855,6 +926,7 @@ export function AssetsClient({ assets, producers }: Props) {
                   onDelete={() => handleSingleDelete(asset.id)}
                   onSendToInbox={() => handleSingleInbox(asset.id)}
                   onAssignProducer={(slug) => handleAssignProducer(asset.id, slug)}
+                  onPreviewVideo={() => setVideoPreview({ url: asset.url, filename: asset.filename })}
                 />
               ))}
             </tbody>

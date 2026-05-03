@@ -61,23 +61,31 @@ export default async function AudioInboxPage({
         </div>
       </div>
 
-      {/* Status summary cards */}
+      {/* Status summary cards — clicking sets the active filter */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 mb-6">
         {[
-          { label: "New",       count: counts.new_asset ?? 0,         color: "text-white/50" },
-          { label: "Review",    count: counts.needs_review ?? 0,       color: "text-orange-400" },
-          { label: "Render",    count: (counts.needs_render ?? 0) + (counts.ready_to_schedule ?? 0), color: "text-amber-400" },
-          { label: "Scheduled", count: counts.scheduled ?? 0,          color: "text-violet-400" },
-          { label: "Uploaded",  count: counts.uploaded ?? 0,           color: "text-emerald-400" },
-        ].map(({ label, count, color }) => (
-          <div
-            key={label}
-            className="rounded-xl border border-white/[0.07] bg-[#0d1016] px-4 py-3"
-          >
-            <p className={`text-2xl font-semibold tabular-nums ${color}`}>{count}</p>
-            <p className="text-[9px] text-white/25 uppercase tracking-wide mt-0.5">{label}</p>
-          </div>
-        ))}
+          { label: "New",       count: counts.new_asset ?? 0,         color: "text-white/50",    filter: "new_asset" },
+          { label: "Review",    count: counts.needs_review ?? 0,       color: "text-orange-400",  filter: "needs_review" },
+          { label: "Render",    count: (counts.needs_render ?? 0) + (counts.ready_to_schedule ?? 0), color: "text-amber-400", filter: "needs_render" },
+          { label: "Scheduled", count: counts.scheduled ?? 0,          color: "text-violet-400",  filter: "scheduled" },
+          { label: "Uploaded",  count: counts.uploaded ?? 0,           color: "text-emerald-400", filter: "uploaded" },
+        ].map(({ label, count, color, filter }) => {
+          const isActive = activeFilter === filter
+          return (
+            <Link
+              key={label}
+              href={`/admin/youtube/inbox?status=${filter}`}
+              className={`rounded-xl border px-4 py-3 transition-colors hover:border-white/20 ${
+                isActive
+                  ? "border-white/25 bg-white/[0.05]"
+                  : "border-white/[0.07] bg-[#0d1016] hover:bg-white/[0.03]"
+              }`}
+            >
+              <p className={`text-2xl font-semibold tabular-nums ${color}`}>{count}</p>
+              <p className="text-[9px] text-white/25 uppercase tracking-wide mt-0.5">{label}</p>
+            </Link>
+          )
+        })}
       </div>
 
       {/* Pipeline reference */}

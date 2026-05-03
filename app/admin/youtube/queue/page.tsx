@@ -337,6 +337,16 @@ export default async function UploadQueuePage() {
                   >
                     {/* Header row */}
                     <div className="flex items-start justify-between gap-4">
+                      {/* Approved thumbnail — shown when available */}
+                      {job.thumbnailAssetUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={job.thumbnailAssetUrl}
+                          alt="thumbnail"
+                          className="w-14 h-9 rounded-lg object-cover border border-white/10 flex-none mt-0.5"
+                        />
+                      )}
+
                       <div className="min-w-0 flex-1">
                         {/* Status + title */}
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -435,6 +445,24 @@ export default async function UploadQueuePage() {
                           Render now →
                         </Link>
                       </div>
+                    )}
+
+                    {/* ── Rendered video preview (native details/summary, no JS required) ── */}
+                    {job.assetMimeType?.startsWith("video/") && job.assetUrl && (
+                      <details className="mt-2">
+                        <summary className="text-[10px] text-sky-400/60 hover:text-sky-400 cursor-pointer transition-colors list-none flex items-center gap-1 select-none">
+                          <span className="text-[9px]">▶</span> Preview render
+                        </summary>
+                        <div className="mt-2">
+                          <video
+                            src={job.assetUrl}
+                            controls
+                            preload="none"
+                            playsInline
+                            className="w-full max-h-40 rounded-lg bg-black border border-white/[0.06]"
+                          />
+                        </div>
+                      </details>
                     )}
 
                     {/* ── pending / scheduled / processing: checklist only ── */}

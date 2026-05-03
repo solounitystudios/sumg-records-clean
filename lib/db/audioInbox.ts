@@ -64,6 +64,8 @@ export interface AudioInboxRow {
   assetUrl: string | null
   assetSizeBytes: number | null
   assetMimeType: string | null
+  // Resolved through yt_upload_jobs.thumbnail_asset_id → assets.url
+  thumbnailAssetUrl: string | null
 }
 
 interface AssetSnippet {
@@ -114,6 +116,7 @@ function toRow(r: any): AudioInboxRow {
     assetUrl:             r._asset?.url ?? null,
     assetSizeBytes:       r._asset?.size_bytes ?? null,
     assetMimeType:        r._asset?.mime_type ?? null,
+    thumbnailAssetUrl:    r._thumbnailAssetUrl ?? null,
   }
 }
 
@@ -136,6 +139,40 @@ async function attachAssets(rows: any[]): Promise<any[]> {
   return rows.map((r) => ({ ...r, _asset: byId[r.asset_id] ?? null }))
 }
 
+// Resolves approved thumbnail image URLs for rows that have a yt_job_id.
+// Two extra SELECT queries regardless of row count; safe to call on every page load.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function attachThumbnailUrls(rows: any[]): Promise<any[]> {
+  const jobIds = [...new Set<string>(rows.map((r) => r.yt_job_id).filter(Boolean))]
+  if (jobIds.length === 0) return rows.map((r) => ({ ...r, _thumbnailAssetUrl: null }))
+
+  const { data: jobData } = await supabase
+    .from("yt_upload_jobs")
+    .select("id, thumbnail_asset_id")
+    .in("id", jobIds)
+
+  const thumbAssetByJobId: Record<string, string> = {}
+  for (const j of (jobData ?? []) as { id: string; thumbnail_asset_id: string | null }[]) {
+    if (j.thumbnail_asset_id) thumbAssetByJobId[j.id] = j.thumbnail_asset_id
+  }
+
+  const assetIds = [...new Set(Object.values(thumbAssetByJobId))]
+  if (assetIds.length === 0) return rows.map((r) => ({ ...r, _thumbnailAssetUrl: null }))
+
+  const { data: assetData } = await supabase
+    .from("assets")
+    .select("id, url")
+    .in("id", assetIds)
+
+  const urlByAssetId: Record<string, string> = {}
+  for (const a of (assetData ?? []) as { id: string; url: string }[]) urlByAssetId[a.id] = a.url
+
+  return rows.map((r) => {
+    const thumbAssetId = r.yt_job_id ? thumbAssetByJobId[r.yt_job_id] : undefined
+    return { ...r, _thumbnailAssetUrl: thumbAssetId ? (urlByAssetId[thumbAssetId] ?? null) : null }
+  })
+}
+
 export async function getAllInboxItems(status?: InboxStatus): Promise<AudioInboxRow[]> {
   let q = supabase
     .from("audio_inbox")
@@ -147,7 +184,8 @@ export async function getAllInboxItems(status?: InboxStatus): Promise<AudioInbox
 
   const { data, error } = await q
   if (error) throw new Error(`getAllInboxItems: ${error.message}`)
-  return (await attachAssets(data ?? [])).map(toRow)
+  const withAssets = await attachAssets(data ?? [])
+  return (await attachThumbnailUrls(withAssets)).map(toRow)
 }
 
 export async function getInboxItemById(id: string): Promise<AudioInboxRow | null> {
@@ -157,8 +195,9 @@ export async function getInboxItemById(id: string): Promise<AudioInboxRow | null
     .eq("id", id)
     .single()
   if (error) return null
-  const [withAsset] = await attachAssets([data])
-  return toRow(withAsset)
+  const withAssets = await attachAssets([data])
+  const [withThumb] = await attachThumbnailUrls(withAssets)
+  return toRow(withThumb)
 }
 
 export async function getInboxByAssetId(assetId: string): Promise<AudioInboxRow | null> {
@@ -168,8 +207,9 @@ export async function getInboxByAssetId(assetId: string): Promise<AudioInboxRow 
     .eq("asset_id", assetId)
     .maybeSingle()
   if (error || !data) return null
-  const [withAsset] = await attachAssets([data])
-  return toRow(withAsset)
+  const withAssets = await attachAssets([data])
+  const [withThumb] = await attachThumbnailUrls(withAssets)
+  return toRow(withThumb)
 }
 
 export async function createInboxEntry(assetId: string): Promise<AudioInboxRow | null> {

@@ -551,6 +551,19 @@ function InboxRow({
                 </div>
               )}
 
+              {/* Approved thumbnail from thumbnail studio */}
+              {item.thumbnailAssetUrl && (
+                <div>
+                  <p className="text-[9px] uppercase tracking-[0.2em] text-white/25 mb-1.5">Approved Thumbnail</p>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.thumbnailAssetUrl}
+                    alt="Approved thumbnail"
+                    className="h-20 w-auto rounded-lg object-cover border border-white/10"
+                  />
+                </div>
+              )}
+
               {item.errorMessage && (
                 <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
                   <p className="text-[10px] text-red-400/80">{item.errorMessage}</p>
