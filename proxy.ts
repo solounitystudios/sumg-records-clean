@@ -24,8 +24,30 @@ function isPromptAsPath(pathname: string): boolean {
   )
 }
 
+const BOT_SCAN_PATHS = new Set([
+  "/xmlrpc.php",
+  "/wp-admin/install.php",
+  "/wp-login.php",
+  "/wp-admin",
+  "/wp-content",
+  "/wp-includes",
+])
+
+function isBotScanPath(pathname: string): boolean {
+  if (BOT_SCAN_PATHS.has(pathname)) return true
+  return (
+    pathname.startsWith("/wp-admin/") ||
+    pathname.startsWith("/wp-content/") ||
+    pathname.startsWith("/wp-includes/")
+  )
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  if (isBotScanPath(pathname)) {
+    return new NextResponse(null, { status: 410 })
+  }
 
   let response = NextResponse.next({ request })
 

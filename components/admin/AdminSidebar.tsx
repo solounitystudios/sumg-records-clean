@@ -62,6 +62,7 @@ const NAV: NavSection[] = [
       { label: "YouTube",     href: "/admin/youtube" },
       { label: "Audio Inbox",       href: "/admin/youtube/inbox" },
       { label: "Thumbnail Studio", href: "/admin/youtube/thumbnail-studio" },
+      { label: "Midjourney Queue", href: "/admin/youtube/thumbnail-studio/midjourney-queue" },
       { label: "Tasks",            href: "/admin/tasks" },
     ],
   },

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import Link from "next/link"
 import { generateThumbnailImages } from "@/app/actions/generateThumbnailImage"
 
 function isValidHttpImageUrl(value: string): boolean {
@@ -17,6 +18,8 @@ import {
   selectVersion,
   rejectVersion,
   getImageAssetsForPicker,
+  createMidjourneyPendingAsset,
+  completeMidjourneyAsset,
 } from "@/lib/youtube/thumbnails/actions"
 
 interface Props {
@@ -55,6 +58,16 @@ export function ThumbnailVersionGrid({
   const [genError, setGenError]       = useState<string | null>(null)
   const [genPrompt, setGenPrompt]     = useState(builtPrompt ?? "")
   const [genCount, setGenCount]       = useState<1 | 2>(1)
+  const [genProvider, setGenProvider] = useState<"openai" | "midjourney">("openai")
+
+  // Midjourney queue state within this panel
+  const [mjSending,    setMjSending]    = useState(false)
+  const [mjPendingId,  setMjPendingId]  = useState<string | null>(null)
+  const [mjError,      setMjError]      = useState<string | null>(null)
+  const [mjUrlInput,   setMjUrlInput]   = useState("")
+  const [mjUrlWarn,    setMjUrlWarn]    = useState<string | null>(null)
+  const [mjCompleting, setMjCompleting] = useState(false)
+  const [mjCopied,     setMjCopied]     = useState(false)
 
   // Keep genPrompt in sync when builtPrompt changes from parent
   const [lastBuiltPrompt, setLastBuiltPrompt] = useState(builtPrompt)
@@ -152,6 +165,51 @@ export function ThumbnailVersionGrid({
     }
   }
 
+  async function handleSendToMjQueue() {
+    if (!genPrompt.trim()) { setMjError("Enter a prompt first."); return }
+    setMjSending(true); setMjError(null)
+    const result = await createMidjourneyPendingAsset({
+      producerSlug: producerSlug ?? "",
+      prompt:       genPrompt.trim(),
+      linkedUploadJobId: undefined,
+    })
+    setMjSending(false)
+    if ("error" in result) { setMjError(result.error); return }
+    setMjPendingId(result.id)
+  }
+
+  async function handleMjComplete() {
+    const url = mjUrlInput.trim()
+    if (!url || !mjPendingId) return
+    if (!isValidHttpImageUrl(url)) { setMjUrlWarn("Paste a direct image URL, not a prompt."); return }
+    setMjUrlWarn(null); setMjCompleting(true)
+    const result = await completeMidjourneyAsset({
+      id:           mjPendingId,
+      imageUrl:     url,
+      producerSlug: producerSlug,
+      projectId,
+    })
+    setMjCompleting(false)
+    if ("error" in result) { setMjError(result.error); return }
+    const newVer: ThumbnailVersion = {
+      id:             result.versionId ?? `mj-${Date.now()}`,
+      project_id:     projectId,
+      asset_id:       result.assetId,
+      image_url:      result.permanentUrl,
+      prompt:         genPrompt.trim(),
+      provider:       "midjourney",
+      style_bucket:   null,
+      version_number: versions.length + 1,
+      selected:       false,
+      rejected:       false,
+      ctr_score:      null,
+      notes:          null,
+      created_at:     new Date().toISOString(),
+    }
+    onVersionsChange([...versions, newVer])
+    setMjPendingId(null); setMjUrlInput(""); setShowAddForm(false)
+  }
+
   async function handleGenerate() {
     if (!genPrompt.trim()) {
       setGenError("Enter or build a prompt first.")
@@ -232,15 +290,13 @@ export function ThumbnailVersionGrid({
             >
               From Assets
             </button>
-            {generationEnabled && (
-              <button
-                type="button"
-                onClick={() => setAddMode("generate")}
-                className={`flex-1 py-1 rounded-lg text-[10px] transition-colors ${addMode === "generate" ? "bg-violet-600/40 text-white" : "text-white/40 hover:text-white/60"}`}
-              >
-                Generate
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setAddMode("generate")}
+              className={`flex-1 py-1 rounded-lg text-[10px] transition-colors ${addMode === "generate" ? "bg-violet-600/40 text-white" : "text-white/40 hover:text-white/60"}`}
+            >
+              Generate
+            </button>
           </div>
 
           {/* URL mode */}
@@ -304,8 +360,26 @@ export function ThumbnailVersionGrid({
           )}
 
           {/* Generate mode */}
-          {addMode === "generate" && generationEnabled && (
+          {addMode === "generate" && (
             <div className="space-y-2">
+              {/* Provider toggle */}
+              <div className="flex gap-1 rounded-lg border border-white/[0.07] bg-black/20 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => { setGenProvider("openai"); setMjPendingId(null); setMjError(null) }}
+                  className={`flex-1 py-1.5 rounded-md text-[10px] font-medium transition-colors ${genProvider === "openai" ? "bg-violet-600/50 text-white" : "text-white/35 hover:text-white/60"}`}
+                >
+                  ⚡ OpenAI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setGenProvider("midjourney"); setGenError(null) }}
+                  className={`flex-1 py-1.5 rounded-md text-[10px] font-medium transition-colors ${genProvider === "midjourney" ? "bg-sky-600/40 text-sky-200" : "text-white/35 hover:text-white/60"}`}
+                >
+                  ✦ Midjourney
+                </button>
+              </div>
+
               <textarea
                 value={genPrompt}
                 onChange={(e) => setGenPrompt(e.target.value)}
@@ -313,32 +387,105 @@ export function ThumbnailVersionGrid({
                 placeholder="Paste or edit your prompt…"
                 className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/25 focus:outline-none focus:border-violet-500/50 resize-none font-mono leading-relaxed"
               />
-              <div className="flex items-center gap-2">
-                <label className="text-[9px] text-white/30 uppercase tracking-[0.15em]">Count</label>
-                {([1, 2] as const).map((n) => (
+
+              {/* OpenAI controls */}
+              {genProvider === "openai" && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[9px] text-white/30 uppercase tracking-[0.15em]">Count</label>
+                    {([1, 2] as const).map((n) => (
+                      <button
+                        type="button"
+                        key={n}
+                        onClick={() => setGenCount(n)}
+                        className={`w-7 h-7 rounded-lg text-[11px] font-mono transition-colors ${genCount === n ? "bg-violet-600/60 text-white" : "text-white/35 border border-white/[0.08] hover:text-white/60"}`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                    <span className="text-[9px] text-white/20 ml-1">image{genCount !== 1 ? "s" : ""} · DALL-E 3</span>
+                  </div>
+                  {genError && <p className="text-[10px] text-red-400/70 leading-snug">{genError}</p>}
+                  {!generationEnabled && (
+                    <p className="text-[9px] text-amber-400/50 text-center">Add OPENAI_API_KEY to enable</p>
+                  )}
                   <button
                     type="button"
-                    key={n}
-                    onClick={() => setGenCount(n)}
-                    className={`w-7 h-7 rounded-lg text-[11px] font-mono transition-colors ${genCount === n ? "bg-violet-600/60 text-white" : "text-white/35 border border-white/[0.08] hover:text-white/60"}`}
+                    onClick={handleGenerate}
+                    disabled={generating || !genPrompt.trim() || !generationEnabled}
+                    className="w-full py-2.5 rounded-lg bg-violet-600/80 hover:bg-violet-600 disabled:opacity-40 text-xs font-medium transition"
                   >
-                    {n}
+                    {generating ? `Generating ${genCount > 1 ? `${genCount} images` : "image"}…` : `Generate Image${genCount > 1 ? "s" : ""} →`}
                   </button>
-                ))}
-                <span className="text-[9px] text-white/20 ml-1">image{genCount !== 1 ? "s" : ""} · DALL-E 3</span>
-              </div>
-              {genError && (
-                <p className="text-[10px] text-red-400/70 leading-snug">{genError}</p>
+                  <p className="text-[9px] text-white/20 text-center">Generated images are saved to Assets and added as versions.</p>
+                </>
               )}
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={generating || !genPrompt.trim()}
-                className="w-full py-2.5 rounded-lg bg-violet-600/80 hover:bg-violet-600 disabled:opacity-40 text-xs font-medium transition"
-              >
-                {generating ? `Generating ${genCount > 1 ? `${genCount} images` : "image"}…` : `Generate Image${genCount > 1 ? "s" : ""} →`}
-              </button>
-              <p className="text-[9px] text-white/20 text-center">Generated images are saved to Assets and added as versions.</p>
+
+              {/* Midjourney controls */}
+              {genProvider === "midjourney" && (
+                <>
+                  {!mjPendingId ? (
+                    <>
+                      {mjError && <p className="text-[10px] text-red-400/70 leading-snug">{mjError}</p>}
+                      <button
+                        type="button"
+                        onClick={handleSendToMjQueue}
+                        disabled={mjSending || !genPrompt.trim()}
+                        className="w-full py-2.5 rounded-lg bg-sky-600/60 hover:bg-sky-600/80 disabled:opacity-40 text-xs font-medium transition border border-sky-500/30"
+                      >
+                        {mjSending ? "Sending…" : "Send to Midjourney Queue →"}
+                      </button>
+                      <p className="text-[9px] text-white/20 text-center">Copy prompt → generate in Midjourney → paste URL below.</p>
+                    </>
+                  ) : (
+                    <div className="space-y-2 rounded-lg border border-sky-500/20 bg-sky-500/[0.04] p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                          <span className="text-[9px] text-sky-300/60 uppercase tracking-[0.15em]">Queued</span>
+                        </div>
+                        <Link
+                          href="/admin/youtube/thumbnail-studio/midjourney-queue"
+                          className="text-[9px] text-sky-400/60 hover:text-sky-400 transition"
+                        >
+                          View Queue →
+                        </Link>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(genPrompt)
+                          setMjCopied(true)
+                          setTimeout(() => setMjCopied(false), 2000)
+                        }}
+                        className="w-full py-1.5 rounded-md border border-sky-500/25 bg-sky-600/10 text-[10px] text-sky-300 hover:bg-sky-600/20 transition"
+                      >
+                        {mjCopied ? "Copied!" : "Copy Prompt for Midjourney"}
+                      </button>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          value={mjUrlInput}
+                          onChange={(e) => { setMjUrlInput(e.target.value); setMjUrlWarn(null) }}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleMjComplete() } }}
+                          placeholder="Paste finished image URL…"
+                          className={`flex-1 bg-black/30 border rounded-md px-2.5 py-1.5 text-[11px] text-white placeholder:text-white/20 focus:outline-none transition-colors ${mjUrlWarn ? "border-amber-500/50" : "border-white/[0.08] focus:border-sky-500/50"}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleMjComplete}
+                          disabled={mjCompleting || !mjUrlInput.trim()}
+                          className="px-3 py-1.5 rounded-md bg-sky-600/60 hover:bg-sky-600/80 text-[11px] text-white disabled:opacity-40 transition whitespace-nowrap"
+                        >
+                          {mjCompleting ? "…" : "Done"}
+                        </button>
+                      </div>
+                      {mjUrlWarn && <p className="text-[9px] text-amber-300/70">{mjUrlWarn}</p>}
+                      {mjError && <p className="text-[9px] text-red-400/70">{mjError}</p>}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>

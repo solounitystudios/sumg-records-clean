@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache"
 import { createServiceClient } from "@/lib/supabase/server"
+import { supabase as adminDb } from "@/lib/db/supabase"
+import { requireAdmin } from "@/lib/auth"
 import type {
   ThumbnailProject,
   ThumbnailVersion,
@@ -10,6 +12,8 @@ import type {
   UploadJobForStudio,
   CanvasConfig,
   PromptLibraryFilters,
+  ThumbnailAsset,
+  MidjourneyQueueRow,
 } from "./types"
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
@@ -630,4 +634,206 @@ export async function saveFreeCreateAsset({
   revalidatePath("/admin/youtube/thumbnail-studio")
   revalidatePath("/admin/assets")
   return { assetId, thumbnailAssetId: (taRow as { id: string }).id }
+}
+
+// ─── Midjourney Queue ─────────────────────────────────────────────────────────
+
+export async function createMidjourneyPendingAsset({
+  producerSlug,
+  prompt,
+  styleBucket,
+  linkedUploadJobId,
+}: {
+  producerSlug: string
+  prompt: string
+  styleBucket?: string
+  linkedUploadJobId?: string
+}): Promise<{ id: string } | { error: string }> {
+  await requireAdmin()
+  const supabase = await createServiceClient()
+
+  const { data, error } = await supabase
+    .from("thumbnail_assets")
+    .insert({
+      producer_slug:        producerSlug || null,
+      image_url:            null,
+      prompt_used:          prompt,
+      style_bucket:         styleBucket ?? null,
+      linked_upload_job_id: linkedUploadJobId ?? null,
+      provider:             "midjourney",
+      provider_status:      "pending",
+      provider_prompt:      prompt,
+    })
+    .select("id")
+    .single()
+
+  if (error) return { error: error.message }
+  revalidatePath("/admin/youtube/thumbnail-studio/midjourney-queue")
+  return { id: (data as { id: string }).id }
+}
+
+export async function completeMidjourneyAsset({
+  id,
+  imageUrl,
+  existingAssetId,
+  producerSlug,
+  projectId,
+}: {
+  id: string
+  imageUrl: string
+  existingAssetId?: string
+  producerSlug?: string
+  projectId?: string
+}): Promise<{ assetId: string; versionId?: string; permanentUrl: string } | { error: string }> {
+  await requireAdmin()
+
+  let assetId = existingAssetId
+  let permanentUrl = imageUrl
+
+  if (!assetId) {
+    // Download from external URL and re-upload to permanent Supabase storage
+    try {
+      const dlResp = await fetch(imageUrl)
+      if (dlResp.ok) {
+        const buf = await dlResp.arrayBuffer()
+        const fileKey = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+        const storagePath = `thumbnails/mj_${fileKey}.png`
+        const { error: storageErr } = await adminDb.storage
+          .from("sumg-assets")
+          .upload(storagePath, buf, { contentType: "image/png", upsert: false })
+        if (!storageErr) {
+          const { data: urlData } = adminDb.storage.from("sumg-assets").getPublicUrl(storagePath)
+          permanentUrl = urlData.publicUrl
+        }
+      }
+    } catch { /* fall back to original URL */ }
+
+    const { data: assetRow, error: assetErr } = await adminDb
+      .from("assets")
+      .insert({
+        type:          "image",
+        url:           permanentUrl,
+        filename:      `thumbnail_mj_${Date.now()}.png`,
+        mime_type:     "image/png",
+        size_bytes:    null,
+        alt_text:      "Midjourney thumbnail",
+        attached_to:   null,
+        uploaded_by:   "thumbnail_studio_midjourney",
+        producer_slug: producerSlug ?? null,
+        status:        "ready",
+        tags:          ["thumbnail", "midjourney"],
+      })
+      .select("id")
+      .single()
+
+    if (assetErr) return { error: assetErr.message }
+    assetId = (assetRow as { id: string }).id
+  }
+
+  // Update the pending thumbnail_assets row
+  const supabase = await createServiceClient()
+  const { error: taErr } = await supabase
+    .from("thumbnail_assets")
+    .update({
+      image_url:       permanentUrl,
+      asset_id:        assetId,
+      provider_status: "complete",
+    })
+    .eq("id", id)
+
+  if (taErr) return { error: taErr.message }
+
+  // If called from Job Mode, also create a thumbnail_version
+  let versionId: string | undefined
+  if (projectId) {
+    const { data: maxVer } = await supabase
+      .from("thumbnail_versions")
+      .select("version_number")
+      .eq("project_id", projectId)
+      .order("version_number", { ascending: false })
+      .limit(1)
+    const nextNum = ((maxVer?.[0] as { version_number: number } | undefined)?.version_number ?? 0) + 1
+
+    const { data: vRow } = await supabase
+      .from("thumbnail_versions")
+      .insert({
+        project_id:     projectId,
+        image_url:      permanentUrl,
+        asset_id:       assetId,
+        prompt:         null,
+        provider:       "midjourney",
+        style_bucket:   null,
+        version_number: nextNum,
+      })
+      .select("id")
+      .single()
+    versionId = (vRow as { id: string } | null)?.id
+  }
+
+  revalidatePath("/admin/youtube/thumbnail-studio/midjourney-queue")
+  revalidatePath("/admin/youtube/thumbnail-studio")
+  return { assetId, versionId, permanentUrl }
+}
+
+export async function getMidjourneyQueue(): Promise<MidjourneyQueueRow[]> {
+  await requireAdmin()
+  const supabase = await createServiceClient()
+
+  const { data: assets, error } = await supabase
+    .from("thumbnail_assets")
+    .select("*")
+    .eq("provider", "midjourney")
+    .order("created_at", { ascending: false })
+    .limit(200)
+
+  if (error || !assets) return []
+
+  // Enrich with linked job titles
+  const jobIds = [...new Set(
+    (assets as ThumbnailAsset[])
+      .map((a) => a.linked_upload_job_id)
+      .filter(Boolean) as string[]
+  )]
+
+  const jobTitleMap: Record<string, string> = {}
+  if (jobIds.length > 0) {
+    const { data: jobs } = await supabase
+      .from("yt_upload_jobs")
+      .select("id, title")
+      .in("id", jobIds)
+    if (jobs) {
+      for (const j of jobs as Array<{ id: string; title: string | null }>) {
+        jobTitleMap[j.id] = j.title ?? "Untitled"
+      }
+    }
+  }
+
+  return (assets as ThumbnailAsset[]).map((a) => ({
+    ...a,
+    linked_job_title: a.linked_upload_job_id ? (jobTitleMap[a.linked_upload_job_id] ?? null) : null,
+  }))
+}
+
+export async function markMidjourneyFailed(id: string): Promise<{ error?: string }> {
+  await requireAdmin()
+  const supabase = await createServiceClient()
+  const { error } = await supabase
+    .from("thumbnail_assets")
+    .update({ provider_status: "failed" })
+    .eq("id", id)
+    .eq("provider", "midjourney")
+  revalidatePath("/admin/youtube/thumbnail-studio/midjourney-queue")
+  return error ? { error: error.message } : {}
+}
+
+export async function deleteThumbnailAsset(id: string): Promise<{ error?: string }> {
+  await requireAdmin()
+  const supabase = await createServiceClient()
+  const { error } = await supabase
+    .from("thumbnail_assets")
+    .delete()
+    .eq("id", id)
+  revalidatePath("/admin/youtube/thumbnail-studio/midjourney-queue")
+  revalidatePath("/admin/youtube/thumbnail-studio")
+  return error ? { error: error.message } : {}
 }

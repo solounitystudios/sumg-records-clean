@@ -106,7 +106,7 @@ export interface PromptLibraryFilters {
 export interface ThumbnailAsset {
   id: string
   producer_slug: string | null
-  image_url: string
+  image_url: string | null        // null when provider_status = 'pending'
   prompt_used: string | null
   linked_song_id: string | null
   linked_upload_job_id: string | null
@@ -115,6 +115,16 @@ export interface ThumbnailAsset {
   style_bucket: string | null
   asset_id: string | null
   name: string | null
+  // v3 provider / Midjourney fields
+  provider: string                // 'manual' | 'openai' | 'midjourney'
+  provider_job_id: string | null
+  provider_status: string         // 'pending' | 'complete' | 'failed'
+  provider_prompt: string | null
+  provider_raw_response: Record<string, unknown>
+}
+
+export interface MidjourneyQueueRow extends ThumbnailAsset {
+  linked_job_title: string | null
 }
 
 export interface CanvasConfig {

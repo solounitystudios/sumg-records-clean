@@ -2,7 +2,12 @@
 
 import { useState, useRef, useTransition } from "react"
 import { buildThumbnailPrompt } from "@/lib/youtube/thumbnails/prompts"
-import { createPrompt, saveFreeCreateAsset } from "@/lib/youtube/thumbnails/actions"
+import {
+  createPrompt,
+  saveFreeCreateAsset,
+  createMidjourneyPendingAsset,
+  completeMidjourneyAsset,
+} from "@/lib/youtube/thumbnails/actions"
 import { getPresetsForProducer } from "@/lib/youtube/thumbnails/presets"
 import { generateThumbnailImages } from "@/app/actions/generateThumbnailImage"
 
@@ -57,6 +62,8 @@ function isValidHttpImageUrl(value: string): boolean {
   }
 }
 
+type GenProvider = "openai" | "midjourney" | "manual"
+
 interface Props {
   producers:               Array<{ slug: string; name: string }>
   generationEnabled:       boolean
@@ -78,6 +85,26 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
   const [promptSaved,        setPromptSaved]         = useState(false)
   const [savingPrompt,       setSavingPrompt]        = useState(false)
 
+  // Provider selector
+  const [genProvider, setGenProvider] = useState<GenProvider>(generationEnabled ? "openai" : "midjourney")
+
+  // OpenAI generation state
+  const [isGenerating, startGenerating] = useTransition()
+  const [genError,           setGenError]            = useState<string | null>(null)
+  const [genResults,         setGenResults]          = useState<Array<{ imageUrl: string; assetId: string }>>([])
+
+  // Midjourney queue state
+  const [mjSending,     setMjSending]     = useState(false)
+  const [mjPendingId,   setMjPendingId]   = useState<string | null>(null)
+  const [mjError,       setMjError]       = useState<string | null>(null)
+  const [mjCompleting,  setMjCompleting]  = useState(false)
+  const [mjComplete,    setMjComplete]    = useState(false)
+  const [mjUrlInput,    setMjUrlInput]    = useState("")
+  const [mjUrlWarning,  setMjUrlWarning]  = useState<string | null>(null)
+  const [mjUploading,   setMjUploading]   = useState(false)
+  const mjFileRef = useRef<HTMLInputElement>(null)
+
+  // Manual import state
   const [imageUrl,           setImageUrl]            = useState("")
   const [imageUrlInput,      setImageUrlInput]       = useState("")
   const [imageError,         setImageError]          = useState(false)
@@ -87,11 +114,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
   const [assetName,          setAssetName]           = useState("")
   const [promptWarning,      setPromptWarning]       = useState<string | null>(null)
   const [uploading,          setUploading]           = useState(false)
-
-  // Generation state
-  const [isGenerating, startGenerating] = useTransition()
-  const [genError,           setGenError]            = useState<string | null>(null)
-  const [genResults,         setGenResults]          = useState<Array<{ imageUrl: string; assetId: string }>>([])
 
   const fileRef = useRef<HTMLInputElement>(null)
   const presets = getPresetsForProducer(producerSlug)
@@ -120,9 +142,38 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
     setBuiltPrompt(prompt)
     setPromptSaved(false)
     setGenResults([])
+    resetMjState()
+  }
+
+  function resetMjState() {
+    setMjPendingId(null)
+    setMjError(null)
+    setMjComplete(false)
+    setMjUrlInput("")
+    setMjUrlWarning(null)
+  }
+
+  function handleProviderChange(p: GenProvider) {
+    setGenProvider(p)
+    setGenResults([])
+    setGenError(null)
+    resetMjState()
+    setImageUrl("")
+    setImageUrlInput("")
+    setImageError(false)
+    setSavedAssetMsg(null)
+    setAssetError(null)
+    setPromptWarning(null)
   }
 
   async function handleCopy() {
+    if (!builtPrompt) return
+    await navigator.clipboard.writeText(builtPrompt)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function handleCopyMjPrompt() {
     if (!builtPrompt) return
     await navigator.clipboard.writeText(builtPrompt)
     setCopied(true)
@@ -141,6 +192,121 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
     setSavingPrompt(false)
     setPromptSaved(true)
   }
+
+  // ── OpenAI ──────────────────────────────────────────────────────────────────
+
+  function handleGenerateImage() {
+    if (!builtPrompt.trim()) return
+    setGenError(null)
+    startGenerating(async () => {
+      const result = await generateThumbnailImages({
+        prompt:      builtPrompt.trim(),
+        count:       1,
+        producerSlug: producerSlug || undefined,
+      })
+      if ("error" in result) {
+        setGenError(result.error)
+        return
+      }
+      setGenResults(result.images)
+      if (result.images[0]) {
+        setImageUrl(result.images[0].imageUrl)
+        setImageUrlInput(result.images[0].imageUrl)
+        setImageError(false)
+        setSavedAssetMsg("Image generated and saved to Assets.")
+        setAssetError(null)
+      }
+    })
+  }
+
+  // ── Midjourney ──────────────────────────────────────────────────────────────
+
+  async function handleSendToMidjourneyQueue() {
+    if (!builtPrompt.trim() || !producerSlug) return
+    setMjSending(true)
+    setMjError(null)
+    const result = await createMidjourneyPendingAsset({
+      producerSlug,
+      prompt:      builtPrompt.trim(),
+      styleBucket: styleBucket || selectedPreset?.prompt_defaults.style_bucket || undefined,
+    })
+    setMjSending(false)
+    if ("error" in result) {
+      setMjError(result.error)
+      return
+    }
+    setMjPendingId(result.id)
+  }
+
+  async function handleMjCompleteByUrl() {
+    const url = mjUrlInput.trim()
+    if (!url || !mjPendingId) return
+    if (!isValidHttpImageUrl(url)) {
+      setMjUrlWarning("Paste a direct image URL (https://…), not a prompt.")
+      return
+    }
+    setMjUrlWarning(null)
+    setMjCompleting(true)
+    const result = await completeMidjourneyAsset({
+      id:           mjPendingId,
+      imageUrl:     url,
+      producerSlug: producerSlug || undefined,
+    })
+    setMjCompleting(false)
+    if ("error" in result) {
+      setMjError(result.error)
+      return
+    }
+    setMjComplete(true)
+    setImageUrl(result.permanentUrl)
+    setImageUrlInput(result.permanentUrl)
+    setImageError(false)
+    setSavedAssetMsg("Midjourney image saved to Assets and Thumbnail Library ✓")
+    setMjPendingId(null)
+  }
+
+  async function handleMjFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !mjPendingId) return
+    setMjUploading(true)
+    setMjError(null)
+    const fd = new FormData()
+    fd.append("file", file)
+    fd.append("type", "image")
+    if (producerSlug) fd.append("producer_slug", producerSlug)
+    try {
+      const { uploadAssetFile } = await import("@/app/actions/assets")
+      const uploadResult = await uploadAssetFile(fd)
+      if ("error" in uploadResult) {
+        setMjError((uploadResult as { error: string }).error)
+        return
+      }
+      const r = uploadResult as { id: string; url: string }
+      const result = await completeMidjourneyAsset({
+        id:              mjPendingId,
+        imageUrl:        r.url,
+        existingAssetId: r.id,
+        producerSlug:    producerSlug || undefined,
+      })
+      if ("error" in result) {
+        setMjError(result.error)
+        return
+      }
+      setMjComplete(true)
+      setImageUrl(result.permanentUrl)
+      setImageUrlInput(result.permanentUrl)
+      setImageError(false)
+      setSavedAssetMsg("Midjourney image saved to Assets and Thumbnail Library ✓")
+      setMjPendingId(null)
+    } catch (err) {
+      setMjError(err instanceof Error ? err.message : "Upload failed")
+    } finally {
+      setMjUploading(false)
+      if (mjFileRef.current) mjFileRef.current.value = ""
+    }
+  }
+
+  // ── Manual Import ──────────────────────────────────────────────────────────
 
   function handleAddUrl() {
     const url = imageUrlInput.trim()
@@ -164,12 +330,10 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
     if (!file) return
     setUploading(true)
     setAssetError(null)
-
     const fd = new FormData()
     fd.append("file", file)
     fd.append("type", "image")
     if (producerSlug) fd.append("producer_slug", producerSlug)
-
     try {
       const { uploadAssetFile } = await import("@/app/actions/assets")
       const result = await uploadAssetFile(fd)
@@ -186,31 +350,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ""
     }
-  }
-
-  function handleGenerateImage() {
-    if (!builtPrompt.trim()) return
-    setGenError(null)
-    startGenerating(async () => {
-      const result = await generateThumbnailImages({
-        prompt:      builtPrompt.trim(),
-        count:       1,
-        producerSlug: producerSlug || undefined,
-      })
-      if ("error" in result) {
-        setGenError(result.error)
-        return
-      }
-      setGenResults(result.images)
-      // Auto-select the first generated image
-      if (result.images[0]) {
-        setImageUrl(result.images[0].imageUrl)
-        setImageUrlInput(result.images[0].imageUrl)
-        setImageError(false)
-        setSavedAssetMsg("Image generated and saved to Assets. Click Save below to add to thumbnail library.")
-        setAssetError(null)
-      }
-    })
   }
 
   async function handleSaveToAssets() {
@@ -389,7 +528,7 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
           </button>
         </div>
 
-        {/* RIGHT: Prompt output + Image import */}
+        {/* RIGHT: Prompt output + provider selector + action */}
         <div className="space-y-4">
           {builtPrompt ? (
             <>
@@ -397,7 +536,7 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
                 <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1.5">Enhanced Prompt</label>
                 <textarea
                   value={builtPrompt}
-                  onChange={(e) => { setBuiltPrompt(e.target.value); setGenResults([]) }}
+                  onChange={(e) => { setBuiltPrompt(e.target.value); setGenResults([]); resetMjState() }}
                   rows={7}
                   className="w-full bg-black/30 border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white/85 focus:outline-none focus:border-violet-500/50 resize-none font-mono leading-relaxed"
                 />
@@ -421,48 +560,277 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
                 </button>
               </div>
 
-              {/* Generate Image button */}
-              {generationEnabled ? (
+              {/* ── Provider selector ── */}
+              <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-1 flex gap-1">
                 <button
                   type="button"
-                  onClick={handleGenerateImage}
-                  disabled={isGenerating || !builtPrompt.trim()}
-                  className="w-full py-3.5 rounded-xl bg-violet-700/70 hover:bg-violet-700 active:scale-[0.98] text-white font-semibold text-sm disabled:opacity-40 transition-all border border-violet-500/30"
+                  onClick={() => handleProviderChange("openai")}
+                  className={`flex-1 py-2.5 rounded-xl text-[11px] font-medium transition-colors ${
+                    genProvider === "openai"
+                      ? "bg-violet-600/40 text-white border border-violet-500/40"
+                      : "text-white/35 hover:text-white/60"
+                  }`}
                 >
-                  {isGenerating ? "Generating image…" : "Generate Image (OpenAI DALL-E 3) →"}
+                  ⚡ Quick · OpenAI
                 </button>
-              ) : (
-                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                  <p className="text-[10px] text-white/30 leading-relaxed">
-                    <span className="text-white/50">Direct image generation</span> — add <span className="font-mono text-amber-400/60">OPENAI_API_KEY</span> to your environment to enable. Until then, copy the prompt above and use Midjourney or DALL-E manually.
-                  </p>
+                <button
+                  type="button"
+                  onClick={() => handleProviderChange("midjourney")}
+                  className={`flex-1 py-2.5 rounded-xl text-[11px] font-medium transition-colors ${
+                    genProvider === "midjourney"
+                      ? "bg-sky-600/30 text-sky-200 border border-sky-500/30"
+                      : "text-white/35 hover:text-white/60"
+                  }`}
+                >
+                  ✦ Premium · Midjourney
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleProviderChange("manual")}
+                  className={`flex-1 py-2.5 rounded-xl text-[11px] font-medium transition-colors ${
+                    genProvider === "manual"
+                      ? "bg-white/[0.08] text-white border border-white/20"
+                      : "text-white/35 hover:text-white/60"
+                  }`}
+                >
+                  ↑ Manual Import
+                </button>
+              </div>
+
+              {/* ── OpenAI panel ── */}
+              {genProvider === "openai" && (
+                <div className="space-y-3">
+                  {generationEnabled ? (
+                    <button
+                      type="button"
+                      onClick={handleGenerateImage}
+                      disabled={isGenerating || !builtPrompt.trim()}
+                      className="w-full py-3.5 rounded-xl bg-violet-700/70 hover:bg-violet-700 active:scale-[0.98] text-white font-semibold text-sm disabled:opacity-40 transition-all border border-violet-500/30"
+                    >
+                      {isGenerating ? "Generating image…" : "Generate Image (OpenAI DALL-E 3) →"}
+                    </button>
+                  ) : (
+                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                      <p className="text-[10px] text-white/30 leading-relaxed">
+                        Add <span className="font-mono text-amber-400/60">OPENAI_API_KEY</span> to enable direct generation.
+                      </p>
+                    </div>
+                  )}
+                  {genError && (
+                    <div className="rounded-xl bg-red-500/[0.07] border border-red-500/20 px-3 py-2.5">
+                      <p className="text-[11px] text-red-400/80 leading-relaxed">{genError}</p>
+                    </div>
+                  )}
+                  {genResults.length > 1 && (
+                    <div>
+                      <p className="text-[9px] uppercase tracking-[0.18em] text-white/30 mb-2">Generated Options — click to select</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {genResults.map((img, i) => (
+                          <button
+                            type="button"
+                            key={img.assetId}
+                            onClick={() => { setImageUrl(img.imageUrl); setImageUrlInput(img.imageUrl); setImageError(false) }}
+                            className={`aspect-video rounded-xl overflow-hidden border transition-colors ${imageUrl === img.imageUrl ? "border-violet-500/70 ring-1 ring-violet-500/30" : "border-white/[0.08] hover:border-white/20"}`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={img.imageUrl} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {genError && (
-                <div className="rounded-xl bg-red-500/[0.07] border border-red-500/20 px-3 py-2.5">
-                  <p className="text-[11px] text-red-400/80 leading-relaxed">{genError}</p>
-                </div>
-              )}
-
-              {/* Multiple gen results picker */}
-              {genResults.length > 1 && (
-                <div>
-                  <p className="text-[9px] uppercase tracking-[0.18em] text-white/30 mb-2">Generated Options — click to select</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {genResults.map((img, i) => (
+              {/* ── Midjourney panel ── */}
+              {genProvider === "midjourney" && (
+                <div className="space-y-3">
+                  {!mjPendingId && !mjComplete ? (
+                    <>
+                      <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.05] px-4 py-3">
+                        <p className="text-[11px] text-sky-300/70 leading-relaxed">
+                          Sends this prompt to the Midjourney queue. Copy the prompt → generate in Midjourney → paste the finished image URL below.
+                        </p>
+                      </div>
+                      {mjError && (
+                        <p className="text-[11px] text-red-400/70">{mjError}</p>
+                      )}
                       <button
                         type="button"
-                        key={img.assetId}
-                        onClick={() => { setImageUrl(img.imageUrl); setImageUrlInput(img.imageUrl); setImageError(false) }}
-                        className={`aspect-video rounded-xl overflow-hidden border transition-colors ${imageUrl === img.imageUrl ? "border-violet-500/70 ring-1 ring-violet-500/30" : "border-white/[0.08] hover:border-white/20"}`}
+                        onClick={handleSendToMidjourneyQueue}
+                        disabled={mjSending || !builtPrompt.trim() || !producerSlug}
+                        className="w-full py-3.5 rounded-xl bg-sky-700/60 hover:bg-sky-700/80 active:scale-[0.98] text-white font-semibold text-sm disabled:opacity-40 transition-all border border-sky-500/30"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img.imageUrl} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
+                        {mjSending ? "Sending…" : "Send to Midjourney Queue →"}
                       </button>
-                    ))}
-                  </div>
+                      {!producerSlug && (
+                        <p className="text-[10px] text-white/30 text-center">Select a producer first</p>
+                      )}
+                    </>
+                  ) : mjPendingId ? (
+                    /* Pending card — prompt queued, awaiting image */
+                    <div className="rounded-2xl border border-sky-500/25 bg-sky-500/[0.04] p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-sky-300/60">Queued — Awaiting Image</p>
+                      </div>
+
+                      <div className="bg-black/30 rounded-lg px-3 py-2.5">
+                        <p className="text-[11px] text-white/50 font-mono leading-relaxed line-clamp-3">{builtPrompt}</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleCopyMjPrompt}
+                        className="w-full py-2.5 rounded-xl border border-sky-500/30 bg-sky-600/10 text-sky-300 hover:bg-sky-600/20 text-sm font-medium transition-colors"
+                      >
+                        {copied ? "Copied!" : "Copy Prompt for Midjourney"}
+                      </button>
+
+                      <div className="h-px bg-white/[0.06]" />
+
+                      <p className="text-[9px] uppercase tracking-[0.18em] text-white/25">Paste Finished Image URL</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={mjUrlInput}
+                          onChange={(e) => { setMjUrlInput(e.target.value); setMjUrlWarning(null) }}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleMjCompleteByUrl() } }}
+                          placeholder="https://cdn.midjourney.com/…"
+                          className={`flex-1 bg-black/30 border rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none transition-colors ${mjUrlWarning ? "border-amber-500/50" : "border-white/[0.08] focus:border-sky-500/50"}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleMjCompleteByUrl}
+                          disabled={mjCompleting || !mjUrlInput.trim()}
+                          className="px-4 py-2.5 rounded-xl bg-sky-700/60 hover:bg-sky-700/80 text-sm text-white disabled:opacity-40 transition-colors whitespace-nowrap"
+                        >
+                          {mjCompleting ? "Saving…" : "Complete"}
+                        </button>
+                      </div>
+                      {mjUrlWarning && <p className="text-[10px] text-amber-300/70">{mjUrlWarning}</p>}
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-px bg-white/[0.06]" />
+                        <span className="text-[10px] text-white/20">or upload</span>
+                        <div className="flex-1 h-px bg-white/[0.06]" />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => mjFileRef.current?.click()}
+                        disabled={mjUploading}
+                        className="w-full py-2.5 rounded-xl border border-dashed border-white/[0.1] text-sm text-white/40 hover:text-white/70 hover:border-white/20 disabled:opacity-40 transition-colors"
+                      >
+                        {mjUploading ? "Uploading…" : "Upload Finished Image"}
+                      </button>
+                      <input ref={mjFileRef} type="file" accept="image/*" className="hidden" onChange={handleMjFileUpload} />
+
+                      {mjError && <p className="text-[11px] text-red-400/70">{mjError}</p>}
+                    </div>
+                  ) : null}
                 </div>
+              )}
+
+              {/* ── Manual Import panel ── */}
+              {genProvider === "manual" && (
+                <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 space-y-3">
+                  <p className="text-[9px] uppercase tracking-[0.2em] text-white/30">Import Finished Thumbnail</p>
+
+                  {imageUrl && !imageError ? (
+                    <div className="relative rounded-xl overflow-hidden border border-white/[0.1]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imageUrl}
+                        alt="Selected thumbnail"
+                        className="w-full object-cover rounded-xl"
+                        onError={() => setImageError(true)}
+                      />
+                      <button
+                        type="button"
+                        onClick={clearImage}
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 text-white/60 hover:text-white text-xs flex items-center justify-center"
+                        title="Clear image"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={imageUrlInput}
+                          onChange={(e) => { setImageUrlInput(e.target.value); setPromptWarning(null) }}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddUrl() } }}
+                          placeholder="Paste final image URL here — not the prompt"
+                          className={`flex-1 bg-black/30 border rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none transition-colors ${promptWarning ? "border-amber-500/50 focus:border-amber-500/70" : "border-white/[0.08] focus:border-violet-500/50"}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddUrl}
+                          disabled={!imageUrlInput.trim()}
+                          className="px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.1] text-sm text-white/60 hover:text-white hover:bg-white/[0.1] disabled:opacity-40 transition-colors whitespace-nowrap"
+                        >
+                          Import URL
+                        </button>
+                      </div>
+
+                      {promptWarning && (
+                        <div className="rounded-xl bg-amber-500/[0.08] border border-amber-500/25 px-3 py-2.5">
+                          <p className="text-[11px] text-amber-300/80 leading-relaxed">{promptWarning}</p>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-px bg-white/[0.06]" />
+                        <span className="text-[10px] text-white/20">or</span>
+                        <div className="flex-1 h-px bg-white/[0.06]" />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => fileRef.current?.click()}
+                        disabled={uploading}
+                        className="w-full py-3 rounded-xl border border-dashed border-white/[0.1] text-sm text-white/40 hover:text-white/70 hover:border-white/20 disabled:opacity-40 transition-colors"
+                      >
+                        {uploading ? "Uploading…" : "Upload Image File"}
+                      </button>
+                      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+                    </>
+                  )}
+
+                  {imageError && (
+                    <p className="text-[11px] text-red-400/70">Could not load image from that URL. Try uploading the file instead.</p>
+                  )}
+
+                  {imageUrl && !imageError && (
+                    <div className="space-y-2 pt-1">
+                      <input
+                        type="text"
+                        value={assetName}
+                        onChange={(e) => setAssetName(e.target.value)}
+                        placeholder="Asset name (optional)"
+                        className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveToAssets}
+                        disabled={savingAsset || !producerSlug}
+                        className="w-full py-3.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 active:scale-[0.98] text-white font-semibold text-sm disabled:opacity-50 transition-all"
+                      >
+                        {savingAsset ? "Saving…" : "Save to Assets"}
+                      </button>
+                      {savedAssetMsg && <p className="text-[11px] text-emerald-400/80 text-center">{savedAssetMsg}</p>}
+                      {assetError && <p className="text-[11px] text-red-400/70 text-center">{assetError}</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Success message for completed Midjourney image */}
+              {savedAssetMsg && (genProvider === "openai" || mjComplete) && (
+                <p className="text-[11px] text-emerald-400/80 text-center">{savedAssetMsg}</p>
               )}
             </>
           ) : (
@@ -470,104 +838,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
               <p className="text-sm text-white/15 text-center px-4">Build a prompt to see options here</p>
             </div>
           )}
-
-          {/* Import section */}
-          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 space-y-3">
-            <p className="text-[9px] uppercase tracking-[0.2em] text-white/30">Import Finished Thumbnail</p>
-
-            {imageUrl && !imageError ? (
-              <div className="relative rounded-xl overflow-hidden border border-white/[0.1]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imageUrl}
-                  alt="Selected thumbnail"
-                  className="w-full object-cover rounded-xl"
-                  onError={() => setImageError(true)}
-                />
-                <button
-                  type="button"
-                  onClick={clearImage}
-                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 text-white/60 hover:text-white text-xs flex items-center justify-center"
-                  title="Clear image"
-                >
-                  ×
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={imageUrlInput}
-                    onChange={(e) => { setImageUrlInput(e.target.value); setPromptWarning(null) }}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddUrl() } }}
-                    placeholder="Paste final image URL here — not the prompt"
-                    className={`flex-1 bg-black/30 border rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none transition-colors ${promptWarning ? "border-amber-500/50 focus:border-amber-500/70" : "border-white/[0.08] focus:border-violet-500/50"}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddUrl}
-                    disabled={!imageUrlInput.trim()}
-                    className="px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.1] text-sm text-white/60 hover:text-white hover:bg-white/[0.1] disabled:opacity-40 transition-colors whitespace-nowrap"
-                  >
-                    Import Image URL
-                  </button>
-                </div>
-
-                {promptWarning && (
-                  <div className="rounded-xl bg-amber-500/[0.08] border border-amber-500/25 px-3 py-2.5">
-                    <p className="text-[11px] text-amber-300/80 leading-relaxed">{promptWarning}</p>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px bg-white/[0.06]" />
-                  <span className="text-[10px] text-white/20">or</span>
-                  <div className="flex-1 h-px bg-white/[0.06]" />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  className="w-full py-3 rounded-xl border border-dashed border-white/[0.1] text-sm text-white/40 hover:text-white/70 hover:border-white/20 disabled:opacity-40 transition-colors"
-                >
-                  {uploading ? "Uploading…" : "Upload Image File"}
-                </button>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
-              </>
-            )}
-
-            {imageError && (
-              <p className="text-[11px] text-red-400/70">Could not load image from that URL. Try uploading the file instead.</p>
-            )}
-
-            {imageUrl && !imageError && (
-              <div className="space-y-2 pt-1">
-                <input
-                  type="text"
-                  value={assetName}
-                  onChange={(e) => setAssetName(e.target.value)}
-                  placeholder="Asset name (optional)"
-                  className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50"
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveToAssets}
-                  disabled={savingAsset || !producerSlug}
-                  className="w-full py-3.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 active:scale-[0.98] text-white font-semibold text-sm disabled:opacity-50 transition-all"
-                >
-                  {savingAsset ? "Saving…" : "Save to Assets"}
-                </button>
-                {savedAssetMsg && (
-                  <p className="text-[11px] text-emerald-400/80 text-center">{savedAssetMsg}</p>
-                )}
-                {assetError && (
-                  <p className="text-[11px] text-red-400/70 text-center">{assetError}</p>
-                )}
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
