@@ -1,6 +1,9 @@
 import Link from "next/link"
 import { requireAdmin } from "@/lib/auth"
 import { getProducers } from "@/lib/db/producers"
+import { getAssets } from "@/lib/db/assets"
+import { PlayButton } from "@/components/admin/player/PlayButton"
+import type { AudioTrack } from "@/lib/player/context"
 
 export const metadata = { title: "Producer Network — SUMG Admin" }
 
@@ -12,9 +15,17 @@ const STATUS_DOT: Record<string, string> = {
 
 export default async function ProducersAdminPage() {
   await requireAdmin()
-  const producers = await getProducers()
+  const [producers, audioAssets] = await Promise.all([getProducers(), getAssets("audio")])
   const totalCredits = producers.reduce((s, p) => s + p.credits, 0)
   const ytLinked = producers.filter((p) => p.ytChannelId).length
+
+  // Group audio tracks by producer slug for play queues
+  const audioByProducer = audioAssets.reduce<Record<string, AudioTrack[]>>((acc, a) => {
+    if (!a.producer_slug) return acc
+    if (!acc[a.producer_slug]) acc[a.producer_slug] = []
+    acc[a.producer_slug].push({ id: a.id, url: a.url, title: a.filename, producer: a.producer_slug, source: "producer-bin" })
+    return acc
+  }, {})
 
   return (
     <main className="px-6 py-10 md:px-10 max-w-5xl">
@@ -83,6 +94,14 @@ export default async function ProducersAdminPage() {
                   {producer.ytHandle && ` · ${producer.ytHandle}`}
                 </p>
               </div>
+
+              {/* Play button — loads all audio assets for this producer */}
+              {audioByProducer[producer.slug]?.length > 0 && (
+                <PlayButton
+                  track={audioByProducer[producer.slug][0]}
+                  queue={audioByProducer[producer.slug]}
+                />
+              )}
 
               {/* DNA link indicator */}
               {producer.dnaSlug && (
