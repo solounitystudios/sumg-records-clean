@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { requireAdmin } from "@/lib/auth"
-import { getAllInboxItems, getInboxCounts } from "@/lib/db/audioInbox"
+import { getAllInboxItems, getArchivedInboxItems, getInboxCounts } from "@/lib/db/audioInbox"
 import { getProducers } from "@/lib/db/producers"
 import { InboxClient } from "./InboxClient"
 import type { InboxStatus } from "@/lib/db/audioInbox"
@@ -10,7 +10,7 @@ export const metadata = { title: "Audio Inbox — SUMG Admin" }
 const VALID_STATUSES: Set<string> = new Set([
   "new_asset", "analyzing", "needs_review", "needs_metadata",
   "needs_thumbnail", "needs_render", "ready_to_schedule",
-  "scheduled", "uploaded", "failed",
+  "scheduled", "uploaded", "failed", "archived",
 ])
 
 export default async function AudioInboxPage({
@@ -21,10 +21,12 @@ export default async function AudioInboxPage({
   await requireAdmin()
 
   const { status } = await searchParams
-  const activeFilter = status && VALID_STATUSES.has(status) ? (status as InboxStatus) : "all"
+  const activeFilter = status && VALID_STATUSES.has(status) ? status : "all"
 
   const [items, producers, counts] = await Promise.all([
-    getAllInboxItems(activeFilter === "all" ? undefined : activeFilter as InboxStatus),
+    activeFilter === "archived"
+      ? getArchivedInboxItems()
+      : getAllInboxItems(activeFilter === "all" ? undefined : activeFilter as InboxStatus),
     getProducers(),
     getInboxCounts(),
   ])
@@ -122,7 +124,7 @@ export default async function AudioInboxPage({
           .filter((p) => !p.status || p.status === "active")
           .map((p) => ({ slug: p.slug, name: p.name }))}
         counts={counts}
-        activeFilter={activeFilter === "all" ? "all" : activeFilter}
+        activeFilter={activeFilter}
       />
     </div>
   )

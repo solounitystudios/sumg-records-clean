@@ -1151,6 +1151,66 @@ export async function bulkAutoApproveHighScore(inboxIds: string[]): Promise<{ pr
   return { processed, errors }
 }
 
+// ─── Archive / Restore / Hard-delete ─────────────────────────────────────────
+
+export async function archiveInboxItem(inboxId: string): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireAdmin()
+  const { error } = await supabase
+    .from("audio_inbox")
+    .update({ deleted_at: new Date().toISOString(), deleted_by: user.email ?? "admin", updated_at: new Date().toISOString() })
+    .eq("id", inboxId)
+  if (error) return { ok: false, error: error.message }
+  await appendLog(inboxId, "archived", `Archived by ${user.email ?? "admin"}`)
+  revalidateInbox()
+  return { ok: true }
+}
+
+export async function restoreInboxItem(inboxId: string): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireAdmin()
+  const { error } = await supabase
+    .from("audio_inbox")
+    .update({ deleted_at: null, deleted_by: null, updated_at: new Date().toISOString() })
+    .eq("id", inboxId)
+  if (error) return { ok: false, error: error.message }
+  await appendLog(inboxId, "restored", `Restored by ${user.email ?? "admin"}`)
+  revalidateInbox()
+  return { ok: true }
+}
+
+export async function hardDeleteInboxItem(inboxId: string): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin()
+  const { error } = await supabase.from("audio_inbox").delete().eq("id", inboxId)
+  if (error) return { ok: false, error: error.message }
+  revalidateInbox()
+  return { ok: true }
+}
+
+export async function bulkArchiveInbox(inboxIds: string[]): Promise<{ processed: number; errors: string[] }> {
+  await requireAdmin()
+  const errors: string[] = []
+  let processed = 0
+  for (const id of inboxIds) {
+    const r = await archiveInboxItem(id)
+    if (r.ok) processed++
+    else errors.push(`${id}: ${r.error}`)
+  }
+  revalidateInbox()
+  return { processed, errors }
+}
+
+export async function bulkDeleteInbox(inboxIds: string[]): Promise<{ processed: number; errors: string[] }> {
+  await requireAdmin()
+  const errors: string[] = []
+  let processed = 0
+  for (const id of inboxIds) {
+    const r = await hardDeleteInboxItem(id)
+    if (r.ok) processed++
+    else errors.push(`${id}: ${r.error}`)
+  }
+  revalidateInbox()
+  return { processed, errors }
+}
+
 // ─── Bulk: schedule ───────────────────────────────────────────────────────────
 
 export async function bulkSchedule(inboxIds: string[]): Promise<{ processed: number; errors: string[] }> {

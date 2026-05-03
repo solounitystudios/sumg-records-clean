@@ -12,10 +12,15 @@ import {
   bulkCreateJobs,
   bulkRender,
   bulkSchedule,
+  bulkArchiveInbox,
+  bulkDeleteInbox,
   updateInboxMetadata,
   classifyAsset,
   approveInboxItem,
   resetInboxItem,
+  archiveInboxItem,
+  restoreInboxItem,
+  hardDeleteInboxItem,
   selectTitleVariant,
   selectThumbnailVariant,
   setLockedTitle,
@@ -71,6 +76,7 @@ const FILTER_TABS: Array<{ key: string; label: string }> = [
   { key: "scheduled",          label: "Scheduled" },
   { key: "uploaded",           label: "Uploaded" },
   { key: "failed",             label: "Failed" },
+  { key: "archived",           label: "Archived" },
 ]
 
 function formatBytes(bytes: number | null): string {
@@ -146,6 +152,8 @@ function InboxRow({
   const [acting, setActing] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [msgIsError, setMsgIsError] = useState(false)
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const showMessage = (m: string, isError = false) => {
     setMsg(m)
@@ -221,6 +229,33 @@ function InboxRow({
     setEdit(initEdit(item))
     onRefresh()
     showMessage("Reset to new_asset")
+  }
+
+  async function handleArchive() {
+    setShowDropdown(false)
+    setActing(true)
+    const r = await archiveInboxItem(item.id)
+    setActing(false)
+    if (r.ok) { onRefresh(); showMessage("Archived") }
+    else showMessage(r.error ?? "Archive failed", true)
+  }
+
+  async function handleRestore() {
+    setShowDropdown(false)
+    setActing(true)
+    const r = await restoreInboxItem(item.id)
+    setActing(false)
+    if (r.ok) { onRefresh(); showMessage("Restored") }
+    else showMessage(r.error ?? "Restore failed", true)
+  }
+
+  async function handleHardDelete() {
+    setShowDeleteConfirm(false)
+    setActing(true)
+    const r = await hardDeleteInboxItem(item.id)
+    setActing(false)
+    if (r.ok) onRefresh()
+    else showMessage(r.error ?? "Delete failed", true)
   }
 
   async function handleSelectTitle(index: number) {
@@ -376,8 +411,99 @@ function InboxRow({
           >
             {expanded ? "▲" : "▼"}
           </button>
+
+          {/* Row actions dropdown */}
+          {showDropdown && (
+            <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
+          )}
+          <div className="relative z-50">
+            <button
+              onClick={() => setShowDropdown((v) => !v)}
+              className="text-[9px] border border-white/10 px-2 py-1 rounded-lg text-white/30 hover:text-white/60 hover:border-white/20 transition-colors"
+              title="More actions"
+            >
+              ⋯
+            </button>
+            {showDropdown && (
+              <div className="absolute right-0 top-full mt-1 rounded-xl border border-white/[0.12] bg-[#0a0c10] shadow-xl shadow-black/70 py-1 min-w-[148px]">
+                {!item.deletedAt ? (
+                  <>
+                    <button
+                      onClick={handleArchive}
+                      disabled={acting}
+                      className="w-full text-left px-3 py-1.5 text-[11px] text-white/50 hover:text-white hover:bg-white/[0.04] transition-colors disabled:opacity-40"
+                    >
+                      Archive
+                    </button>
+                    <button
+                      onClick={() => { setShowDropdown(false); setShowDeleteConfirm(true) }}
+                      className="w-full text-left px-3 py-1.5 text-[11px] text-red-400/60 hover:text-red-400 hover:bg-red-500/[0.04] transition-colors"
+                    >
+                      Delete permanently
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleRestore}
+                      disabled={acting}
+                      className="w-full text-left px-3 py-1.5 text-[11px] text-emerald-400/60 hover:text-emerald-400 hover:bg-emerald-500/[0.04] transition-colors disabled:opacity-40"
+                    >
+                      Restore
+                    </button>
+                    <button
+                      onClick={() => { setShowDropdown(false); setShowDeleteConfirm(true) }}
+                      className="w-full text-left px-3 py-1.5 text-[11px] text-red-400/60 hover:text-red-400 hover:bg-red-500/[0.04] transition-colors"
+                    >
+                      Delete permanently
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Delete confirmation dialog */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            className="bg-[#0d1016] border border-white/[0.12] rounded-2xl p-6 max-w-sm w-full shadow-2xl shadow-black/80"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-semibold text-white mb-2">Delete this item?</h3>
+            {item.status === "uploaded" && (
+              <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                <p className="text-[11px] text-amber-400/80 leading-relaxed">
+                  This item has already been uploaded to YouTube. Deleting it removes the inbox record only — the YouTube video will not be affected.
+                </p>
+              </div>
+            )}
+            <p className="text-xs text-white/35 mb-5 leading-relaxed">
+              This permanently removes the inbox record and cannot be undone. Related YT jobs and DNA packs are preserved.
+            </p>
+            <div className="flex items-center gap-2 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="text-xs text-white/35 hover:text-white/65 transition-colors px-3 py-1.5"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleHardDelete}
+                disabled={acting}
+                className="text-xs border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/60 transition-colors px-4 py-1.5 rounded-lg disabled:opacity-50"
+              >
+                Delete permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Expanded detail panel */}
       {expanded && (
@@ -735,10 +861,12 @@ export function InboxClient({ items, producers, counts, activeFilter }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [isPending, startTransition] = useTransition()
   const [bulkMsg, setBulkMsg] = useState<string | null>(null)
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
 
   const refresh = useCallback(() => router.refresh(), [router])
 
-  const filteredItems = activeFilter === "all"
+  // "all" and "archived" both pass items through unchanged — server already filters
+  const filteredItems = (activeFilter === "all" || activeFilter === "archived")
     ? items
     : items.filter((i) => i.status === activeFilter)
 
@@ -910,6 +1038,19 @@ export function InboxClient({ items, producers, counts, activeFilter }: Props) {
               >
                 Schedule
               </button>
+              <div className="w-px h-4 bg-white/[0.08] mx-1 flex-none" />
+              <button
+                onClick={() => runBulk("Archive", bulkArchiveInbox)}
+                className="text-[11px] border border-white/15 px-3 py-1.5 rounded-xl text-white/45 hover:text-white hover:border-white/30 transition-colors whitespace-nowrap"
+              >
+                Archive
+              </button>
+              <button
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                className="text-[11px] border border-red-500/25 px-3 py-1.5 rounded-xl text-red-400/55 hover:text-red-400 hover:border-red-500/45 transition-colors whitespace-nowrap"
+              >
+                Delete
+              </button>
               <button
                 onClick={() => setSelected(new Set())}
                 className="text-[10px] text-white/25 hover:text-white/50 transition-colors ml-1"
@@ -920,6 +1061,50 @@ export function InboxClient({ items, producers, counts, activeFilter }: Props) {
           ) : (
             <span className="text-[11px] text-white/40 px-2">Processing…</span>
           )}
+        </div>
+      )}
+
+      {/* Bulk delete confirmation */}
+      {showBulkDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setShowBulkDeleteConfirm(false)}
+        >
+          <div
+            className="bg-[#0d1016] border border-white/[0.12] rounded-2xl p-6 max-w-sm w-full shadow-2xl shadow-black/80"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-semibold text-white mb-2">
+              Delete {selected.size} item{selected.size !== 1 ? "s" : ""}?
+            </h3>
+            {Array.from(selected).some((id) => items.find((i) => i.id === id)?.status === "uploaded") && (
+              <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                <p className="text-[11px] text-amber-400/80 leading-relaxed">
+                  One or more selected items have already been uploaded to YouTube. Deleting removes the inbox record only — YouTube videos are not affected.
+                </p>
+              </div>
+            )}
+            <p className="text-xs text-white/35 mb-5 leading-relaxed">
+              This permanently removes these inbox records and cannot be undone. Related YT jobs and DNA packs are preserved.
+            </p>
+            <div className="flex items-center gap-2 justify-end">
+              <button
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="text-xs text-white/35 hover:text-white/65 transition-colors px-3 py-1.5"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowBulkDeleteConfirm(false)
+                  runBulk("Delete", bulkDeleteInbox)
+                }}
+                className="text-xs border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:border-red-500/60 transition-colors px-4 py-1.5 rounded-lg"
+              >
+                Delete permanently
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

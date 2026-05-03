@@ -66,6 +66,9 @@ export interface AudioInboxRow {
   assetMimeType: string | null
   // Resolved through yt_upload_jobs.thumbnail_asset_id → assets.url
   thumbnailAssetUrl: string | null
+  // Soft delete
+  deletedAt: string | null
+  deletedBy: string | null
 }
 
 interface AssetSnippet {
@@ -117,6 +120,8 @@ function toRow(r: any): AudioInboxRow {
     assetSizeBytes:       r._asset?.size_bytes ?? null,
     assetMimeType:        r._asset?.mime_type ?? null,
     thumbnailAssetUrl:    r._thumbnailAssetUrl ?? null,
+    deletedAt:            r.deleted_at ?? null,
+    deletedBy:            r.deleted_by ?? null,
   }
 }
 
@@ -177,6 +182,7 @@ export async function getAllInboxItems(status?: InboxStatus): Promise<AudioInbox
   let q = supabase
     .from("audio_inbox")
     .select("*")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(500)
 
@@ -184,6 +190,18 @@ export async function getAllInboxItems(status?: InboxStatus): Promise<AudioInbox
 
   const { data, error } = await q
   if (error) throw new Error(`getAllInboxItems: ${error.message}`)
+  const withAssets = await attachAssets(data ?? [])
+  return (await attachThumbnailUrls(withAssets)).map(toRow)
+}
+
+export async function getArchivedInboxItems(): Promise<AudioInboxRow[]> {
+  const { data, error } = await supabase
+    .from("audio_inbox")
+    .select("*")
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false })
+    .limit(200)
+  if (error) throw new Error(`getArchivedInboxItems: ${error.message}`)
   const withAssets = await attachAssets(data ?? [])
   return (await attachThumbnailUrls(withAssets)).map(toRow)
 }
@@ -243,21 +261,25 @@ const ALL_STATUSES: InboxStatus[] = [
   "failed",
 ]
 
-export async function getInboxCounts(): Promise<Record<InboxStatus | "all", number>> {
+export async function getInboxCounts(): Promise<Record<InboxStatus | "all" | "archived", number>> {
   // Parallel HEAD COUNT queries — transfers zero row data regardless of table size.
-  const [allResult, ...perStatus] = await Promise.all([
-    supabase.from("audio_inbox").select("*", { count: "exact", head: true }),
+  const [allResult, archivedResult, ...perStatus] = await Promise.all([
+    supabase.from("audio_inbox").select("*", { count: "exact", head: true }).is("deleted_at", null),
+    supabase.from("audio_inbox").select("*", { count: "exact", head: true }).not("deleted_at", "is", null),
     ...ALL_STATUSES.map((s) =>
-      supabase.from("audio_inbox").select("*", { count: "exact", head: true }).eq("status", s),
+      supabase.from("audio_inbox").select("*", { count: "exact", head: true }).eq("status", s).is("deleted_at", null),
     ),
   ])
 
   if (allResult.error) throw new Error(`getInboxCounts: ${allResult.error.message}`)
 
-  const counts: Record<string, number> = { all: allResult.count ?? 0 }
+  const counts: Record<string, number> = {
+    all:      allResult.count ?? 0,
+    archived: archivedResult.count ?? 0,
+  }
   ALL_STATUSES.forEach((s, i) => {
     counts[s] = perStatus[i].count ?? 0
   })
 
-  return counts as Record<InboxStatus | "all", number>
+  return counts as Record<InboxStatus | "all" | "archived", number>
 }
