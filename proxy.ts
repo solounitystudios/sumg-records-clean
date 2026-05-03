@@ -4,6 +4,26 @@ import { type NextRequest, NextResponse } from "next/server"
 const ADMIN_ROLES = ["owner", "co_owner", "admin", "editor", "media_manager", "release_manager"] as const
 const SETTINGS_ROLES = ["owner", "co_owner", "admin"] as const
 
+// Known valid path segments directly under /admin/youtube/
+const VALID_YT_SEGMENTS = new Set([
+  "inbox", "command", "monetization", "optimizer", "schedule",
+  "engine", "render", "queue", "channels", "jobs", "thumbnail-studio",
+])
+
+function isPromptAsPath(pathname: string): boolean {
+  if (!pathname.startsWith("/admin/youtube/")) return false
+  const segment = pathname.slice("/admin/youtube/".length).split("/")[0]
+  if (VALID_YT_SEGMENTS.has(segment)) return false
+  // Prompt text: long (>30 chars), has spaces/commas/hyphens from Midjourney flags
+  return (
+    segment.length > 30 ||
+    segment.includes("--") ||
+    segment.includes(",") ||
+    segment.includes("%20") || // URL-encoded space
+    segment.includes("%2C")    // URL-encoded comma
+  )
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -65,6 +85,12 @@ export async function proxy(request: NextRequest) {
     !SETTINGS_ROLES.includes(role as (typeof SETTINGS_ROLES)[number])
   ) {
     return NextResponse.redirect(new URL("/dashboard", request.url))
+  }
+
+  // Guard: prompt text accidentally used as a route (e.g. copy-paste into browser bar)
+  // Redirect to Thumbnail Studio instead of serving a 404.
+  if (isPromptAsPath(pathname)) {
+    return NextResponse.redirect(new URL("/admin/youtube/thumbnail-studio", request.url))
   }
 
   return response

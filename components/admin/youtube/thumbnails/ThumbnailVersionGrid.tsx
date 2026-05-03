@@ -171,10 +171,11 @@ export function ThumbnailVersionGrid({
           {addMode === "url" && (
             <>
               <input
-                type="url"
+                type="text"
                 placeholder="Image URL (Midjourney, external…)"
                 value={addUrl}
                 onChange={(e) => setAddUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault() }}
                 className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/25 focus:outline-none focus:border-violet-500/50"
               />
               <input
@@ -182,6 +183,7 @@ export function ThumbnailVersionGrid({
                 placeholder="Prompt used (optional)"
                 value={addPrompt}
                 onChange={(e) => setAddPrompt(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault() }}
                 className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/25 focus:outline-none focus:border-violet-500/50"
               />
               <div className="flex gap-2">

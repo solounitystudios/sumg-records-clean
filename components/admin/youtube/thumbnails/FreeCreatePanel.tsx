@@ -400,10 +400,10 @@ export function FreeCreatePanel({ producers }: Props) {
                 {/* URL input */}
                 <div className="flex gap-2">
                   <input
-                    type="url"
+                    type="text"
                     value={imageUrlInput}
                     onChange={(e) => setImageUrlInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddUrl()}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddUrl() } }}
                     placeholder="Paste image URL (Midjourney, external…)"
                     className="flex-1 bg-black/30 border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50"
                   />
