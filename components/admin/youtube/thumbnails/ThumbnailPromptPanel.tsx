@@ -195,6 +195,7 @@ export function ThumbnailPromptPanel({
       )}
 
       <button
+        type="button"
         onClick={handleBuild}
         className="w-full py-2.5 rounded-xl bg-violet-600/80 hover:bg-violet-600 text-white text-xs font-medium transition-colors"
       >
@@ -215,12 +216,14 @@ export function ThumbnailPromptPanel({
           />
           <div className="flex gap-1.5">
             <button
+              type="button"
               onClick={handleCopy}
               className="flex-1 py-1.5 rounded-lg border border-white/[0.08] text-xs text-white/50 hover:text-white hover:border-white/20 transition-colors"
             >
               {copied ? "Copied!" : "Copy"}
             </button>
             <button
+              type="button"
               onClick={handleSaveToLibrary}
               disabled={saving || saved}
               className="flex-1 py-1.5 rounded-lg border border-white/[0.08] text-xs text-white/50 hover:text-white hover:border-white/20 disabled:opacity-40 transition-colors"
@@ -229,6 +232,7 @@ export function ThumbnailPromptPanel({
             </button>
             {projectId && (
               <button
+                type="button"
                 onClick={handleSaveToProject}
                 disabled={savingProject || savedProject}
                 className="flex-1 py-1.5 rounded-lg border border-white/[0.08] text-xs text-white/50 hover:text-white hover:border-white/20 disabled:opacity-40 transition-colors"
@@ -252,6 +256,7 @@ export function ThumbnailPromptPanel({
           <div className="space-y-1.5 max-h-40 overflow-y-auto">
             {savedPrompts.slice(0, 8).map((p) => (
               <button
+                type="button"
                 key={p.id}
                 onClick={() => handleUseLibraryPrompt(p)}
                 className="w-full text-left px-3 py-2 rounded-lg border border-white/[0.06] bg-white/[0.01] hover:bg-white/[0.04] hover:border-white/15 transition-colors"

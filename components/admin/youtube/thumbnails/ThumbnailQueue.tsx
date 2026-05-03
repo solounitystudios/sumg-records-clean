@@ -40,6 +40,7 @@ export function ThumbnailQueue({ jobs, selectedJobId, onSelect }: Props) {
 
         return (
           <button
+            type="button"
             key={job.id}
             onClick={() => onSelect(job)}
             className={`w-full text-left px-4 py-3 border-l-2 transition-colors duration-150 ${

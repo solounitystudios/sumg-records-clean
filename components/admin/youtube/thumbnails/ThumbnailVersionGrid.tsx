@@ -132,6 +132,7 @@ export function ThumbnailVersionGrid({
       <div className="flex items-center justify-between mb-2">
         <p className="text-[9px] uppercase tracking-[0.18em] text-white/30">Versions</p>
         <button
+          type="button"
           onClick={() => { setShowAddForm((p) => !p); setAddMode("url") }}
           className="text-[10px] text-violet-400/70 hover:text-violet-400 transition"
         >
@@ -144,6 +145,7 @@ export function ThumbnailVersionGrid({
           {/* Mode tabs */}
           <div className="flex gap-1 mb-1">
             <button
+              type="button"
               onClick={() => setAddMode("url")}
               className={`flex-1 py-1 rounded-lg text-[10px] transition-colors ${
                 addMode === "url"
@@ -154,6 +156,7 @@ export function ThumbnailVersionGrid({
               Paste URL
             </button>
             <button
+              type="button"
               onClick={handleSwitchToAssets}
               className={`flex-1 py-1 rounded-lg text-[10px] transition-colors ${
                 addMode === "assets"
@@ -183,6 +186,7 @@ export function ThumbnailVersionGrid({
               />
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={handleAddByUrl}
                   disabled={adding || !addUrl.trim()}
                   className="flex-1 py-1.5 rounded-lg bg-violet-600/80 hover:bg-violet-600 disabled:opacity-40 text-xs font-medium transition"
@@ -190,6 +194,7 @@ export function ThumbnailVersionGrid({
                   {adding ? "Adding…" : "Add Version"}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setShowAddForm(false)}
                   className="px-3 py-1.5 rounded-lg border border-white/[0.08] text-white/40 hover:text-white/60 text-xs transition"
                 >
@@ -209,6 +214,7 @@ export function ThumbnailVersionGrid({
                 <div className="grid grid-cols-3 gap-1.5 max-h-48 overflow-y-auto">
                   {imageAssets.map((asset) => (
                     <button
+                      type="button"
                       key={asset.id}
                       onClick={() => handlePickAsset(asset)}
                       disabled={adding}
@@ -227,6 +233,7 @@ export function ThumbnailVersionGrid({
                 </div>
               )}
               <button
+                type="button"
                 onClick={() => setShowAddForm(false)}
                 className="w-full py-1.5 rounded-lg border border-white/[0.08] text-white/40 hover:text-white/60 text-xs transition"
               >
@@ -274,6 +281,7 @@ export function ThumbnailVersionGrid({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation()
                   handleReject(v)

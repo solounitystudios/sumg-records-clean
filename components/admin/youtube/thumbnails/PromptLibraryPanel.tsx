@@ -242,6 +242,7 @@ export function PromptLibraryPanel({ producers }: Props) {
 
         {/* New prompt button */}
         <button
+          type="button"
           onClick={() => setCreateMode((p) => !p)}
           className="px-5 py-2.5 rounded-xl bg-violet-600/80 hover:bg-violet-600 text-white text-sm font-medium transition-colors whitespace-nowrap"
         >
@@ -253,6 +254,7 @@ export function PromptLibraryPanel({ producers }: Props) {
       <div className="flex items-center gap-1">
         {VIEW_TABS.map((tab) => (
           <button
+            type="button"
             key={tab.key}
             onClick={() => setViewMode(tab.key)}
             className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-colors ${
@@ -329,10 +331,10 @@ export function PromptLibraryPanel({ producers }: Props) {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleCreateNew} disabled={isPending} className="px-5 py-2.5 rounded-xl bg-violet-600/80 hover:bg-violet-600 text-white text-sm font-medium disabled:opacity-50 transition-colors">
+            <button type="button" onClick={handleCreateNew} disabled={isPending} className="px-5 py-2.5 rounded-xl bg-violet-600/80 hover:bg-violet-600 text-white text-sm font-medium disabled:opacity-50 transition-colors">
               {isPending ? "Creating…" : "Create Prompt"}
             </button>
-            <button onClick={() => setCreateMode(false)} className="px-4 py-2.5 text-sm text-white/35 hover:text-white/60 transition-colors">
+            <button type="button" onClick={() => setCreateMode(false)} className="px-4 py-2.5 text-sm text-white/35 hover:text-white/60 transition-colors">
               Cancel
             </button>
           </div>
@@ -389,8 +391,8 @@ export function PromptLibraryPanel({ producers }: Props) {
               This permanently removes the prompt from the library. Consider archiving instead to keep it recoverable.
             </p>
             <div className="flex items-center gap-2 justify-end">
-              <button onClick={() => setDeleteConfirmId(null)} className="text-xs text-white/35 hover:text-white/65 px-3 py-1.5 transition-colors">Cancel</button>
-              <button onClick={() => handleDelete(deleteConfirmId)} disabled={isPending} className="text-xs border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors px-4 py-1.5 rounded-lg disabled:opacity-50">
+              <button type="button" onClick={() => setDeleteConfirmId(null)} className="text-xs text-white/35 hover:text-white/65 px-3 py-1.5 transition-colors">Cancel</button>
+              <button type="button" onClick={() => handleDelete(deleteConfirmId)} disabled={isPending} className="text-xs border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors px-4 py-1.5 rounded-lg disabled:opacity-50">
                 Delete permanently
               </button>
             </div>
@@ -482,6 +484,7 @@ function PromptCard({
         <div className="flex items-center gap-1 flex-none">
           {/* Favorite */}
           <button
+            type="button"
             onClick={onToggleFavorite}
             disabled={isPending}
             title={p.favorite ? "Remove from favorites" : "Add to favorites"}
@@ -491,6 +494,7 @@ function PromptCard({
           </button>
           {/* Winner */}
           <button
+            type="button"
             onClick={onToggleWinner}
             disabled={isPending}
             title={p.winner_bool ? "Remove winner mark" : "Mark as winner"}
@@ -500,6 +504,7 @@ function PromptCard({
           </button>
           {/* Copy */}
           <button
+            type="button"
             onClick={handleCopy}
             title="Copy prompt"
             className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] text-white/25 hover:text-white/60 hover:bg-white/[0.04] transition-colors"
@@ -508,6 +513,7 @@ function PromptCard({
           </button>
           {/* Edit */}
           <button
+            type="button"
             onClick={isEditing ? onCancelEdit : onEdit}
             title={isEditing ? "Cancel edit" : "Edit prompt"}
             className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] transition-colors ${isEditing ? "text-violet-400 bg-violet-400/10" : "text-white/25 hover:text-white/60 hover:bg-white/[0.04]"}`}
@@ -516,6 +522,7 @@ function PromptCard({
           </button>
           {/* Duplicate */}
           <button
+            type="button"
             onClick={onDuplicate}
             disabled={isPending}
             title="Duplicate"
@@ -526,6 +533,7 @@ function PromptCard({
           {/* Archive / Restore */}
           {isArchived ? (
             <button
+              type="button"
               onClick={onRestore}
               disabled={isPending}
               title="Restore prompt"
@@ -535,6 +543,7 @@ function PromptCard({
             </button>
           ) : (
             <button
+              type="button"
               onClick={onArchive}
               disabled={isPending}
               title="Archive prompt"
@@ -545,6 +554,7 @@ function PromptCard({
           )}
           {/* Delete */}
           <button
+            type="button"
             onClick={onDeleteRequest}
             title="Delete permanently"
             className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] text-white/15 hover:text-red-400/60 hover:bg-red-500/[0.06] transition-colors"
@@ -621,6 +631,7 @@ function PromptCard({
           </div>
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={onSaveEdit}
               disabled={isPending}
               className="px-5 py-2 rounded-xl bg-violet-600/80 hover:bg-violet-600 text-white text-sm font-medium disabled:opacity-50 transition-colors"
@@ -628,6 +639,7 @@ function PromptCard({
               {isPending ? "Saving…" : "Save"}
             </button>
             <button
+              type="button"
               onClick={onCancelEdit}
               className="px-4 py-2 text-sm text-white/35 hover:text-white/60 transition-colors"
             >

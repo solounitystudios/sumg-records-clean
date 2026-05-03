@@ -211,6 +211,7 @@ export function FreeCreatePanel({ producers }: Props) {
         <div className="flex flex-wrap gap-2">
           {STYLE_BUCKETS.map((b) => (
             <button
+              type="button"
               key={b}
               onClick={() => setStyleBucket(styleBucket === b ? "" : b)}
               className={`px-3 py-1.5 rounded-full text-[11px] border transition-colors ${
@@ -232,6 +233,7 @@ export function FreeCreatePanel({ producers }: Props) {
           <div className="flex flex-wrap gap-2">
             {presets.map((p) => (
               <button
+                type="button"
                 key={p.preset_slug}
                 onClick={() => setSelectedPresetSlug(selectedPresetSlug === p.preset_slug ? "" : p.preset_slug)}
                 className={`px-3 py-1.5 rounded-full text-[11px] border transition-colors ${
@@ -319,6 +321,7 @@ export function FreeCreatePanel({ producers }: Props) {
           )}
 
           <button
+            type="button"
             onClick={handleBuild}
             className="w-full py-4 rounded-2xl bg-violet-600 hover:bg-violet-500 active:scale-[0.98] text-white font-semibold text-sm transition-all"
           >
@@ -344,12 +347,14 @@ export function FreeCreatePanel({ producers }: Props) {
 
               <div className="grid grid-cols-2 gap-2">
                 <button
+                  type="button"
                   onClick={handleCopy}
                   className="py-3 rounded-xl border border-violet-500/40 bg-violet-600/10 text-violet-300 hover:bg-violet-600/20 hover:border-violet-500/60 active:scale-[0.98] text-sm font-medium transition-all"
                 >
                   {copied ? "Copied!" : "Copy Prompt"}
                 </button>
                 <button
+                  type="button"
                   onClick={handleSavePrompt}
                   disabled={savingPrompt || promptSaved || !producerSlug}
                   className="py-3 rounded-xl border border-white/[0.1] text-white/55 hover:text-white hover:border-white/25 disabled:opacity-40 text-sm transition-colors"
@@ -383,6 +388,7 @@ export function FreeCreatePanel({ producers }: Props) {
                   onError={() => setImageError(true)}
                 />
                 <button
+                  type="button"
                   onClick={() => { setImageUrl(""); setImageUrlInput(""); setImageError(false); setSavedAssetMsg(null) }}
                   className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 text-white/60 hover:text-white text-xs flex items-center justify-center"
                 >
@@ -402,6 +408,7 @@ export function FreeCreatePanel({ producers }: Props) {
                     className="flex-1 bg-black/30 border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50"
                   />
                   <button
+                    type="button"
                     onClick={handleAddUrl}
                     disabled={!imageUrlInput.trim()}
                     className="px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.1] text-sm text-white/60 hover:text-white hover:bg-white/[0.1] disabled:opacity-40 transition-colors whitespace-nowrap"
@@ -418,6 +425,7 @@ export function FreeCreatePanel({ producers }: Props) {
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => fileRef.current?.click()}
                   disabled={uploading}
                   className="w-full py-3 rounded-xl border border-dashed border-white/[0.1] text-sm text-white/40 hover:text-white/70 hover:border-white/20 disabled:opacity-40 transition-colors"
@@ -449,6 +457,7 @@ export function FreeCreatePanel({ producers }: Props) {
                   className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50"
                 />
                 <button
+                  type="button"
                   onClick={handleSaveToAssets}
                   disabled={savingAsset || !producerSlug}
                   className="w-full py-3.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 active:scale-[0.98] text-white font-semibold text-sm disabled:opacity-50 transition-all"

@@ -224,6 +224,7 @@ export function ThumbnailStudioClient({ initialJobs, producers }: Props) {
       <div className="flex items-center gap-1 rounded-xl border border-white/[0.07] bg-[#0d1016] p-1">
         {STUDIO_TABS.map((tab) => (
           <button
+            type="button"
             key={tab.key}
             onClick={() => setStudioTab(tab.key)}
             className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-[11px] font-medium transition-colors ${
@@ -298,7 +299,7 @@ export function ThumbnailStudioClient({ initialJobs, producers }: Props) {
             {error && (
               <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-400">
                 {error}
-                <button onClick={() => setError(null)} className="ml-2 text-red-400/60 hover:text-red-400">×</button>
+                <button type="button" onClick={() => setError(null)} className="ml-2 text-red-400/60 hover:text-red-400">×</button>
               </div>
             )}
             {statusMsg && (
@@ -369,6 +370,7 @@ export function ThumbnailStudioClient({ initialJobs, producers }: Props) {
             {/* Action buttons */}
             <div className="flex gap-2 pb-2">
               <button
+                type="button"
                 onClick={handleSaveDraft}
                 disabled={isPending}
                 className="flex-1 py-2.5 rounded-xl border border-white/[0.1] text-xs text-white/60 hover:text-white hover:border-white/20 disabled:opacity-40 transition-colors"
@@ -376,6 +378,7 @@ export function ThumbnailStudioClient({ initialJobs, producers }: Props) {
                 Save Draft
               </button>
               <button
+                type="button"
                 onClick={handleApprove}
                 disabled={isPending || !selectedVersionId}
                 className="flex-1 py-2.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 disabled:opacity-40 text-xs font-medium transition-colors"
@@ -383,6 +386,7 @@ export function ThumbnailStudioClient({ initialJobs, producers }: Props) {
                 {isPending ? "Approving…" : "Approve →"}
               </button>
               <button
+                type="button"
                 onClick={handleSkip}
                 disabled={isPending}
                 className="px-4 py-2.5 rounded-xl border border-white/[0.06] text-xs text-white/25 hover:text-white/50 disabled:opacity-40 transition-colors"

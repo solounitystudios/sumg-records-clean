@@ -19,6 +19,7 @@ export function ThumbnailPresetPicker({ presets, selectedSlug, onSelect }: Props
           const active = preset.preset_slug === selectedSlug
           return (
             <button
+              type="button"
               key={preset.preset_slug}
               onClick={() => onSelect(preset)}
               className={`text-left px-3 py-2.5 rounded-xl border transition-colors duration-150 ${

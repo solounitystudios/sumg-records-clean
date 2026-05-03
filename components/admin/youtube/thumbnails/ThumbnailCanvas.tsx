@@ -114,6 +114,7 @@ export function ThumbnailCanvas({ config, selectedImageUrl, onChange }: Props) {
               Text Shadow
             </label>
             <button
+              type="button"
               onClick={() => set("shadowEnabled", !config.shadowEnabled)}
               className={`px-3 py-1.5 rounded-lg border text-xs transition-colors ${
                 config.shadowEnabled
@@ -168,6 +169,7 @@ export function ThumbnailCanvas({ config, selectedImageUrl, onChange }: Props) {
           <div className="flex gap-1.5 flex-wrap">
             {TEXT_POSITIONS.map((p) => (
               <button
+                type="button"
                 key={p.value}
                 onClick={() => set("titlePosition", p.value)}
                 className={`px-2.5 py-1 rounded text-[10px] border transition-colors ${
@@ -190,6 +192,7 @@ export function ThumbnailCanvas({ config, selectedImageUrl, onChange }: Props) {
           <div className="flex gap-1.5 flex-wrap">
             {OVERLAYS.map((o) => (
               <button
+                type="button"
                 key={o.value}
                 onClick={() => set("overlay", o.value)}
                 className={`px-2.5 py-1 rounded text-[10px] border transition-colors ${
@@ -212,6 +215,7 @@ export function ThumbnailCanvas({ config, selectedImageUrl, onChange }: Props) {
           <div className="flex gap-1.5 flex-wrap">
             {LOGO_POSITIONS.map((p) => (
               <button
+                type="button"
                 key={p.value}
                 onClick={() => set("logoPosition", p.value)}
                 className={`px-2.5 py-1 rounded text-[10px] border transition-colors ${
