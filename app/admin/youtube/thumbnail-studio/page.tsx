@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { requireAdmin } from "@/lib/auth"
 import { getJobsForStudio } from "@/lib/youtube/thumbnails/actions"
+import { getProducers } from "@/lib/db/producers"
 import { ThumbnailStudioClient } from "./ThumbnailStudioClient"
 
 export const metadata = { title: "Thumbnail Studio — SUMG Admin" }
@@ -8,7 +9,14 @@ export const metadata = { title: "Thumbnail Studio — SUMG Admin" }
 export default async function ThumbnailStudioPage() {
   await requireAdmin()
 
-  const jobs = await getJobsForStudio()
+  const [jobs, allProducers] = await Promise.all([
+    getJobsForStudio(),
+    getProducers(),
+  ])
+
+  const producers = allProducers
+    .filter((p) => !p.status || p.status === "active")
+    .map((p) => ({ slug: p.slug, name: p.name }))
 
   const approved = jobs.filter((j) => j.thumbnail_status === "approved").length
   const pending  = jobs.filter((j) => !j.thumbnail_status || j.thumbnail_status === "pending").length
@@ -84,7 +92,7 @@ export default async function ThumbnailStudioPage() {
       </div>
 
       {/* Studio */}
-      <ThumbnailStudioClient initialJobs={jobs} />
+      <ThumbnailStudioClient initialJobs={jobs} producers={producers} />
     </div>
   )
 }

@@ -84,6 +84,23 @@ export interface ThumbnailPromptRow {
   active: boolean
   created_at: string
   updated_at: string
+  // v2 library management fields
+  name: string | null
+  description: string | null
+  favorite: boolean
+  archived_at: string | null
+  use_count: number
+  last_used_at: string | null
+}
+
+export interface PromptLibraryFilters {
+  search?: string
+  producerSlug?: string
+  styleBucket?: string
+  category?: string
+  favoritesOnly?: boolean
+  winnersOnly?: boolean
+  includeArchived?: boolean
 }
 
 export interface ThumbnailAsset {
@@ -94,6 +111,10 @@ export interface ThumbnailAsset {
   linked_song_id: string | null
   linked_upload_job_id: string | null
   created_at: string
+  // v2 fields
+  style_bucket: string | null
+  asset_id: string | null
+  name: string | null
 }
 
 export interface CanvasConfig {

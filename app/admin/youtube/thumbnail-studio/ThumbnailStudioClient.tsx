@@ -8,6 +8,8 @@ import { ThumbnailVersionGrid }  from "@/components/admin/youtube/thumbnails/Thu
 import { ThumbnailPresetPicker } from "@/components/admin/youtube/thumbnails/ThumbnailPresetPicker"
 import { AudioPlayer }           from "@/components/admin/youtube/thumbnails/AudioPlayer"
 import { VideoPreview }          from "@/components/admin/youtube/thumbnails/VideoPreview"
+import { FreeCreatePanel }       from "@/components/admin/youtube/thumbnails/FreeCreatePanel"
+import { PromptLibraryPanel }    from "@/components/admin/youtube/thumbnails/PromptLibraryPanel"
 import {
   getOrCreateProject,
   getProjectVersions,
@@ -39,11 +41,21 @@ const DEFAULT_CANVAS: CanvasConfig = {
   shadowEnabled: true,
 }
 
+type StudioTab = "queue" | "free-create" | "prompt-library"
+
+const STUDIO_TABS: Array<{ key: StudioTab; label: string }> = [
+  { key: "queue",          label: "Job Queue" },
+  { key: "free-create",    label: "Free Create" },
+  { key: "prompt-library", label: "Prompt Library" },
+]
+
 interface Props {
   initialJobs: UploadJobForStudio[]
+  producers: Array<{ slug: string; name: string }>
 }
 
-export function ThumbnailStudioClient({ initialJobs }: Props) {
+export function ThumbnailStudioClient({ initialJobs, producers }: Props) {
+  const [studioTab, setStudioTab] = useState<StudioTab>("queue")
   const [jobs, setJobs] = useState(initialJobs)
   const [selectedJob, setSelectedJob]             = useState<UploadJobForStudio | null>(null)
   const [project, setProject]                     = useState<ThumbnailProject | null>(null)
@@ -207,7 +219,37 @@ export function ThumbnailStudioClient({ initialJobs }: Props) {
   const hasJob = !!selectedJob && !loadingProject
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] gap-0 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#08090d]">
+    <div className="space-y-4">
+      {/* ── Tab bar ──────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1 rounded-xl border border-white/[0.07] bg-[#0d1016] p-1">
+        {STUDIO_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setStudioTab(tab.key)}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-[11px] font-medium transition-colors ${
+              studioTab === tab.key
+                ? "bg-white/[0.08] text-white"
+                : "text-white/35 hover:text-white/60 hover:bg-white/[0.04]"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Free Create ─────────────────────────────────────────────── */}
+      {studioTab === "free-create" && (
+        <FreeCreatePanel producers={producers} />
+      )}
+
+      {/* ── Prompt Library ──────────────────────────────────────────── */}
+      {studioTab === "prompt-library" && (
+        <PromptLibraryPanel producers={producers} />
+      )}
+
+      {/* ── Job Queue (existing layout) ─────────────────────────────── */}
+      {studioTab === "queue" && (
+    <div className="flex h-[calc(100vh-12rem)] gap-0 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#08090d]">
 
       {/* ── Left panel: Queue ───────────────────────────────── */}
       <div className="w-56 shrink-0 flex flex-col border-r border-white/[0.06]">
@@ -358,6 +400,8 @@ export function ThumbnailStudioClient({ initialJobs }: Props) {
           </div>
         )}
       </div>
+    </div>
+      )}
     </div>
   )
 }

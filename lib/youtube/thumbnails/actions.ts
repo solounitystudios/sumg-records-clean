@@ -9,6 +9,7 @@ import type {
   ThumbnailPromptRow,
   UploadJobForStudio,
   CanvasConfig,
+  PromptLibraryFilters,
 } from "./types"
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
@@ -380,4 +381,246 @@ export async function savePromptToLibrary(
 
   if (error) return { error: error.message }
   return {}
+}
+
+// ─── Prompt Library v2: full CRUD ────────────────────────────────────────────
+
+export async function getPromptLibrary(
+  filters: PromptLibraryFilters = {}
+): Promise<ThumbnailPromptRow[]> {
+  const supabase = await createClient()
+
+  let q = supabase
+    .from("thumbnail_prompts")
+    .select("*")
+    .eq("active", true)
+    .order("created_at", { ascending: false })
+    .limit(300)
+
+  if (!filters.includeArchived) q = q.is("archived_at", null)
+  if (filters.producerSlug)     q = q.eq("producer_slug", filters.producerSlug)
+  if (filters.styleBucket)      q = q.eq("style_bucket", filters.styleBucket)
+  if (filters.category)         q = q.eq("category", filters.category)
+  if (filters.favoritesOnly)    q = q.eq("favorite", true)
+  if (filters.winnersOnly)      q = q.eq("winner_bool", true)
+  if (filters.search) {
+    const term = filters.search.replace(/[%_]/g, "\\$&")
+    q = q.or(`prompt.ilike.%${term}%,name.ilike.%${term}%`)
+  }
+
+  const { data } = await q
+  return (data ?? []) as ThumbnailPromptRow[]
+}
+
+export async function createPrompt(data: {
+  producerSlug: string
+  prompt: string
+  name?: string
+  description?: string
+  category?: string
+  styleBucket?: string
+  ctrScore?: number
+}): Promise<{ id: string } | { error: string }> {
+  const supabase = await createClient()
+  const { data: row, error } = await supabase
+    .from("thumbnail_prompts")
+    .insert({
+      producer_slug: data.producerSlug,
+      prompt:        data.prompt,
+      name:          data.name ?? null,
+      description:   data.description ?? null,
+      category:      data.category ?? null,
+      style_bucket:  data.styleBucket ?? null,
+      ctr_score:     data.ctrScore ?? null,
+    })
+    .select("id")
+    .single()
+
+  if (error) return { error: error.message }
+  return { id: (row as { id: string }).id }
+}
+
+export async function updatePrompt(
+  id: string,
+  data: {
+    prompt?: string
+    name?: string
+    description?: string
+    category?: string
+    styleBucket?: string
+    ctrScore?: number | null
+  }
+): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (data.prompt      !== undefined) updates.prompt       = data.prompt
+  if (data.name        !== undefined) updates.name         = data.name ?? null
+  if (data.description !== undefined) updates.description  = data.description ?? null
+  if (data.category    !== undefined) updates.category     = data.category ?? null
+  if (data.styleBucket !== undefined) updates.style_bucket = data.styleBucket ?? null
+  if (data.ctrScore    !== undefined) updates.ctr_score    = data.ctrScore ?? null
+
+  const { error } = await supabase.from("thumbnail_prompts").update(updates).eq("id", id)
+  revalidatePath("/admin/youtube/thumbnail-studio")
+  if (error) return { error: error.message }
+  return {}
+}
+
+export async function archivePrompt(id: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("thumbnail_prompts")
+    .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", id)
+  revalidatePath("/admin/youtube/thumbnail-studio")
+  if (error) return { error: error.message }
+  return {}
+}
+
+export async function restorePrompt(id: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("thumbnail_prompts")
+    .update({ archived_at: null, updated_at: new Date().toISOString() })
+    .eq("id", id)
+  revalidatePath("/admin/youtube/thumbnail-studio")
+  if (error) return { error: error.message }
+  return {}
+}
+
+export async function deletePromptPermanently(id: string): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase.from("thumbnail_prompts").delete().eq("id", id)
+  revalidatePath("/admin/youtube/thumbnail-studio")
+  if (error) return { error: error.message }
+  return {}
+}
+
+export async function duplicatePrompt(id: string): Promise<{ id: string } | { error: string }> {
+  const supabase = await createClient()
+  const { data: src } = await supabase.from("thumbnail_prompts").select("*").eq("id", id).single()
+  if (!src) return { error: "Prompt not found" }
+
+  const r = src as Record<string, unknown>
+  const { data: row, error } = await supabase
+    .from("thumbnail_prompts")
+    .insert({
+      producer_slug: r.producer_slug,
+      prompt:        r.prompt,
+      name:          r.name ? `Copy of ${r.name}` : null,
+      description:   r.description ?? null,
+      category:      r.category ?? null,
+      style_bucket:  r.style_bucket ?? null,
+      ctr_score:     r.ctr_score ?? null,
+    })
+    .select("id")
+    .single()
+
+  revalidatePath("/admin/youtube/thumbnail-studio")
+  if (error) return { error: error.message }
+  return { id: (row as { id: string }).id }
+}
+
+export async function markPromptFavorite(id: string, value: boolean): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("thumbnail_prompts")
+    .update({ favorite: value, updated_at: new Date().toISOString() })
+    .eq("id", id)
+  if (error) return { error: error.message }
+  return {}
+}
+
+export async function markPromptWinner(id: string, value: boolean): Promise<{ error?: string }> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("thumbnail_prompts")
+    .update({ winner_bool: value, updated_at: new Date().toISOString() })
+    .eq("id", id)
+  if (error) return { error: error.message }
+  return {}
+}
+
+export async function incrementPromptUseCount(id: string): Promise<void> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from("thumbnail_prompts")
+    .select("use_count")
+    .eq("id", id)
+    .single()
+  const current = (data as { use_count: number } | null)?.use_count ?? 0
+  await supabase
+    .from("thumbnail_prompts")
+    .update({ use_count: current + 1, last_used_at: new Date().toISOString() })
+    .eq("id", id)
+}
+
+// ─── Free Create: save image to asset library ─────────────────────────────────
+
+export async function saveFreeCreateAsset({
+  producerSlug,
+  imageUrl,
+  promptUsed,
+  styleBucket,
+  name,
+}: {
+  producerSlug: string
+  imageUrl: string
+  promptUsed?: string
+  styleBucket?: string
+  name?: string
+}): Promise<{ assetId: string; thumbnailAssetId: string } | { error: string }> {
+  const supabase = await createClient()
+
+  // Determine a filename from the URL
+  const urlFilename = imageUrl.split("/").pop()?.split("?")[0] ?? ""
+  const filename = urlFilename || `thumbnail_free_${Date.now()}.png`
+  const mimeType = filename.endsWith(".webp")
+    ? "image/webp"
+    : filename.endsWith(".jpg") || filename.endsWith(".jpeg")
+    ? "image/jpeg"
+    : "image/png"
+
+  // 1. Create assets row
+  const { data: assetRow, error: assetErr } = await supabase
+    .from("assets")
+    .insert({
+      type:         "image",
+      url:          imageUrl,
+      filename,
+      mime_type:    mimeType,
+      size_bytes:   null,
+      alt_text:     name ?? "Free Create thumbnail",
+      attached_to:  null,
+      uploaded_by:  "thumbnail_studio_free_create",
+      producer_slug: producerSlug || null,
+      status:       "ready",
+      tags:         ["thumbnail", "free-create"],
+    })
+    .select("id")
+    .single()
+
+  if (assetErr) return { error: assetErr.message }
+  const assetId = (assetRow as { id: string }).id
+
+  // 2. Record in thumbnail_assets library (no linked job)
+  const { data: taRow, error: taErr } = await supabase
+    .from("thumbnail_assets")
+    .insert({
+      producer_slug:        producerSlug || null,
+      image_url:            imageUrl,
+      prompt_used:          promptUsed ?? null,
+      style_bucket:         styleBucket ?? null,
+      asset_id:             assetId,
+      name:                 name ?? null,
+      linked_upload_job_id: null,
+    })
+    .select("id")
+    .single()
+
+  if (taErr) return { error: taErr.message }
+
+  revalidatePath("/admin/youtube/thumbnail-studio")
+  revalidatePath("/admin/assets")
+  return { assetId, thumbnailAssetId: (taRow as { id: string }).id }
 }
