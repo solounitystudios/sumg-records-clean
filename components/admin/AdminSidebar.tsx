@@ -13,6 +13,9 @@ const NAV: NavSection[] = [
     label: "CORE",
     items: [
       { label: "Command Center", href: "/admin", exact: true },
+      { label: "Live Dashboard",  href: "/admin/command-center" },
+      { label: "Alerts",          href: "/admin/alerts" },
+      { label: "Activity Log",    href: "/admin/activity" },
       { label: "Website / CMS",  href: "/admin/cms" },
       { label: "Analytics",      href: "/admin/analytics" },
       { label: "Intelligence",   href: "/admin/intelligence" },
@@ -36,6 +39,7 @@ const NAV: NavSection[] = [
     key: "business",
     label: "BUSINESS",
     items: [
+      { label: "Revenue",    href: "/admin/revenue" },
       { label: "Rights",     href: "/admin/rights" },
       { label: "Royalties",  href: "/admin/royalties" },
       { label: "Finance",    href: "/admin/finance" },
@@ -49,6 +53,7 @@ const NAV: NavSection[] = [
     key: "operations",
     label: "OPERATIONS",
     items: [
+      { label: "Content Gen",  href: "/admin/content-gen" },
       { label: "Messages",    href: "/admin/messages" },
       { label: "Assets",      href: "/admin/assets" },
       { label: "Imports",     href: "/admin/imports" },

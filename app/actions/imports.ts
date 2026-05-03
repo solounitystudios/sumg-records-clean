@@ -18,6 +18,7 @@ export interface ImportResult {
   skipped: number
   errors: string[]
   logId: string | null
+  updatedEntities?: { id: string; title: string; slug?: string }[]
 }
 
 // ─── BMI Import ───────────────────────────────────────────────────────────────
@@ -38,15 +39,15 @@ export async function processBMIImport(formData: FormData): Promise<ImportResult
 
   let matched = 0, updated = 0, created = 0, skipped = 0
   const errors: string[] = []
+  const updatedEntities: { id: string; title: string; slug?: string }[] = []
 
   for (const work of works) {
     if (!work.title) { skipped++; continue }
 
     try {
-      // Try to find existing song by title (case-insensitive)
       const { data: existing } = await supabase
         .from("songs")
-        .select("id, rights_metadata, title")
+        .select("id, rights_metadata, title, slug")
         .ilike("title", work.title)
         .limit(1)
         .maybeSingle()
@@ -73,9 +74,11 @@ export async function processBMIImport(formData: FormData): Promise<ImportResult
           .eq("id", existing.id)
 
         if (error) { errors.push(`Update failed for "${work.title}": ${error.message}`); skipped++ }
-        else updated++
+        else {
+          updated++
+          updatedEntities.push({ id: existing.id, title: existing.title, slug: (existing as { slug?: string }).slug })
+        }
       } else {
-        // Song doesn't exist — log as skipped (don't auto-create orphan songs)
         skipped++
       }
     } catch (e) {
@@ -90,7 +93,7 @@ export async function processBMIImport(formData: FormData): Promise<ImportResult
   revalidatePath("/admin/rights")
   revalidatePath("/admin/integrity")
 
-  return { importType: "bmi", totalRows: works.length, matched, created, updated, skipped, errors, logId }
+  return { importType: "bmi", totalRows: works.length, matched, created, updated, skipped, errors, logId, updatedEntities }
 }
 
 // ─── Distro Import ────────────────────────────────────────────────────────────
@@ -111,14 +114,14 @@ export async function processDistroImport(formData: FormData): Promise<ImportRes
 
   let matched = 0, updated = 0, created = 0, skipped = 0
   const errors: string[] = []
+  const updatedEntities: { id: string; title: string; slug?: string }[] = []
 
   for (const row of rows) {
     try {
       if (row.isrc) {
-        // Match by ISRC (most reliable)
         const { data: song } = await supabase
           .from("songs")
-          .select("id, title")
+          .select("id, title, slug")
           .eq("isrc", row.isrc)
           .limit(1)
           .maybeSingle()
@@ -131,6 +134,7 @@ export async function processDistroImport(formData: FormData): Promise<ImportRes
               .update({ streams: row.streams, updated_at: new Date().toISOString() })
               .eq("id", song.id)
             updated++
+            updatedEntities.push({ id: song.id, title: song.title, slug: (song as { slug?: string }).slug })
           }
           continue
         }
@@ -139,20 +143,20 @@ export async function processDistroImport(formData: FormData): Promise<ImportRes
       if (row.title) {
         const { data: song } = await supabase
           .from("songs")
-          .select("id, isrc")
+          .select("id, title, isrc, slug")
           .ilike("title", row.title)
           .limit(1)
           .maybeSingle()
 
         if (song) {
           matched++
-          // Backfill ISRC if missing and we have it
-          if (!song.isrc && row.isrc) {
+          if (!(song as { isrc?: string }).isrc && row.isrc) {
             await supabase
               .from("songs")
               .update({ isrc: row.isrc, updated_at: new Date().toISOString() })
               .eq("id", song.id)
             updated++
+            updatedEntities.push({ id: song.id, title: song.title, slug: (song as { slug?: string }).slug })
           }
           continue
         }
@@ -170,7 +174,7 @@ export async function processDistroImport(formData: FormData): Promise<ImportRes
   revalidatePath("/admin/imports")
   revalidatePath("/admin/rights")
 
-  return { importType: "distro", totalRows: rows.length, matched, created, updated, skipped, errors, logId }
+  return { importType: "distro", totalRows: rows.length, matched, created, updated, skipped, errors, logId, updatedEntities }
 }
 
 // ─── Log ──────────────────────────────────────────────────────────────────────

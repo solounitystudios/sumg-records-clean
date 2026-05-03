@@ -200,6 +200,7 @@ export async function approveProject(
   producerSlug: string | null,
   title: string | null,
   mode: 'generated' | 'edited' | 'custom' = 'generated',
+  promptUsed?: string,
 ): Promise<{ error?: string }> {
   const supabase = await createClient()
 
@@ -238,6 +239,7 @@ export async function approveProject(
   await supabase.from("thumbnail_assets").insert({
     producer_slug:        producerSlug ?? null,
     image_url:            imageUrl,
+    prompt_used:          promptUsed ?? null,
     linked_upload_job_id: jobId,
   })
 

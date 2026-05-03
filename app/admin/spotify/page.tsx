@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getArtists } from "@/lib/db/artists";
-import { getSpotifyArtist } from "@/lib/spotify";
+import { getSpotifyArtist, getSpotifyArtistTopTracks, pickSpotifyImage } from "@/lib/spotify";
 import { getArtistSpotifySnapshots } from "@/lib/cms";
 import { formatFollowers } from "@/lib/spotifyFormat";
 import { SpotifyRefreshButton } from "@/components/admin/SpotifyRefreshButton";
@@ -9,8 +9,6 @@ import { SpotifySearchPanel } from "@/components/admin/SpotifySearchPanel";
 import type { Artist } from "@/lib/data";
 
 export const metadata = { title: "Spotify Intelligence — SUMG Admin" };
-
-// ─── Spotify icon ─────────────────────────────────────────────────────────────
 
 function SpotifyIcon({ className }: { className: string }) {
   return (
@@ -20,117 +18,183 @@ function SpotifyIcon({ className }: { className: string }) {
   );
 }
 
-// ─── Per-artist live data row (async — streams independently) ─────────────────
+function msToMin(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
 
-async function LinkedArtistRow({ artist }: { artist: Artist & { spotifyId: string } }) {
+// ─── Top tracks strip (async, loads independently) ────────────────────────────
+
+async function ArtistTopTracks({ spotifyId }: { spotifyId: string }) {
+  const tracks = await getSpotifyArtistTopTracks(spotifyId);
+  if (!tracks.length) return null;
+
+  return (
+    <div className="mt-4 border-t border-white/[0.05] pt-4">
+      <p className="text-[9px] uppercase tracking-[0.25em] text-white/20 mb-2.5 font-mono">Top Tracks</p>
+      <div className="space-y-1.5">
+        {tracks.slice(0, 5).map((track, i) => (
+          <a
+            key={track.id}
+            href={track.external_urls.spotify}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 group px-2 py-1.5 -mx-2 rounded-lg hover:bg-white/[0.04] transition-all duration-150"
+          >
+            <span className="text-[9px] font-mono text-white/20 w-4 shrink-0 text-right">{i + 1}</span>
+            <span className="flex-1 text-xs text-white/60 truncate group-hover:text-white/80 transition-colors duration-150">
+              {track.name}
+            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className="h-1 w-14 rounded-full bg-white/[0.06] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[#1DB954]/40 group-hover:bg-[#1DB954]/60 transition-colors duration-150"
+                  style={{ width: `${track.popularity}%` }}
+                />
+              </div>
+              <span className="text-[9px] font-mono text-white/25 w-6 text-right">{track.popularity}</span>
+            </div>
+            <span className="text-[9px] font-mono text-white/20 w-8 text-right">{msToMin(track.duration_ms)}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Per-artist card (async — streams independently) ─────────────────────────
+
+async function LinkedArtistCard({ artist }: { artist: Artist & { spotifyId: string } }) {
   const [spotifyData, snapshots] = await Promise.all([
     getSpotifyArtist(artist.spotifyId),
     getArtistSpotifySnapshots(artist.slug).catch(() => []),
   ]);
 
-  const followers = spotifyData?.followers.total ?? 0;
-  const popularity = spotifyData?.popularity ?? 0;
-  const genres = spotifyData?.genres ?? [];
-  const spotifyUrl = spotifyData?.external_urls.spotify;
+  const followers   = spotifyData?.followers.total ?? 0;
+  const popularity  = spotifyData?.popularity ?? 0;
+  const genres      = spotifyData?.genres ?? [];
+  const spotifyUrl  = spotifyData?.external_urls.spotify;
+  const image       = spotifyData ? pickSpotifyImage(spotifyData.images, 300) : undefined;
 
-  // Trend: delta between two most recent snapshots
   const [latest, previous] = snapshots;
-  const trend =
-    latest && previous ? latest.followers - previous.followers : null;
+  const trend = latest && previous ? latest.followers - previous.followers : null;
 
   return (
-    <div className="flex items-start sm:items-center gap-5 py-4 border-b border-white/[0.05] last:border-0 flex-col sm:flex-row">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-3 flex-wrap mb-1">
-          <span className="text-sm font-medium text-white/80">{artist.name}</span>
-          <span className="text-[10px] uppercase tracking-[0.12em] text-white/30">
-            {artist.genre}
-          </span>
-          {!spotifyData && (
-            <span className="text-[10px] text-red-400/50 border border-red-400/20 px-2 py-0.5">
-              Unavailable
-            </span>
+    <div className="rounded-2xl border border-white/[0.08] bg-[#0a0c10] p-5 hover:border-white/[0.14] transition-all duration-150">
+      <div className="flex items-start gap-4">
+        {/* Artist image */}
+        <div className="shrink-0">
+          {image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={image.url}
+              alt={artist.name}
+              className="w-14 h-14 rounded-xl object-cover"
+              style={{ border: "1px solid rgba(29,185,84,0.15)" }}
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
+              <span className="text-xl font-semibold text-white/20">{artist.name.charAt(0)}</span>
+            </div>
           )}
         </div>
-        {spotifyData && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-xs font-medium text-white/60">
-              {formatFollowers(followers)} followers
-            </span>
-            {artist.monthlyListeners > 0 && (
-              <>
-                <span className="text-[10px] text-white/20">·</span>
-                <span className="text-xs text-white/40">
-                  {formatFollowers(artist.monthlyListeners)}{" "}
-                  <span className="text-white/25">monthly</span>
-                </span>
-              </>
-            )}
-            <span className="text-[10px] text-white/20">·</span>
-            <span className="text-xs text-white/40">
-              Pop.{" "}
-              <span className="text-white/60">{popularity}</span>
-              <span className="text-white/20">/100</span>
-            </span>
-            {genres[0] && (
-              <>
-                <span className="text-[10px] text-white/20">·</span>
-                <span className="text-[10px] text-white/30 capitalize">{genres[0]}</span>
-              </>
-            )}
-            {trend !== null && (
-              <>
-                <span className="text-[10px] text-white/20">·</span>
-                <span
-                  className={`text-[10px] font-medium ${
-                    trend > 0
-                      ? "text-green-400/70"
-                      : trend < 0
-                      ? "text-red-400/60"
-                      : "text-white/25"
-                  }`}
+
+        {/* Data block */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold text-white/90">{artist.name}</span>
+                <span className="text-[9px] uppercase tracking-[0.15em] text-white/25 font-mono">{artist.genre}</span>
+                {!spotifyData && (
+                  <span className="text-[9px] text-red-400/50 border border-red-400/20 px-2 py-0.5 rounded font-mono">
+                    Unavailable
+                  </span>
+                )}
+              </div>
+
+              {spotifyData && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <div>
+                    <div className="text-[9px] text-white/25 font-mono uppercase tracking-wider mb-0.5">Followers</div>
+                    <div className="text-sm font-semibold font-mono tabular-nums text-white/80">
+                      {formatFollowers(followers)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-white/25 font-mono uppercase tracking-wider mb-0.5">Popularity</div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-16 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[#1DB954]/50"
+                          style={{ width: `${popularity}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-semibold font-mono tabular-nums text-white/60">
+                        {popularity}<span className="text-white/20">/100</span>
+                      </span>
+                    </div>
+                  </div>
+                  {genres[0] && (
+                    <div>
+                      <div className="text-[9px] text-white/25 font-mono uppercase tracking-wider mb-0.5">Genre</div>
+                      <div className="text-xs text-white/40 capitalize">{genres[0]}</div>
+                    </div>
+                  )}
+                  {artist.monthlyListeners > 0 && (
+                    <div>
+                      <div className="text-[9px] text-white/25 font-mono uppercase tracking-wider mb-0.5">Monthly</div>
+                      <div className="text-xs font-mono tabular-nums text-white/50">{formatFollowers(artist.monthlyListeners)}</div>
+                    </div>
+                  )}
+                  {trend !== null && (
+                    <div>
+                      <div className="text-[9px] text-white/25 font-mono uppercase tracking-wider mb-0.5">Trend</div>
+                      <div className={`text-xs font-semibold font-mono tabular-nums ${trend > 0 ? "text-emerald-400/80" : trend < 0 ? "text-red-400/60" : "text-white/25"}`}>
+                        {trend > 0 ? "▲" : trend < 0 ? "▼" : "—"} {trend !== 0 ? Math.abs(trend).toLocaleString() : "flat"}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 flex-none flex-wrap">
+              <SpotifyRefreshButton artistSlug={artist.slug} />
+              {spotifyUrl && (
+                <a
+                  href={spotifyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-mono text-[#1DB954]/40 hover:text-[#1DB954] transition-colors duration-150 border border-[#1DB954]/15 hover:border-[#1DB954]/40 px-2.5 py-1 rounded"
+                  aria-label="Open on Spotify"
                 >
-                  {trend > 0 ? "▲" : trend < 0 ? "▼" : "—"}{" "}
-                  {trend !== 0
-                    ? `${Math.abs(trend).toLocaleString()} vs last`
-                    : "no change"}
-                </span>
-              </>
-            )}
-            {snapshots.length === 0 && (
-              <>
-                <span className="text-[10px] text-white/20">·</span>
-                <span className="text-[10px] text-white/20 italic">no snapshots yet</span>
-              </>
-            )}
+                  Spotify ↗
+                </a>
+              )}
+              <Link
+                href={`/admin/artists/${artist.slug}/edit`}
+                className="text-[9px] font-mono tracking-[0.15em] uppercase text-white/25 hover:text-white transition-colors duration-150 border border-white/[0.08] hover:border-white/20 px-2.5 py-1 rounded"
+              >
+                Edit
+              </Link>
+            </div>
           </div>
-        )}
-      </div>
-      <div className="flex items-center gap-3 flex-none flex-wrap">
-        <SpotifyRefreshButton artistSlug={artist.slug} />
-        {spotifyUrl && (
-          <a
-            href={spotifyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[10px] text-[#1DB954]/40 hover:text-[#1DB954] transition-colors"
-            aria-label="Open on Spotify"
-          >
-            ↗
-          </a>
-        )}
-        <Link
-          href={`/admin/artists/${artist.slug}/edit`}
-          className="text-[10px] tracking-[0.15em] uppercase text-white/25 hover:text-white transition-colors"
-        >
-          Edit
-        </Link>
-        <Link
-          href={`/artists/${artist.slug}`}
-          className="text-[10px] tracking-[0.15em] uppercase text-white/20 hover:text-white transition-colors"
-        >
-          Public →
-        </Link>
+
+          {/* Top tracks inline */}
+          {spotifyData && (
+            <Suspense
+              fallback={
+                <div className="mt-4 border-t border-white/[0.05] pt-4">
+                  <div className="text-[9px] font-mono text-white/15 animate-pulse">Loading tracks…</div>
+                </div>
+              }
+            >
+              <ArtistTopTracks spotifyId={artist.spotifyId} />
+            </Suspense>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -141,35 +205,39 @@ async function LinkedArtistRow({ artist }: { artist: Artist & { spotifyId: strin
 export default async function SpotifyAdminPage() {
   const artists = await getArtists();
 
-  const linked = artists.filter(
-    (a): a is Artist & { spotifyId: string } => !!a.spotifyId
-  );
+  const linked   = artists.filter((a): a is Artist & { spotifyId: string } => !!a.spotifyId);
   const unlinked = artists.filter((a) => !a.spotifyId);
 
   return (
     <main className="px-6 py-10 md:px-10 max-w-5xl">
       {/* Header */}
-      <div className="mb-10">
-        <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">Admin</p>
-        <div className="flex items-center gap-3">
-          <SpotifyIcon className="w-5 h-5 fill-[#1DB954]/70" />
-          <h1 className="text-3xl font-semibold">Spotify Intelligence</h1>
+      <div className="mb-10 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.35em] text-white/25 mb-2 font-mono">Admin / DSP</p>
+          <div className="flex items-center gap-3">
+            <SpotifyIcon className="w-5 h-5 fill-[#1DB954]/70" />
+            <h1 className="text-3xl font-semibold tracking-tight">Spotify Intelligence</h1>
+          </div>
+          <p className="mt-2 text-sm text-white/40">
+            Live artist stats · follower snapshots · top tracks · catalog search
+          </p>
         </div>
-        <p className="mt-2 text-sm text-white/50">
-          Live artist stats, follower snapshots, and catalog search.
-        </p>
+        <div className="flex items-center gap-1.5 shrink-0 mt-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#1DB954] animate-pulse" />
+          <span className="text-[10px] font-mono text-[#1DB954]/60 tracking-wider">LIVE</span>
+        </div>
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-4 mb-12">
+      <div className="grid grid-cols-3 gap-3 mb-10">
         {[
-          { label: "Linked Artists", value: linked.length },
-          { label: "Unlinked", value: unlinked.length },
-          { label: "Total Roster", value: artists.length },
-        ].map(({ label, value }) => (
-          <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="text-xs uppercase tracking-[0.2em] text-white/35 mb-2">{label}</div>
-            <div className="text-2xl font-semibold">{value}</div>
+          { label: "Linked Artists", value: linked.length, color: "text-[#1DB954]", border: "border-[#1DB954]/15" },
+          { label: "Unlinked", value: unlinked.length, color: unlinked.length > 0 ? "text-amber-400/80" : "text-white/40", border: "border-white/[0.08]" },
+          { label: "Total Roster", value: artists.length, color: "text-white/70", border: "border-white/[0.08]" },
+        ].map(({ label, value, color, border }) => (
+          <div key={label} className={`rounded-2xl border ${border} bg-white/[0.02] p-5`}>
+            <div className="text-[9px] uppercase tracking-[0.25em] text-white/30 mb-2 font-mono">{label}</div>
+            <div className={`text-2xl font-semibold tabular-nums font-mono ${color}`}>{value}</div>
           </div>
         ))}
       </div>
@@ -179,20 +247,26 @@ export default async function SpotifyAdminPage() {
         <section className="mb-12">
           <div className="flex items-center gap-2.5 mb-5">
             <SpotifyIcon className="w-3.5 h-3.5 fill-[#1DB954]/60" />
-            <p className="text-xs uppercase tracking-[0.2em] text-white/40">Linked Roster</p>
+            <p className="text-[10px] uppercase tracking-[0.25em] text-white/35 font-mono">Linked Roster</p>
+            <span className="text-[9px] font-mono text-white/20">— {linked.length} artist{linked.length !== 1 ? "s" : ""}</span>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-[#0d1016] px-6">
+          <div className="space-y-3">
             {linked.map((artist) => (
               <Suspense
                 key={artist.slug}
                 fallback={
-                  <div className="flex items-center justify-between py-4 border-b border-white/[0.05]">
-                    <span className="text-sm text-white/40">{artist.name}</span>
-                    <span className="text-xs text-white/15 animate-pulse">Loading…</span>
+                  <div className="rounded-2xl border border-white/[0.07] bg-[#0a0c10] p-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-xl bg-white/[0.04] animate-pulse" />
+                      <div className="space-y-2">
+                        <div className="h-3 w-32 bg-white/[0.06] rounded animate-pulse" />
+                        <div className="h-2 w-48 bg-white/[0.04] rounded animate-pulse" />
+                      </div>
+                    </div>
                   </div>
                 }
               >
-                <LinkedArtistRow artist={artist} />
+                <LinkedArtistCard artist={artist} />
               </Suspense>
             ))}
           </div>
@@ -202,26 +276,24 @@ export default async function SpotifyAdminPage() {
       {/* Unlinked roster */}
       {unlinked.length > 0 && (
         <section className="mb-12">
-          <p className="text-xs uppercase tracking-[0.2em] text-white/30 mb-4">
+          <p className="text-[10px] uppercase tracking-[0.25em] text-white/25 mb-4 font-mono">
             Unlinked Artists
           </p>
-          <div className="rounded-2xl border border-white/8 bg-white/[0.02] px-5">
-            {unlinked.map((artist, i) => (
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.015] divide-y divide-white/[0.04]">
+            {unlinked.map((artist) => (
               <div
                 key={artist.slug}
-                className={`flex items-center justify-between py-3.5 ${
-                  i < unlinked.length - 1 ? "border-b border-white/[0.04]" : ""
-                }`}
+                className="flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.03] transition-all duration-150"
               >
                 <div>
                   <span className="text-sm text-white/60">{artist.name}</span>
-                  <span className="ml-3 text-[10px] uppercase tracking-[0.12em] text-white/25">
+                  <span className="ml-3 text-[9px] uppercase tracking-[0.15em] text-white/25 font-mono">
                     {artist.genre}
                   </span>
                 </div>
                 <Link
                   href={`/admin/artists/${artist.slug}/edit`}
-                  className="text-[10px] tracking-[0.15em] uppercase text-white/25 hover:text-white transition-colors border border-white/10 px-3 py-1.5 hover:border-white/25 whitespace-nowrap"
+                  className="text-[9px] font-mono tracking-[0.15em] uppercase text-white/25 hover:text-white transition-colors duration-150 border border-white/[0.08] hover:border-white/25 px-3 py-1.5 rounded whitespace-nowrap"
                 >
                   Link Spotify →
                 </Link>
@@ -231,12 +303,12 @@ export default async function SpotifyAdminPage() {
         </section>
       )}
 
-      {/* Search */}
+      {/* Catalog search */}
       <section>
-        <p className="text-xs uppercase tracking-[0.2em] text-white/40 mb-5">
+        <p className="text-[10px] uppercase tracking-[0.25em] text-white/35 mb-5 font-mono">
           Search Spotify Catalog
         </p>
-        <div className="rounded-2xl border border-white/10 bg-[#0d1016] p-6">
+        <div className="rounded-2xl border border-white/[0.08] bg-[#0a0c10] p-6">
           <SpotifySearchPanel />
         </div>
       </section>

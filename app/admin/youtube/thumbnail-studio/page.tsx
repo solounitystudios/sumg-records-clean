@@ -2,6 +2,7 @@ import Link from "next/link"
 import { requireAdmin } from "@/lib/auth"
 import { getJobsForStudio } from "@/lib/youtube/thumbnails/actions"
 import { getProducers } from "@/lib/db/producers"
+import { isImageGenerationConfigured } from "@/lib/image-generation"
 import { ThumbnailStudioClient } from "./ThumbnailStudioClient"
 
 export const metadata = { title: "Thumbnail Studio — SUMG Admin" }
@@ -92,7 +93,11 @@ export default async function ThumbnailStudioPage() {
       </div>
 
       {/* Studio */}
-      <ThumbnailStudioClient initialJobs={jobs} producers={producers} />
+      <ThumbnailStudioClient
+        initialJobs={jobs}
+        producers={producers}
+        generationEnabled={isImageGenerationConfigured()}
+      />
     </div>
   )
 }

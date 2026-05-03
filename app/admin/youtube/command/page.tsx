@@ -62,11 +62,23 @@ function StatusPill({ status }: { status: string }) {
   )
 }
 
-function Stat({ label, value, accent }: { label: string; value: number | string; accent?: string }) {
+function Stat({ label, value, accent, href }: { label: string; value: number | string; accent?: string; href?: string }) {
+  const inner = (
+    <>
+      <p className="text-[9px] uppercase tracking-[0.2em] text-white/30 mb-2 font-mono">{label}</p>
+      <p className={`text-2xl font-semibold tabular-nums font-mono ${accent ?? "text-white"}`}>{value}</p>
+    </>
+  )
+  if (href) {
+    return (
+      <Link href={href} className="block border border-white/[0.07] bg-[#0d1016] p-4 rounded-xl hover:border-white/15 hover:bg-white/[0.03] transition-all duration-150">
+        {inner}
+      </Link>
+    )
+  }
   return (
     <div className="border border-white/[0.07] bg-[#0d1016] p-4 rounded-xl">
-      <p className="text-[9px] uppercase tracking-[0.2em] text-white/30 mb-2">{label}</p>
-      <p className={`text-2xl font-semibold tabular-nums ${accent ?? "text-white"}`}>{value}</p>
+      {inner}
     </div>
   )
 }
@@ -154,12 +166,12 @@ export default async function CommandPanelPage() {
       <section>
         <p className="text-[10px] uppercase tracking-[0.2em] text-white/30 mb-4">Today</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <Stat label="Uploaded"  value={fmt(today.uploadedToday)}  accent="text-emerald-400" />
-          <Stat label="Scheduled" value={fmt(today.scheduledToday)} accent="text-blue-400" />
-          <Stat label="Queue"     value={fmt(today.queueDepth)} />
-          <Stat label="Failed"    value={fmt(today.failedTotal)}    accent={today.failedTotal > 0 ? "text-red-400" : undefined} />
-          <Stat label="Needs Asset"  value={fmt(today.needsAsset)} />
-          <Stat label="Needs Render" value={fmt(today.needsRender)} />
+          <Stat label="Uploaded"     value={fmt(today.uploadedToday)}  accent="text-emerald-400" href="/admin/youtube/jobs?status=uploaded" />
+          <Stat label="Scheduled"    value={fmt(today.scheduledToday)} accent="text-blue-400"    href="/admin/youtube/schedule" />
+          <Stat label="Queue"        value={fmt(today.queueDepth)}                               href="/admin/youtube/queue" />
+          <Stat label="Failed"       value={fmt(today.failedTotal)}    accent={today.failedTotal > 0 ? "text-red-400" : undefined} href="/admin/youtube/jobs?status=failed" />
+          <Stat label="Needs Asset"  value={fmt(today.needsAsset)}                               href="/admin/youtube/queue?status=needs_asset" />
+          <Stat label="Needs Render" value={fmt(today.needsRender)}                              href="/admin/youtube/queue?status=needs_render" />
         </div>
       </section>
 

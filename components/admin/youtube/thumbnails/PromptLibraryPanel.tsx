@@ -24,7 +24,9 @@ const STYLE_BUCKETS = [
 ]
 
 interface Props {
-  producers: Array<{ slug: string; name: string }>
+  producers:          Array<{ slug: string; name: string }>
+  onUseInJobMode?:    (prompt: string) => void
+  onUseInFreeCreate?: (prompt: string) => void
 }
 
 type ViewMode = "all" | "favorites" | "winners" | "archived"
@@ -49,7 +51,7 @@ function emptyDraft(p?: ThumbnailPromptRow): EditDraft {
   }
 }
 
-export function PromptLibraryPanel({ producers }: Props) {
+export function PromptLibraryPanel({ producers, onUseInJobMode, onUseInFreeCreate }: Props) {
   const [prompts,          setPrompts]          = useState<ThumbnailPromptRow[]>([])
   const [loading,          setLoading]          = useState(true)
   const [viewMode,         setViewMode]         = useState<ViewMode>("all")
@@ -371,6 +373,8 @@ export function PromptLibraryPanel({ producers }: Props) {
               onArchive={() => handleArchive(p.id)}
               onRestore={() => handleRestore(p.id)}
               onDeleteRequest={() => setDeleteConfirmId(p.id)}
+              onUseInJobMode={onUseInJobMode ? () => onUseInJobMode(p.prompt) : undefined}
+              onUseInFreeCreate={onUseInFreeCreate ? () => onUseInFreeCreate(p.prompt) : undefined}
             />
           ))}
         </div>
@@ -421,6 +425,8 @@ function PromptCard({
   onArchive,
   onRestore,
   onDeleteRequest,
+  onUseInJobMode,
+  onUseInFreeCreate,
 }: {
   prompt: ThumbnailPromptRow
   isEditing: boolean
@@ -437,6 +443,8 @@ function PromptCard({
   onArchive: () => void
   onRestore: () => void
   onDeleteRequest: () => void
+  onUseInJobMode?: () => void
+  onUseInFreeCreate?: () => void
 }) {
   const [copied, setCopied] = useState(false)
 
@@ -502,6 +510,28 @@ function PromptCard({
           >
             🏆
           </button>
+          {/* Use in Job Mode */}
+          {onUseInJobMode && (
+            <button
+              type="button"
+              onClick={onUseInJobMode}
+              title="Use this prompt in Job Mode"
+              className="h-7 px-2 rounded-lg flex items-center justify-center text-[9px] font-mono text-violet-400/60 hover:text-violet-400 hover:bg-violet-500/[0.08] transition-colors whitespace-nowrap"
+            >
+              Job
+            </button>
+          )}
+          {/* Use in Free Create */}
+          {onUseInFreeCreate && (
+            <button
+              type="button"
+              onClick={onUseInFreeCreate}
+              title="Use this prompt in Free Create"
+              className="h-7 px-2 rounded-lg flex items-center justify-center text-[9px] font-mono text-sky-400/60 hover:text-sky-400 hover:bg-sky-500/[0.08] transition-colors whitespace-nowrap"
+            >
+              Free
+            </button>
+          )}
           {/* Copy */}
           <button
             type="button"

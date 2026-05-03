@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useRef, useState, useTransition } from "react"
 import { processBMIImport, processDistroImport } from "@/app/actions/imports"
 import type { ImportResult, ImportType } from "@/app/actions/imports"
@@ -215,28 +216,62 @@ export function ImportClient() {
       {result && (
         <div className="space-y-4">
           <div className="rounded-xl border border-white/[0.07] bg-[#0d1016] p-5">
-            <p className="text-sm font-medium text-white/70 mb-4">Import Complete</p>
+            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/40 mb-4">Import Complete</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: "Total Rows",  value: result.totalRows },
-                { label: "Matched",     value: result.matched,  color: "text-sky-400" },
-                { label: "Updated",     value: result.updated,  color: "text-emerald-400" },
-                { label: "Skipped",     value: result.skipped,  color: result.skipped > 0 ? "text-amber-400" : "text-white/40" },
+                { label: "Total Rows",  value: result.totalRows, color: undefined },
+                { label: "Matched",     value: result.matched,   color: "text-sky-400" },
+                { label: "Updated",     value: result.updated,   color: "text-emerald-400" },
+                { label: "Skipped",     value: result.skipped,   color: result.skipped > 0 ? "text-amber-400" : "text-white/40" },
               ].map(({ label, value, color }) => (
                 <div key={label}>
-                  <p className={`text-xl font-semibold tabular-nums ${color ?? "text-white/70"}`}>{value}</p>
-                  <p className="text-[10px] text-white/30 mt-0.5">{label}</p>
+                  <p className={`text-xl font-semibold tabular-nums font-mono ${color ?? "text-white/70"}`}>{value}</p>
+                  <p className="text-[9px] text-white/30 mt-0.5 uppercase tracking-wider">{label}</p>
                 </div>
               ))}
             </div>
             {result.logId && (
-              <p className="text-[10px] text-white/20 mt-4">Log ID: <span className="font-mono">{result.logId}</span></p>
+              <p className="text-[9px] text-white/20 mt-4 font-mono">Log: <span>{result.logId}</span></p>
             )}
           </div>
 
+          {/* Updated entities — clickable links */}
+          {result.updatedEntities && result.updatedEntities.length > 0 && (
+            <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.03] p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-emerald-400/70">
+                  Updated Records ({result.updatedEntities.length})
+                </p>
+                <Link
+                  href="/admin/songs"
+                  className="text-[9px] font-mono text-emerald-400/40 hover:text-emerald-400/80 transition-colors duration-150 tracking-wider"
+                >
+                  View All Songs →
+                </Link>
+              </div>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {result.updatedEntities.slice(0, 20).map((e) => (
+                  <Link
+                    key={e.id}
+                    href={e.slug ? `/admin/songs/${e.id}/edit` : `/admin/songs`}
+                    className="flex items-center gap-2 px-2 py-1.5 -mx-2 rounded hover:bg-emerald-500/[0.06] transition-all duration-150 group"
+                  >
+                    <span className="h-1 w-1 rounded-full bg-emerald-400/40 shrink-0" />
+                    <span className="text-[11px] text-emerald-400/70 group-hover:text-emerald-400/90 transition-colors duration-150 truncate">
+                      {e.title}
+                    </span>
+                    <span className="text-[9px] font-mono text-emerald-400/25 ml-auto shrink-0 group-hover:text-emerald-400/50 transition-colors duration-150">→</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           {result.errors.length > 0 && (
             <div className="rounded-xl border border-amber-500/15 bg-amber-500/5 p-4 space-y-1">
-              <p className="text-xs text-amber-400 font-medium">{result.errors.length} error{result.errors.length !== 1 ? "s" : ""}</p>
+              <p className="text-[10px] font-mono text-amber-400 tracking-wider">
+                {result.errors.length} error{result.errors.length !== 1 ? "s" : ""}
+              </p>
               {result.errors.slice(0, 10).map((e, i) => (
                 <p key={i} className="text-[11px] text-amber-400/60">{e}</p>
               ))}
@@ -245,7 +280,7 @@ export function ImportClient() {
 
           <button
             onClick={reset}
-            className="rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white/70 transition hover:border-white/40 hover:text-white"
+            className="rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white/70 transition-all duration-150 hover:border-white/40 hover:text-white"
           >
             Import Another File
           </button>

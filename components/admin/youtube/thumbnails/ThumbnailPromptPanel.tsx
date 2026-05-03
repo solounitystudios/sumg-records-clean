@@ -47,12 +47,13 @@ const CAMERA_STYLES = [
 ]
 
 interface Props {
-  producerSlug: string
-  jobTitle: string | null
-  preset: ThumbnailPreset | null
-  savedPrompts: ThumbnailPromptRow[]
-  projectId?: string
-  onPromptBuilt: (prompt: string) => void
+  producerSlug:   string
+  jobTitle:       string | null
+  preset:         ThumbnailPreset | null
+  savedPrompts:   ThumbnailPromptRow[]
+  projectId?:     string
+  initialPrompt?: string
+  onPromptBuilt:  (prompt: string) => void
 }
 
 export function ThumbnailPromptPanel({
@@ -61,13 +62,14 @@ export function ThumbnailPromptPanel({
   preset,
   savedPrompts,
   projectId,
+  initialPrompt,
   onPromptBuilt,
 }: Props) {
   const [rawIdea, setRawIdea]   = useState("")
   const [mood, setMood]         = useState(preset?.prompt_defaults.mood?.[0] ?? "")
   const [scene, setScene]       = useState("")
   const [camera, setCamera]     = useState(preset?.prompt_defaults.camera ?? "")
-  const [builtPrompt, setBuiltPrompt] = useState("")
+  const [builtPrompt, setBuiltPrompt] = useState(initialPrompt ?? "")
   const [copied, setCopied]           = useState(false)
   const [saving, setSaving]           = useState(false)
   const [saved, setSaved]             = useState(false)

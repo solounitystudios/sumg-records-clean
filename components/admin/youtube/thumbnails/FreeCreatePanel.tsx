@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useTransition } from "react"
 import { buildThumbnailPrompt } from "@/lib/youtube/thumbnails/prompts"
 import { createPrompt, saveFreeCreateAsset } from "@/lib/youtube/thumbnails/actions"
 import { getPresetsForProducer } from "@/lib/youtube/thumbnails/presets"
+import { generateThumbnailImages } from "@/app/actions/generateThumbnailImage"
 
 const STYLE_BUCKETS = [
   "MindLoft Sessions",
@@ -36,15 +37,6 @@ const MOODS = [
   "strange luxury and hidden power",
 ]
 
-function isValidHttpImageUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return url.protocol === "http:" || url.protocol === "https:"
-  } catch {
-    return false
-  }
-}
-
 const SCENE_TYPES = [
   "private Harlem loft",
   "Buffalo Route 33 at night",
@@ -56,11 +48,23 @@ const SCENE_TYPES = [
   "corner store at midnight",
 ]
 
-interface Props {
-  producers: Array<{ slug: string; name: string }>
+function isValidHttpImageUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === "http:" || url.protocol === "https:"
+  } catch {
+    return false
+  }
 }
 
-export function FreeCreatePanel({ producers }: Props) {
+interface Props {
+  producers:               Array<{ slug: string; name: string }>
+  generationEnabled:       boolean
+  initialPrompt?:          string
+  onInitialPromptConsumed?: () => void
+}
+
+export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, onInitialPromptConsumed }: Props) {
   const [producerSlug,       setProducerSlug]       = useState(producers[0]?.slug ?? "")
   const [artistName,         setArtistName]          = useState("")
   const [styleBucket,        setStyleBucket]         = useState("")
@@ -81,14 +85,27 @@ export function FreeCreatePanel({ producers }: Props) {
   const [savedAssetMsg,      setSavedAssetMsg]       = useState<string | null>(null)
   const [assetError,         setAssetError]          = useState<string | null>(null)
   const [assetName,          setAssetName]           = useState("")
-
   const [promptWarning,      setPromptWarning]       = useState<string | null>(null)
   const [uploading,          setUploading]           = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
 
+  // Generation state
+  const [isGenerating, startGenerating] = useTransition()
+  const [genError,           setGenError]            = useState<string | null>(null)
+  const [genResults,         setGenResults]          = useState<Array<{ imageUrl: string; assetId: string }>>([])
+
+  const fileRef = useRef<HTMLInputElement>(null)
   const presets = getPresetsForProducer(producerSlug)
-  const [selectedPresetSlug, setSelectedPresetSlug]  = useState("")
+  const [selectedPresetSlug, setSelectedPresetSlug] = useState("")
   const selectedPreset = presets.find((p) => p.preset_slug === selectedPresetSlug) ?? null
+
+  // Absorb initialPrompt from Prompt Library → Free Create cross-tab handoff
+  const [lastInitialPrompt, setLastInitialPrompt] = useState(initialPrompt)
+  if (initialPrompt && initialPrompt !== lastInitialPrompt) {
+    setLastInitialPrompt(initialPrompt)
+    setBuiltPrompt(initialPrompt)
+    setGenResults([])
+    onInitialPromptConsumed?.()
+  }
 
   function handleBuild() {
     const prompt = buildThumbnailPrompt({
@@ -102,6 +119,7 @@ export function FreeCreatePanel({ producers }: Props) {
     })
     setBuiltPrompt(prompt)
     setPromptSaved(false)
+    setGenResults([])
   }
 
   async function handleCopy() {
@@ -129,7 +147,7 @@ export function FreeCreatePanel({ producers }: Props) {
     if (!url) return
     if (!isValidHttpImageUrl(url)) {
       setPromptWarning(
-        "This looks like a prompt, not an image URL. Copy the prompt above, generate the image in Midjourney/OpenAI, then paste the final image link or upload the file."
+        "This looks like a prompt, not an image URL. Copy the prompt above, generate the image in Midjourney or OpenAI, then paste the final image link or upload the file below."
       )
       return
     }
@@ -138,6 +156,7 @@ export function FreeCreatePanel({ producers }: Props) {
     setImageError(false)
     setAssetError(null)
     setSavedAssetMsg(null)
+    setGenResults([])
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -157,6 +176,7 @@ export function FreeCreatePanel({ producers }: Props) {
       if (result && "url" in result) {
         setImageUrl(result.url as string)
         setImageUrlInput(result.url as string)
+        setGenResults([])
       } else if (result && "error" in result) {
         setAssetError((result as { error: string }).error)
       }
@@ -166,6 +186,31 @@ export function FreeCreatePanel({ producers }: Props) {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ""
     }
+  }
+
+  function handleGenerateImage() {
+    if (!builtPrompt.trim()) return
+    setGenError(null)
+    startGenerating(async () => {
+      const result = await generateThumbnailImages({
+        prompt:      builtPrompt.trim(),
+        count:       1,
+        producerSlug: producerSlug || undefined,
+      })
+      if ("error" in result) {
+        setGenError(result.error)
+        return
+      }
+      setGenResults(result.images)
+      // Auto-select the first generated image
+      if (result.images[0]) {
+        setImageUrl(result.images[0].imageUrl)
+        setImageUrlInput(result.images[0].imageUrl)
+        setImageError(false)
+        setSavedAssetMsg("Image generated and saved to Assets. Click Save below to add to thumbnail library.")
+        setAssetError(null)
+      }
+    })
   }
 
   async function handleSaveToAssets() {
@@ -183,19 +228,26 @@ export function FreeCreatePanel({ producers }: Props) {
     if ("error" in result) {
       setAssetError(result.error)
     } else {
-      setSavedAssetMsg("Saved to Assets library")
-      setTimeout(() => setSavedAssetMsg(null), 4000)
+      setSavedAssetMsg("Saved to Assets and Thumbnail Library ✓")
+      setTimeout(() => setSavedAssetMsg(null), 5000)
     }
+  }
+
+  function clearImage() {
+    setImageUrl("")
+    setImageUrlInput("")
+    setImageError(false)
+    setSavedAssetMsg(null)
+    setGenResults([])
   }
 
   return (
     <div className="space-y-6 pb-24">
-      {/* ── Producer row ──────────────────────────────────────────────── */}
+
+      {/* Producer row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1.5">
-            Producer
-          </label>
+          <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1.5">Producer</label>
           <select
             value={producerSlug}
             onChange={(e) => { setProducerSlug(e.target.value); setSelectedPresetSlug("") }}
@@ -207,7 +259,6 @@ export function FreeCreatePanel({ producers }: Props) {
             ))}
           </select>
         </div>
-
         <div>
           <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1.5">
             Artist / Context <span className="normal-case text-white/20">(optional — used in prompt)</span>
@@ -222,7 +273,7 @@ export function FreeCreatePanel({ producers }: Props) {
         </div>
       </div>
 
-      {/* ── Style buckets ─────────────────────────────────────────────── */}
+      {/* Style buckets */}
       <div>
         <p className="text-[9px] uppercase tracking-[0.2em] text-white/30 mb-2">Style Bucket</p>
         <div className="flex flex-wrap gap-2">
@@ -243,7 +294,7 @@ export function FreeCreatePanel({ producers }: Props) {
         </div>
       </div>
 
-      {/* ── Presets (if available for this producer) ──────────────────── */}
+      {/* Presets */}
       {presets.length > 0 && (
         <div>
           <p className="text-[9px] uppercase tracking-[0.2em] text-white/30 mb-2">Preset</p>
@@ -266,15 +317,13 @@ export function FreeCreatePanel({ producers }: Props) {
         </div>
       )}
 
-      {/* ── Main two-col layout ───────────────────────────────────────── */}
+      {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* ── LEFT: Prompt builder ──────────────────────────────────── */}
+        {/* LEFT: Prompt builder */}
         <div className="space-y-4">
           <div>
-            <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1.5">
-              Visual Idea
-            </label>
+            <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1.5">Visual Idea</label>
             <textarea
               value={rawIdea}
               onChange={(e) => setRawIdea(e.target.value)}
@@ -284,24 +333,18 @@ export function FreeCreatePanel({ producers }: Props) {
             />
           </div>
 
-          {/* Camera style */}
           <div>
-            <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1.5">
-              Camera Style
-            </label>
+            <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1.5">Camera Style</label>
             <select
               value={camera}
               onChange={(e) => setCamera(e.target.value)}
               className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500/50 appearance-none"
             >
               <option value="">— Auto from preset —</option>
-              {CAMERA_STYLES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {CAMERA_STYLES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
 
-          {/* Refiners toggle */}
           <button
             type="button"
             onClick={() => setShowRefiners((p) => !p)}
@@ -346,17 +389,15 @@ export function FreeCreatePanel({ producers }: Props) {
           </button>
         </div>
 
-        {/* ── RIGHT: Output + Image ─────────────────────────────────── */}
+        {/* RIGHT: Prompt output + Image import */}
         <div className="space-y-4">
           {builtPrompt ? (
             <>
               <div>
-                <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1.5">
-                  Enhanced Prompt
-                </label>
+                <label className="block text-[9px] uppercase tracking-[0.2em] text-white/30 mb-1.5">Enhanced Prompt</label>
                 <textarea
                   value={builtPrompt}
-                  onChange={(e) => setBuiltPrompt(e.target.value)}
+                  onChange={(e) => { setBuiltPrompt(e.target.value); setGenResults([]) }}
                   rows={7}
                   className="w-full bg-black/30 border border-white/[0.1] rounded-xl px-4 py-3 text-sm text-white/85 focus:outline-none focus:border-violet-500/50 resize-none font-mono leading-relaxed"
                 />
@@ -376,33 +417,61 @@ export function FreeCreatePanel({ producers }: Props) {
                   disabled={savingPrompt || promptSaved || !producerSlug}
                   className="py-3 rounded-xl border border-white/[0.1] text-white/55 hover:text-white hover:border-white/25 disabled:opacity-40 text-sm transition-colors"
                 >
-                  {savingPrompt ? "Saving…" : promptSaved ? "Saved ✓" : "Save Prompt"}
+                  {savingPrompt ? "Saving…" : promptSaved ? "Saved to Library ✓" : "Save Prompt"}
                 </button>
               </div>
-              <div className="rounded-xl bg-white/[0.02] border border-white/[0.05] px-4 py-3 space-y-1.5">
-                <p className="text-[9px] uppercase tracking-[0.18em] text-white/25 mb-2">Workflow</p>
-                {[
-                  { n: 1, text: "Build prompt above" },
-                  { n: 2, text: "Copy prompt → paste into Midjourney or OpenAI" },
-                  { n: 3, text: "Upload or link the finished image below" },
-                  { n: 4, text: "Save to Assets" },
-                ].map(({ n, text }) => (
-                  <div key={n} className="flex items-start gap-2">
-                    <span className="text-[9px] text-violet-400/50 font-mono tabular-nums shrink-0 mt-px">Step {n}</span>
-                    <span className="text-[10px] text-white/30 leading-snug">{text}</span>
+
+              {/* Generate Image button */}
+              {generationEnabled ? (
+                <button
+                  type="button"
+                  onClick={handleGenerateImage}
+                  disabled={isGenerating || !builtPrompt.trim()}
+                  className="w-full py-3.5 rounded-xl bg-violet-700/70 hover:bg-violet-700 active:scale-[0.98] text-white font-semibold text-sm disabled:opacity-40 transition-all border border-violet-500/30"
+                >
+                  {isGenerating ? "Generating image…" : "Generate Image (OpenAI DALL-E 3) →"}
+                </button>
+              ) : (
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                  <p className="text-[10px] text-white/30 leading-relaxed">
+                    <span className="text-white/50">Direct image generation</span> — add <span className="font-mono text-amber-400/60">OPENAI_API_KEY</span> to your environment to enable. Until then, copy the prompt above and use Midjourney or DALL-E manually.
+                  </p>
+                </div>
+              )}
+
+              {genError && (
+                <div className="rounded-xl bg-red-500/[0.07] border border-red-500/20 px-3 py-2.5">
+                  <p className="text-[11px] text-red-400/80 leading-relaxed">{genError}</p>
+                </div>
+              )}
+
+              {/* Multiple gen results picker */}
+              {genResults.length > 1 && (
+                <div>
+                  <p className="text-[9px] uppercase tracking-[0.18em] text-white/30 mb-2">Generated Options — click to select</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {genResults.map((img, i) => (
+                      <button
+                        type="button"
+                        key={img.assetId}
+                        onClick={() => { setImageUrl(img.imageUrl); setImageUrlInput(img.imageUrl); setImageError(false) }}
+                        className={`aspect-video rounded-xl overflow-hidden border transition-colors ${imageUrl === img.imageUrl ? "border-violet-500/70 ring-1 ring-violet-500/30" : "border-white/[0.08] hover:border-white/20"}`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img.imageUrl} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="h-36 flex items-center justify-center rounded-2xl border border-dashed border-white/[0.06]">
-              <p className="text-sm text-white/15 text-center px-4">
-                Build a prompt to see it here
-              </p>
+              <p className="text-sm text-white/15 text-center px-4">Build a prompt to see options here</p>
             </div>
           )}
 
-          {/* ── Import section ─────────────────────────────────── */}
+          {/* Import section */}
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 space-y-3">
             <p className="text-[9px] uppercase tracking-[0.2em] text-white/30">Import Finished Thumbnail</p>
 
@@ -411,21 +480,21 @@ export function FreeCreatePanel({ producers }: Props) {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={imageUrl}
-                  alt="Generated thumbnail"
+                  alt="Selected thumbnail"
                   className="w-full object-cover rounded-xl"
                   onError={() => setImageError(true)}
                 />
                 <button
                   type="button"
-                  onClick={() => { setImageUrl(""); setImageUrlInput(""); setImageError(false); setSavedAssetMsg(null) }}
+                  onClick={clearImage}
                   className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 text-white/60 hover:text-white text-xs flex items-center justify-center"
+                  title="Clear image"
                 >
                   ×
                 </button>
               </div>
             ) : (
               <>
-                {/* URL input */}
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -451,7 +520,6 @@ export function FreeCreatePanel({ producers }: Props) {
                   </div>
                 )}
 
-                {/* File upload */}
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-px bg-white/[0.06]" />
                   <span className="text-[10px] text-white/20">or</span>
@@ -466,21 +534,14 @@ export function FreeCreatePanel({ producers }: Props) {
                 >
                   {uploading ? "Uploading…" : "Upload Image File"}
                 </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
               </>
             )}
 
             {imageError && (
-              <p className="text-[11px] text-red-400/70">Could not load image from that URL.</p>
+              <p className="text-[11px] text-red-400/70">Could not load image from that URL. Try uploading the file instead.</p>
             )}
 
-            {/* Asset name + save */}
             {imageUrl && !imageError && (
               <div className="space-y-2 pt-1">
                 <input

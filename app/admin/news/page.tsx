@@ -1,79 +1,88 @@
 import Link from "next/link"
 import { getNews } from "@/lib/db/news"
 import { createNewsItem, deleteNewsItem } from "@/app/actions/news"
+import { NewsIngestPanel } from "./NewsIngestPanel"
 
 export const metadata = { title: "News — SUMG Admin" }
 
 const categoryStyle: Record<string, string> = {
-  Release: "bg-emerald-500/15 text-emerald-400",
-  Visual: "bg-violet-500/15 text-violet-400",
-  Announcement: "bg-blue-500/15 text-blue-400",
-  Brand: "bg-amber-500/15 text-amber-400",
-  Business: "bg-slate-500/15 text-slate-400",
+  Release:      "bg-emerald-500/12 text-emerald-400 border-emerald-500/20",
+  Visual:       "bg-violet-500/12 text-violet-400 border-violet-500/20",
+  Announcement: "bg-blue-500/12 text-blue-400 border-blue-500/20",
+  Brand:        "bg-amber-500/12 text-amber-400 border-amber-500/20",
+  Business:     "bg-slate-500/12 text-slate-400 border-slate-500/20",
 }
 
 const inputClass =
-  "w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/25 focus:border-white/30 focus:outline-none focus:ring-1 focus:ring-white/20 transition"
+  "w-full rounded-xl border border-white/[0.1] bg-white/[0.03] px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-white/25 focus:outline-none focus:ring-1 focus:ring-white/15 transition-all duration-150"
 
-const labelClass = "block text-xs uppercase tracking-[0.2em] text-white/40 mb-2"
+const labelClass = "block text-[9px] uppercase tracking-[0.25em] text-white/35 mb-2 font-mono"
 
 const categories = ["Release", "Visual", "Announcement", "Brand", "Business"]
 
 export default async function NewsAdminPage() {
-  const news = await getNews()
+  const news     = await getNews()
   const featured = news.filter((n) => n.featured)
 
   return (
     <main className="px-6 py-10 md:px-10">
+      {/* Header */}
       <div className="mb-10">
-        <p className="text-xs uppercase tracking-[0.35em] text-white/35 mb-2">Admin</p>
-        <h1 className="text-3xl font-semibold">News</h1>
-        <p className="mt-2 text-sm text-white/50">Manage label news and announcements.</p>
+        <p className="text-[10px] uppercase tracking-[0.35em] text-white/25 mb-2 font-mono">Admin / Content</p>
+        <h1 className="text-3xl font-semibold tracking-tight">News</h1>
+        <p className="mt-2 text-sm text-white/40">Label news, announcements, and industry feed ingest.</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3 mb-10">
+      {/* KPI row */}
+      <div className="grid gap-3 sm:grid-cols-3 mb-10">
         {[
-          { label: "Total Items", value: news.length },
-          { label: "Featured", value: featured.length },
-          { label: "Categories", value: [...new Set(news.map((n) => n.category))].length },
+          { label: "Total Items",  value: news.length },
+          { label: "Featured",     value: featured.length },
+          { label: "Categories",   value: [...new Set(news.map((n) => n.category))].length },
         ].map(({ label, value }) => (
-          <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-5">
-            <div className="text-xs uppercase tracking-[0.2em] text-white/35 mb-2">{label}</div>
-            <div className="text-2xl font-semibold">{value}</div>
+          <div key={label} className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5">
+            <div className="text-[9px] uppercase tracking-[0.25em] text-white/30 mb-2 font-mono">{label}</div>
+            <div className="text-2xl font-semibold tabular-nums font-mono">{value}</div>
           </div>
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <div className="space-y-3">
+      {/* Industry feed ingest */}
+      <div className="mb-8">
+        <NewsIngestPanel />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        {/* News list */}
+        <div className="space-y-2.5">
           {news.map((item) => (
             <div
               key={item.id}
-              className="rounded-2xl border border-white/10 bg-[#0d1016] p-5"
+              className="rounded-2xl border border-white/[0.08] bg-[#0a0c10] p-5 hover:border-white/[0.13] transition-all duration-150"
             >
               <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3 flex-wrap min-w-0">
-                  <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${categoryStyle[item.category] ?? "bg-white/8 text-white/40"}`}>
+                <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                  <span className={`text-[9px] border px-2 py-0.5 rounded shrink-0 font-mono ${categoryStyle[item.category] ?? "bg-white/5 text-white/35 border-white/10"}`}>
                     {item.category}
                   </span>
                   {item.featured && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/50 shrink-0">
+                    <span className="text-[9px] border border-white/[0.1] px-2 py-0.5 rounded shrink-0 font-mono text-white/40">
                       Featured
                     </span>
                   )}
-                  <span className="text-xs text-white/30 shrink-0">{item.date}</span>
+                  <span className="text-[9px] text-white/25 shrink-0 font-mono">{item.date}</span>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <Link
                     href={`/admin/news/${item.id}/edit`}
-                    className="text-xs text-white/40 hover:text-white transition"
+                    className="text-[10px] font-mono text-white/30 hover:text-white transition-colors duration-150 tracking-wider"
                   >
                     Edit
                   </Link>
                   <form action={deleteNewsItem.bind(null, item.id)}>
                     <button
                       type="submit"
-                      className="text-xs text-red-400/50 hover:text-red-400 transition"
+                      className="text-[10px] font-mono text-red-400/35 hover:text-red-400 transition-colors duration-150 tracking-wider"
                     >
                       Delete
                     </button>
@@ -81,19 +90,21 @@ export default async function NewsAdminPage() {
                 </div>
               </div>
               <h3 className="mt-3 text-sm font-semibold">{item.title}</h3>
-              <p className="mt-1 text-xs text-white/45 leading-5 line-clamp-2">{item.excerpt}</p>
+              <p className="mt-1 text-[11px] text-white/40 leading-relaxed line-clamp-2">{item.excerpt}</p>
             </div>
           ))}
 
           {news.length === 0 && (
-            <div className="rounded-2xl border border-white/10 bg-[#0d1016] p-10 text-center text-sm text-white/35">
-              No news items yet. Create the first one →
+            <div className="rounded-2xl border border-white/[0.07] bg-[#0a0c10] p-10 text-center">
+              <p className="text-sm text-white/25 font-mono">No news items yet.</p>
+              <p className="mt-1 text-xs text-white/15">Use the feed ingest above or create one manually →</p>
             </div>
           )}
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-[#0d1016] p-6 self-start">
-          <h2 className="text-xs uppercase tracking-[0.2em] text-white/40 mb-6">New Item</h2>
+        {/* Create form */}
+        <div className="rounded-2xl border border-white/[0.08] bg-[#0a0c10] p-6 self-start">
+          <h2 className="text-[9px] font-mono uppercase tracking-[0.25em] text-white/35 mb-6">New Item</h2>
 
           <form action={createNewsItem} className="space-y-4">
             <div>
@@ -147,7 +158,7 @@ export default async function NewsAdminPage() {
 
             <div>
               <label htmlFor="n-category" className={labelClass}>Category</label>
-              <select id="n-category" name="category" defaultValue="Announcement" className={inputClass}>
+              <select id="n-category" name="category" defaultValue="Announcement" className={`${inputClass} bg-[#0a0c10]`}>
                 {categories.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
@@ -161,14 +172,14 @@ export default async function NewsAdminPage() {
                 type="checkbox"
                 className="rounded border-white/20 bg-white/5 text-white"
               />
-              <label htmlFor="n-featured" className="text-sm text-white/60">
-                Featured (show prominently on news page)
+              <label htmlFor="n-featured" className="text-xs text-white/50">
+                Featured
               </label>
             </div>
 
             <button
               type="submit"
-              className="w-full rounded-full bg-white px-6 py-3 text-sm font-medium text-black transition hover:bg-white/90"
+              className="w-full rounded-full bg-white px-6 py-3 text-sm font-medium text-black transition-all duration-150 hover:bg-white/90"
             >
               Create Item
             </button>
