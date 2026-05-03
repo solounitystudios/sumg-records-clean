@@ -177,7 +177,7 @@ export function ThumbnailVersionGrid({
     // The server action already inserted the versions into the DB;
     // refresh the version list by adding them locally.
     const newVersions: ThumbnailVersion[] = result.images.map((img, i) => ({
-      id:             `${Date.now()}-${i}`,   // placeholder — real ID is in DB
+      id:             img.versionId ?? `${Date.now()}-${i}`,
       project_id:     projectId,
       asset_id:       img.assetId,
       image_url:      img.imageUrl,

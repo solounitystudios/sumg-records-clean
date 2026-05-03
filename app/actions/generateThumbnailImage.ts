@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/server"
 import { generateWithOpenAI, isImageGenerationConfigured } from "@/lib/image-generation"
 
 export interface GeneratedThumbnailImage {
-  imageUrl:      string
-  assetId:       string
+  imageUrl:       string
+  assetId:        string
+  versionId?:     string
   revisedPrompt?: string
 }
 
@@ -62,14 +63,37 @@ export async function generateThumbnailImages({
     }
 
     for (const img of result.images) {
-      const filename = `thumbnail_ai_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.png`
+      const fileKey = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      const filename = `thumbnail_ai_${fileKey}.png`
 
-      // Save to assets table
+      // Download OpenAI image immediately — their URLs expire in ~1 hour.
+      // Re-upload to Supabase storage so we have a permanent URL.
+      let permanentUrl = img.url
+      try {
+        const dlResp = await fetch(img.url)
+        if (dlResp.ok) {
+          const imageBuffer = await dlResp.arrayBuffer()
+          const storagePath = `thumbnails/${fileKey}.png`
+          const { error: storageErr } = await supabase.storage
+            .from("sumg-assets")
+            .upload(storagePath, imageBuffer, { contentType: "image/png", upsert: false })
+          if (!storageErr) {
+            const { data: urlData } = supabase.storage.from("sumg-assets").getPublicUrl(storagePath)
+            permanentUrl = urlData.publicUrl
+          } else {
+            console.error("[generateThumbnailImages] storage upload failed:", storageErr.message)
+          }
+        }
+      } catch (dlErr) {
+        console.error("[generateThumbnailImages] image download failed:", dlErr)
+      }
+
+      // Save to assets table using permanent URL
       const { data: assetRow, error: assetErr } = await supabase
         .from("assets")
         .insert({
           type:          "image",
-          url:           img.url,
+          url:           permanentUrl,
           filename,
           mime_type:     "image/png",
           size_bytes:    null,
@@ -93,27 +117,33 @@ export async function generateThumbnailImages({
       // Record in thumbnail_assets for the library
       await supabase.from("thumbnail_assets").insert({
         producer_slug:        producerSlug ?? null,
-        image_url:            img.url,
+        image_url:            permanentUrl,
         prompt_used:          img.revisedPrompt ?? prompt,
         asset_id:             assetId,
         name:                 `AI Generated — ${new Date().toLocaleDateString()}`,
         linked_upload_job_id: null,
       })
 
-      // Attach as a version to the project if specified
+      // Attach as a version to the project if specified; return real DB id
+      let versionId: string | undefined
       if (projectId) {
-        await supabase.from("thumbnail_versions").insert({
-          project_id:     projectId,
-          image_url:      img.url,
-          asset_id:       assetId,
-          prompt:         img.revisedPrompt ?? prompt,
-          provider:       "openai",
-          style_bucket:   null,
-          version_number: nextVersionNum++,
-        })
+        const { data: versionRow } = await supabase
+          .from("thumbnail_versions")
+          .insert({
+            project_id:     projectId,
+            image_url:      permanentUrl,
+            asset_id:       assetId,
+            prompt:         img.revisedPrompt ?? prompt,
+            provider:       "openai",
+            style_bucket:   null,
+            version_number: nextVersionNum++,
+          })
+          .select("id")
+          .single()
+        versionId = (versionRow as { id: string } | null)?.id
       }
 
-      images.push({ imageUrl: img.url, assetId, revisedPrompt: img.revisedPrompt })
+      images.push({ imageUrl: permanentUrl, assetId, versionId, revisedPrompt: img.revisedPrompt })
     }
 
     if (images.length === 0) {
