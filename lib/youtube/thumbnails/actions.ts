@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import type {
   ThumbnailProject,
   ThumbnailVersion,
@@ -15,7 +15,7 @@ import type {
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getJobsForStudio(): Promise<UploadJobForStudio[]> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { data, error } = await supabase
     .from("yt_upload_jobs")
     .select(
@@ -25,12 +25,17 @@ export async function getJobsForStudio(): Promise<UploadJobForStudio[]> {
     .order("created_at", { ascending: false })
     .limit(100)
 
-  if (error) return []
-  return (data ?? []) as UploadJobForStudio[]
+  if (error) {
+    console.error("[getJobsForStudio] query error:", error.message)
+    return []
+  }
+  const rows = (data ?? []) as UploadJobForStudio[]
+  console.log(`[getJobsForStudio] returned ${rows.length} rows — statuses: ${[...new Set(rows.map(r => r.status))].join(", ") || "none"}`)
+  return rows
 }
 
 export async function getOrCreateProject(jobId: string): Promise<ThumbnailProject | { error: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
 
   const { data: existing } = await supabase
     .from("thumbnail_projects")
@@ -63,7 +68,7 @@ export async function getOrCreateProject(jobId: string): Promise<ThumbnailProjec
 }
 
 export async function getProjectVersions(projectId: string): Promise<ThumbnailVersion[]> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { data } = await supabase
     .from("thumbnail_versions")
     .select("*")
@@ -73,7 +78,7 @@ export async function getProjectVersions(projectId: string): Promise<ThumbnailVe
 }
 
 export async function getPresetsFromDb(producerSlug: string): Promise<ThumbnailPreset[]> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { data } = await supabase
     .from("thumbnail_presets")
     .select("*")
@@ -84,7 +89,7 @@ export async function getPresetsFromDb(producerSlug: string): Promise<ThumbnailP
 }
 
 export async function getPromptsFromLibrary(producerSlug: string): Promise<ThumbnailPromptRow[]> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { data } = await supabase
     .from("thumbnail_prompts")
     .select("*")
@@ -103,7 +108,7 @@ export async function saveProjectDraft(
   presetSlug?: string,
   notes?: string,
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { error } = await supabase
     .from("thumbnail_projects")
     .update({
@@ -125,7 +130,7 @@ export async function addVersionByUrl(
   prompt?: string,
   styleBucket?: string,
 ): Promise<{ id: string } | { error: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
 
   const { data: existing } = await supabase
     .from("thumbnail_versions")
@@ -158,7 +163,7 @@ export async function selectVersion(
   projectId: string,
   versionId: string,
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
 
   await supabase
     .from("thumbnail_versions")
@@ -181,7 +186,7 @@ export async function selectVersion(
 }
 
 export async function rejectVersion(versionId: string): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { error } = await supabase
     .from("thumbnail_versions")
     .update({ rejected: true, selected: false })
@@ -202,7 +207,7 @@ export async function approveProject(
   mode: 'generated' | 'edited' | 'custom' = 'generated',
   promptUsed?: string,
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
 
   // 1. Insert into assets so renderer can fetch it by ID
   const filename = `thumbnail_project_${projectId}.png`
@@ -273,7 +278,7 @@ export async function approveProject(
 }
 
 export async function skipThumbnail(jobId: string): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { error } = await supabase
     .from("yt_upload_jobs")
     .update({
@@ -292,7 +297,7 @@ export async function getJobMediaAssets(jobId: string): Promise<{
   audioUrl: string | null
   renderUrl: string | null
 }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
 
   // Audio URL via audio_inbox → assets
   const { data: inboxRow } = await supabase
@@ -343,7 +348,7 @@ export async function savePromptToProject(
   projectId: string,
   prompt: string,
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { error } = await supabase
     .from("thumbnail_projects")
     .update({ notes: prompt, updated_at: new Date().toISOString() })
@@ -354,7 +359,7 @@ export async function savePromptToProject(
 }
 
 export async function getImageAssetsForPicker(): Promise<Array<{ id: string; url: string; filename: string }>> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { data } = await supabase
     .from("assets")
     .select("id, url, filename")
@@ -371,7 +376,7 @@ export async function savePromptToLibrary(
   category?: string,
   styleBucket?: string,
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { error } = await supabase
     .from("thumbnail_prompts")
     .insert({
@@ -390,7 +395,7 @@ export async function savePromptToLibrary(
 export async function getPromptLibrary(
   filters: PromptLibraryFilters = {}
 ): Promise<ThumbnailPromptRow[]> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
 
   let q = supabase
     .from("thumbnail_prompts")
@@ -423,7 +428,7 @@ export async function createPrompt(data: {
   styleBucket?: string
   ctrScore?: number
 }): Promise<{ id: string } | { error: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { data: row, error } = await supabase
     .from("thumbnail_prompts")
     .insert({
@@ -453,7 +458,7 @@ export async function updatePrompt(
     ctrScore?: number | null
   }
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (data.prompt      !== undefined) updates.prompt       = data.prompt
   if (data.name        !== undefined) updates.name         = data.name ?? null
@@ -469,7 +474,7 @@ export async function updatePrompt(
 }
 
 export async function archivePrompt(id: string): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { error } = await supabase
     .from("thumbnail_prompts")
     .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
@@ -480,7 +485,7 @@ export async function archivePrompt(id: string): Promise<{ error?: string }> {
 }
 
 export async function restorePrompt(id: string): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { error } = await supabase
     .from("thumbnail_prompts")
     .update({ archived_at: null, updated_at: new Date().toISOString() })
@@ -491,7 +496,7 @@ export async function restorePrompt(id: string): Promise<{ error?: string }> {
 }
 
 export async function deletePromptPermanently(id: string): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { error } = await supabase.from("thumbnail_prompts").delete().eq("id", id)
   revalidatePath("/admin/youtube/thumbnail-studio")
   if (error) return { error: error.message }
@@ -499,7 +504,7 @@ export async function deletePromptPermanently(id: string): Promise<{ error?: str
 }
 
 export async function duplicatePrompt(id: string): Promise<{ id: string } | { error: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { data: src } = await supabase.from("thumbnail_prompts").select("*").eq("id", id).single()
   if (!src) return { error: "Prompt not found" }
 
@@ -524,7 +529,7 @@ export async function duplicatePrompt(id: string): Promise<{ id: string } | { er
 }
 
 export async function markPromptFavorite(id: string, value: boolean): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { error } = await supabase
     .from("thumbnail_prompts")
     .update({ favorite: value, updated_at: new Date().toISOString() })
@@ -534,7 +539,7 @@ export async function markPromptFavorite(id: string, value: boolean): Promise<{ 
 }
 
 export async function markPromptWinner(id: string, value: boolean): Promise<{ error?: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { error } = await supabase
     .from("thumbnail_prompts")
     .update({ winner_bool: value, updated_at: new Date().toISOString() })
@@ -544,7 +549,7 @@ export async function markPromptWinner(id: string, value: boolean): Promise<{ er
 }
 
 export async function incrementPromptUseCount(id: string): Promise<void> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
   const { data } = await supabase
     .from("thumbnail_prompts")
     .select("use_count")
@@ -572,7 +577,7 @@ export async function saveFreeCreateAsset({
   styleBucket?: string
   name?: string
 }): Promise<{ assetId: string; thumbnailAssetId: string } | { error: string }> {
-  const supabase = await createClient()
+  const supabase = await createServiceClient()
 
   // Determine a filename from the URL
   const urlFilename = imageUrl.split("/").pop()?.split("?")[0] ?? ""
