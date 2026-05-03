@@ -12,7 +12,7 @@ import type {
   UploadJobForStudio,
   CanvasConfig,
   PromptLibraryFilters,
-  ThumbnailAsset,
+  ThumbnailGenerationJob,
   MidjourneyQueueRow,
 } from "./types"
 
@@ -653,16 +653,14 @@ export async function createMidjourneyPendingAsset({
   const supabase = await createServiceClient()
 
   const { data, error } = await supabase
-    .from("thumbnail_assets")
+    .from("thumbnail_generation_jobs")
     .insert({
-      producer_slug:        producerSlug || null,
-      image_url:            null,
-      prompt_used:          prompt,
-      style_bucket:         styleBucket ?? null,
-      linked_upload_job_id: linkedUploadJobId ?? null,
-      provider:             "midjourney",
-      provider_status:      "pending",
-      provider_prompt:      prompt,
+      provider:      "midjourney",
+      status:        "pending",
+      prompt,
+      producer_slug: producerSlug || null,
+      style_bucket:  styleBucket ?? null,
+      upload_job_id: linkedUploadJobId ?? null,
     })
     .select("id")
     .single()
@@ -686,6 +684,22 @@ export async function completeMidjourneyAsset({
   projectId?: string
 }): Promise<{ assetId: string; versionId?: string; permanentUrl: string } | { error: string }> {
   await requireAdmin()
+  const supabase = await createServiceClient()
+
+  // Fetch the generation job to get linked context
+  const { data: jobRow } = await supabase
+    .from("thumbnail_generation_jobs")
+    .select("prompt, producer_slug, upload_job_id, style_bucket")
+    .eq("id", id)
+    .single()
+  const job = jobRow as {
+    prompt: string
+    producer_slug: string | null
+    upload_job_id: string | null
+    style_bucket: string | null
+  } | null
+
+  const resolvedProducerSlug = producerSlug ?? job?.producer_slug ?? null
 
   let assetId = existingAssetId
   let permanentUrl = imageUrl
@@ -719,7 +733,7 @@ export async function completeMidjourneyAsset({
         alt_text:      "Midjourney thumbnail",
         attached_to:   null,
         uploaded_by:   "thumbnail_studio_midjourney",
-        producer_slug: producerSlug ?? null,
+        producer_slug: resolvedProducerSlug,
         status:        "ready",
         tags:          ["thumbnail", "midjourney"],
       })
@@ -730,18 +744,34 @@ export async function completeMidjourneyAsset({
     assetId = (assetRow as { id: string }).id
   }
 
-  // Update the pending thumbnail_assets row
-  const supabase = await createServiceClient()
-  const { error: taErr } = await supabase
+  // Create thumbnail_assets row — image_url is a real permanent URL here
+  const { data: taRow, error: taErr } = await supabase
     .from("thumbnail_assets")
+    .insert({
+      producer_slug:        resolvedProducerSlug,
+      image_url:            permanentUrl,
+      prompt_used:          job?.prompt ?? null,
+      style_bucket:         job?.style_bucket ?? null,
+      asset_id:             assetId,
+      linked_upload_job_id: job?.upload_job_id ?? null,
+    })
+    .select("id")
+    .single()
+
+  if (taErr) return { error: taErr.message }
+  const thumbnailAssetId = (taRow as { id: string }).id
+
+  // Mark the generation job complete
+  const { error: jobErr } = await supabase
+    .from("thumbnail_generation_jobs")
     .update({
-      image_url:       permanentUrl,
-      asset_id:        assetId,
-      provider_status: "complete",
+      status:                       "complete",
+      completed_thumbnail_asset_id: thumbnailAssetId,
+      updated_at:                   new Date().toISOString(),
     })
     .eq("id", id)
 
-  if (taErr) return { error: taErr.message }
+  if (jobErr) return { error: jobErr.message }
 
   // If called from Job Mode, also create a thumbnail_version
   let versionId: string | undefined
@@ -760,9 +790,9 @@ export async function completeMidjourneyAsset({
         project_id:     projectId,
         image_url:      permanentUrl,
         asset_id:       assetId,
-        prompt:         null,
+        prompt:         job?.prompt ?? null,
         provider:       "midjourney",
-        style_bucket:   null,
+        style_bucket:   job?.style_bucket ?? null,
         version_number: nextNum,
       })
       .select("id")
@@ -779,38 +809,55 @@ export async function getMidjourneyQueue(): Promise<MidjourneyQueueRow[]> {
   await requireAdmin()
   const supabase = await createServiceClient()
 
-  const { data: assets, error } = await supabase
-    .from("thumbnail_assets")
+  const { data: jobs, error } = await supabase
+    .from("thumbnail_generation_jobs")
     .select("*")
     .eq("provider", "midjourney")
     .order("created_at", { ascending: false })
     .limit(200)
 
-  if (error || !assets) return []
+  if (error || !jobs) return []
 
-  // Enrich with linked job titles
-  const jobIds = [...new Set(
-    (assets as ThumbnailAsset[])
-      .map((a) => a.linked_upload_job_id)
-      .filter(Boolean) as string[]
-  )]
+  const rows = jobs as ThumbnailGenerationJob[]
 
+  // Enrich with linked upload job titles
+  const uploadJobIds = [...new Set(rows.map((j) => j.upload_job_id).filter(Boolean) as string[])]
   const jobTitleMap: Record<string, string> = {}
-  if (jobIds.length > 0) {
-    const { data: jobs } = await supabase
+  if (uploadJobIds.length > 0) {
+    const { data: uploadJobs } = await supabase
       .from("yt_upload_jobs")
       .select("id, title")
-      .in("id", jobIds)
-    if (jobs) {
-      for (const j of jobs as Array<{ id: string; title: string | null }>) {
+      .in("id", uploadJobIds)
+    if (uploadJobs) {
+      for (const j of uploadJobs as Array<{ id: string; title: string | null }>) {
         jobTitleMap[j.id] = j.title ?? "Untitled"
       }
     }
   }
 
-  return (assets as ThumbnailAsset[]).map((a) => ({
-    ...a,
-    linked_job_title: a.linked_upload_job_id ? (jobTitleMap[a.linked_upload_job_id] ?? null) : null,
+  // Fetch image_url for completed jobs via completed_thumbnail_asset_id
+  const completedAssetIds = [...new Set(
+    rows.map((j) => j.completed_thumbnail_asset_id).filter(Boolean) as string[]
+  )]
+  const imageUrlMap: Record<string, string> = {}
+  if (completedAssetIds.length > 0) {
+    const { data: assets } = await supabase
+      .from("thumbnail_assets")
+      .select("id, image_url")
+      .in("id", completedAssetIds)
+    if (assets) {
+      for (const a of assets as Array<{ id: string; image_url: string }>) {
+        imageUrlMap[a.id] = a.image_url
+      }
+    }
+  }
+
+  return rows.map((j) => ({
+    ...j,
+    linked_job_title: j.upload_job_id ? (jobTitleMap[j.upload_job_id] ?? null) : null,
+    image_url: j.completed_thumbnail_asset_id
+      ? (imageUrlMap[j.completed_thumbnail_asset_id] ?? null)
+      : null,
   }))
 }
 
@@ -818,10 +865,21 @@ export async function markMidjourneyFailed(id: string): Promise<{ error?: string
   await requireAdmin()
   const supabase = await createServiceClient()
   const { error } = await supabase
-    .from("thumbnail_assets")
-    .update({ provider_status: "failed" })
+    .from("thumbnail_generation_jobs")
+    .update({ status: "failed", updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("provider", "midjourney")
+  revalidatePath("/admin/youtube/thumbnail-studio/midjourney-queue")
+  return error ? { error: error.message } : {}
+}
+
+export async function deleteGenerationJob(id: string): Promise<{ error?: string }> {
+  await requireAdmin()
+  const supabase = await createServiceClient()
+  const { error } = await supabase
+    .from("thumbnail_generation_jobs")
+    .delete()
+    .eq("id", id)
   revalidatePath("/admin/youtube/thumbnail-studio/midjourney-queue")
   return error ? { error: error.message } : {}
 }

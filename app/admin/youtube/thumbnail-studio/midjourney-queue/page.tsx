@@ -9,9 +9,9 @@ export default async function MidjourneyQueuePage() {
   await requireAdmin()
   const initialItems = await getMidjourneyQueue()
 
-  const pending  = initialItems.filter((i) => i.provider_status === "pending").length
-  const complete = initialItems.filter((i) => i.provider_status === "complete").length
-  const failed   = initialItems.filter((i) => i.provider_status === "failed").length
+  const pending  = initialItems.filter((i) => i.status === "pending").length
+  const complete = initialItems.filter((i) => i.status === "complete").length
+  const failed   = initialItems.filter((i) => i.status === "failed").length
 
   return (
     <div className="px-4 sm:px-6 py-8">

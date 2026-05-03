@@ -5,7 +5,7 @@ import type { MidjourneyQueueRow } from "@/lib/youtube/thumbnails/types"
 import {
   completeMidjourneyAsset,
   markMidjourneyFailed,
-  deleteThumbnailAsset,
+  deleteGenerationJob,
 } from "@/lib/youtube/thumbnails/actions"
 
 type StatusFilter = "all" | "pending" | "complete" | "failed"
@@ -60,9 +60,8 @@ function QueueRow({ item, onUpdate, onRemove }: RowProps) {
     setCompleting(false)
     if ("error" in result) { setRowError(result.error); return }
     onUpdate(item.id, {
-      image_url:       result.permanentUrl,
-      asset_id:        result.assetId,
-      provider_status: "complete",
+      image_url: result.permanentUrl,
+      status:    "complete",
     })
     setUrlInput("")
   }
@@ -89,9 +88,8 @@ function QueueRow({ item, onUpdate, onRemove }: RowProps) {
       })
       if ("error" in result) { setRowError(result.error); return }
       onUpdate(item.id, {
-        image_url:       result.permanentUrl,
-        asset_id:        result.assetId,
-        provider_status: "complete",
+        image_url: result.permanentUrl,
+        status:    "complete",
       })
     } catch (err) {
       setRowError(err instanceof Error ? err.message : "Upload failed")
@@ -106,18 +104,18 @@ function QueueRow({ item, onUpdate, onRemove }: RowProps) {
     const r = await markMidjourneyFailed(item.id)
     setMarking(false)
     if (r.error) { setRowError(r.error); return }
-    onUpdate(item.id, { provider_status: "failed" })
+    onUpdate(item.id, { status: "failed" })
   }
 
   async function handleDelete() {
     setDeleting(true)
-    const r = await deleteThumbnailAsset(item.id)
+    const r = await deleteGenerationJob(item.id)
     setDeleting(false)
     if (r.error) { setRowError(r.error); return }
     onRemove(item.id)
   }
 
-  const statusKey = item.provider_status ?? "pending"
+  const statusKey = item.status ?? "pending"
 
   return (
     <div className="rounded-2xl border border-white/[0.07] bg-[#0d1016] overflow-hidden">
@@ -155,15 +153,15 @@ function QueueRow({ item, onUpdate, onRemove }: RowProps) {
         </div>
 
         {/* Prompt */}
-        {item.provider_prompt && (
+        {item.prompt && (
           <div className="flex items-start gap-2">
             <div className="flex-1 bg-black/30 rounded-lg px-3 py-2 min-w-0">
-              <p className="text-[11px] text-white/50 font-mono leading-relaxed line-clamp-3 break-words">{item.provider_prompt}</p>
+              <p className="text-[11px] text-white/50 font-mono leading-relaxed line-clamp-3 break-words">{item.prompt}</p>
             </div>
             <button
               type="button"
               onClick={async () => {
-                await navigator.clipboard.writeText(item.provider_prompt ?? "")
+                await navigator.clipboard.writeText(item.prompt ?? "")
                 setCopied(true)
                 setTimeout(() => setCopied(false), 2000)
               }}
@@ -175,7 +173,7 @@ function QueueRow({ item, onUpdate, onRemove }: RowProps) {
         )}
 
         {/* Completed image */}
-        {item.provider_status === "complete" && item.image_url && (
+        {item.status === "complete" && item.image_url && (
           <div className="rounded-xl overflow-hidden border border-white/[0.08]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -188,7 +186,7 @@ function QueueRow({ item, onUpdate, onRemove }: RowProps) {
         )}
 
         {/* Pending completion form */}
-        {item.provider_status === "pending" && (
+        {item.status === "pending" && (
           <div className="space-y-2 pt-1 border-t border-white/[0.06]">
             <p className="text-[9px] uppercase tracking-[0.18em] text-white/25 pt-1">Paste Finished Image URL</p>
             <div className="flex gap-2">
@@ -241,7 +239,7 @@ function QueueRow({ item, onUpdate, onRemove }: RowProps) {
         )}
 
         {/* Failed row actions */}
-        {item.provider_status === "failed" && (
+        {item.status === "failed" && (
           <p className="text-[10px] text-red-400/50 text-center pt-1">This job was marked as failed.</p>
         )}
 
@@ -269,13 +267,13 @@ export function MidjourneyQueueClient({ initialItems }: Props) {
     setItems((prev) => prev.filter((item) => item.id !== id))
   }
 
-  const filtered = filter === "all" ? items : items.filter((i) => i.provider_status === filter)
+  const filtered = filter === "all" ? items : items.filter((i) => i.status === filter)
 
   const FILTERS: Array<{ key: StatusFilter; label: string }> = [
     { key: "all",      label: `All (${items.length})` },
-    { key: "pending",  label: `Pending (${items.filter(i => i.provider_status === "pending").length})` },
-    { key: "complete", label: `Complete (${items.filter(i => i.provider_status === "complete").length})` },
-    { key: "failed",   label: `Failed (${items.filter(i => i.provider_status === "failed").length})` },
+    { key: "pending",  label: `Pending (${items.filter(i => i.status === "pending").length})` },
+    { key: "complete", label: `Complete (${items.filter(i => i.status === "complete").length})` },
+    { key: "failed",   label: `Failed (${items.filter(i => i.status === "failed").length})` },
   ]
 
   return (
