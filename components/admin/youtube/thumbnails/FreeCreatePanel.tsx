@@ -36,6 +36,15 @@ const MOODS = [
   "strange luxury and hidden power",
 ]
 
+function isValidHttpImageUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === "http:" || url.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
 const SCENE_TYPES = [
   "private Harlem loft",
   "Buffalo Route 33 at night",
@@ -73,6 +82,7 @@ export function FreeCreatePanel({ producers }: Props) {
   const [assetError,         setAssetError]          = useState<string | null>(null)
   const [assetName,          setAssetName]           = useState("")
 
+  const [promptWarning,      setPromptWarning]       = useState<string | null>(null)
   const [uploading,          setUploading]           = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -117,6 +127,13 @@ export function FreeCreatePanel({ producers }: Props) {
   function handleAddUrl() {
     const url = imageUrlInput.trim()
     if (!url) return
+    if (!isValidHttpImageUrl(url)) {
+      setPromptWarning(
+        "This looks like a prompt, not an image URL. Copy the prompt above, generate the image in Midjourney/OpenAI, then paste the final image link or upload the file."
+      )
+      return
+    }
+    setPromptWarning(null)
     setImageUrl(url)
     setImageError(false)
     setAssetError(null)
@@ -362,9 +379,20 @@ export function FreeCreatePanel({ producers }: Props) {
                   {savingPrompt ? "Saving…" : promptSaved ? "Saved ✓" : "Save Prompt"}
                 </button>
               </div>
-              <p className="text-[10px] text-white/20 text-center">
-                Copy → paste into Midjourney → download → add image below
-              </p>
+              <div className="rounded-xl bg-white/[0.02] border border-white/[0.05] px-4 py-3 space-y-1.5">
+                <p className="text-[9px] uppercase tracking-[0.18em] text-white/25 mb-2">Workflow</p>
+                {[
+                  { n: 1, text: "Build prompt above" },
+                  { n: 2, text: "Copy prompt → paste into Midjourney or OpenAI" },
+                  { n: 3, text: "Upload or link the finished image below" },
+                  { n: 4, text: "Save to Assets" },
+                ].map(({ n, text }) => (
+                  <div key={n} className="flex items-start gap-2">
+                    <span className="text-[9px] text-violet-400/50 font-mono tabular-nums shrink-0 mt-px">Step {n}</span>
+                    <span className="text-[10px] text-white/30 leading-snug">{text}</span>
+                  </div>
+                ))}
+              </div>
             </>
           ) : (
             <div className="h-36 flex items-center justify-center rounded-2xl border border-dashed border-white/[0.06]">
@@ -374,9 +402,9 @@ export function FreeCreatePanel({ producers }: Props) {
             </div>
           )}
 
-          {/* ── Image section ──────────────────────────────────── */}
+          {/* ── Import section ─────────────────────────────────── */}
           <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 space-y-3">
-            <p className="text-[9px] uppercase tracking-[0.2em] text-white/30">Generated Image</p>
+            <p className="text-[9px] uppercase tracking-[0.2em] text-white/30">Import Finished Thumbnail</p>
 
             {imageUrl && !imageError ? (
               <div className="relative rounded-xl overflow-hidden border border-white/[0.1]">
@@ -402,10 +430,10 @@ export function FreeCreatePanel({ producers }: Props) {
                   <input
                     type="text"
                     value={imageUrlInput}
-                    onChange={(e) => setImageUrlInput(e.target.value)}
+                    onChange={(e) => { setImageUrlInput(e.target.value); setPromptWarning(null) }}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddUrl() } }}
-                    placeholder="Paste image URL (Midjourney, external…)"
-                    className="flex-1 bg-black/30 border border-white/[0.08] rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50"
+                    placeholder="Paste final image URL here — not the prompt"
+                    className={`flex-1 bg-black/30 border rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none transition-colors ${promptWarning ? "border-amber-500/50 focus:border-amber-500/70" : "border-white/[0.08] focus:border-violet-500/50"}`}
                   />
                   <button
                     type="button"
@@ -413,9 +441,15 @@ export function FreeCreatePanel({ producers }: Props) {
                     disabled={!imageUrlInput.trim()}
                     className="px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.1] text-sm text-white/60 hover:text-white hover:bg-white/[0.1] disabled:opacity-40 transition-colors whitespace-nowrap"
                   >
-                    Add URL
+                    Import Image URL
                   </button>
                 </div>
+
+                {promptWarning && (
+                  <div className="rounded-xl bg-amber-500/[0.08] border border-amber-500/25 px-3 py-2.5">
+                    <p className="text-[11px] text-amber-300/80 leading-relaxed">{promptWarning}</p>
+                  </div>
+                )}
 
                 {/* File upload */}
                 <div className="flex items-center gap-3">
@@ -430,7 +464,7 @@ export function FreeCreatePanel({ producers }: Props) {
                   disabled={uploading}
                   className="w-full py-3 rounded-xl border border-dashed border-white/[0.1] text-sm text-white/40 hover:text-white/70 hover:border-white/20 disabled:opacity-40 transition-colors"
                 >
-                  {uploading ? "Uploading…" : "Upload image file"}
+                  {uploading ? "Uploading…" : "Upload Image File"}
                 </button>
                 <input
                   ref={fileRef}

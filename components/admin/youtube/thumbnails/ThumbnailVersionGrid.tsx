@@ -1,6 +1,15 @@
 "use client"
 
 import { useState, useTransition } from "react"
+
+function isValidHttpImageUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === "http:" || url.protocol === "https:"
+  } catch {
+    return false
+  }
+}
 import type { ThumbnailVersion } from "@/lib/youtube/thumbnails/types"
 import {
   addVersionByUrl,
@@ -34,6 +43,7 @@ export function ThumbnailVersionGrid({
   const [addMode, setAddMode]   = useState<AddMode>("url")
   const [imageAssets, setImageAssets] = useState<Array<{ id: string; url: string; filename: string }>>([])
   const [loadingAssets, setLoadingAssets] = useState(false)
+  const [urlError, setUrlError] = useState<string | null>(null)
 
   function handleSelect(v: ThumbnailVersion) {
     startTransition(async () => {
@@ -59,6 +69,11 @@ export function ThumbnailVersionGrid({
 
   async function handleAddByUrl() {
     if (!addUrl.trim()) return
+    if (!isValidHttpImageUrl(addUrl.trim())) {
+      setUrlError("This looks like a prompt, not an image URL. Paste a direct image link (https://…).")
+      return
+    }
+    setUrlError(null)
     setAdding(true)
     const result = await addVersionByUrl(projectId, addUrl.trim(), addPrompt.trim() || undefined)
     setAdding(false)
@@ -172,12 +187,15 @@ export function ThumbnailVersionGrid({
             <>
               <input
                 type="text"
-                placeholder="Image URL (Midjourney, external…)"
+                placeholder="Paste final image URL here — not the prompt"
                 value={addUrl}
-                onChange={(e) => setAddUrl(e.target.value)}
+                onChange={(e) => { setAddUrl(e.target.value); setUrlError(null) }}
                 onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault() }}
-                className="w-full bg-black/30 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/25 focus:outline-none focus:border-violet-500/50"
+                className={`w-full bg-black/30 border rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/25 focus:outline-none transition-colors ${urlError ? "border-amber-500/50" : "border-white/[0.08] focus:border-violet-500/50"}`}
               />
+              {urlError && (
+                <p className="text-[10px] text-amber-300/75 leading-snug">{urlError}</p>
+              )}
               <input
                 type="text"
                 placeholder="Prompt used (optional)"
