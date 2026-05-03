@@ -1,7 +1,7 @@
 "use server"
 
 import { requireAdmin } from "@/lib/auth"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { generateWithOpenAI, isImageGenerationConfigured } from "@/lib/image-generation"
 
 export interface GeneratedThumbnailImage {
@@ -47,7 +47,7 @@ export async function generateThumbnailImages({
       style:   "vivid",
     })
 
-    const supabase = await createClient()
+    const supabase = await createServiceClient()
     const images: GeneratedThumbnailImage[] = []
 
     // Get current max version_number for this project (if provided)
