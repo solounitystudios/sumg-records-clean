@@ -826,21 +826,13 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
               {/* Single scrollable zone */}
               <div className="flex-1 min-h-0 overflow-y-auto">
 
-                {/* Canvas — only rendered when a version is selected */}
+                {/* Canvas — full-bleed, only rendered when a version is selected */}
                 {selectedVersion && (
-                  <div className="px-5 pt-4 pb-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[9px] uppercase tracking-[0.2em] text-white/25">Preview</p>
-                      <p className="text-[10px] text-white/20 truncate max-w-[60%] text-right">
-                        {selectedJob.title ?? "Untitled"}
-                      </p>
-                    </div>
-                    <ThumbnailCanvas
-                      config={canvasConfig}
-                      selectedImageUrl={selectedVersion.image_url}
-                      onChange={setCanvasConfig}
-                    />
-                  </div>
+                  <ThumbnailCanvas
+                    config={canvasConfig}
+                    selectedImageUrl={selectedVersion.image_url}
+                    onChange={setCanvasConfig}
+                  />
                 )}
 
                 {/* Error banner */}

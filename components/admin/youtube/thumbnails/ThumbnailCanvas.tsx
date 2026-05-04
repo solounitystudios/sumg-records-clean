@@ -43,8 +43,8 @@ export function ThumbnailCanvas({ config, selectedImageUrl, onChange }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* 16:9 Preview — sticky so it stays visible as controls/versions scroll beneath */}
-      <div className="sticky top-0 z-10 bg-[#060810] pb-2">
+      {/* 16:9 Preview — full-bleed, sticky while controls/versions scroll beneath */}
+      <div className="sticky top-0 z-10">
         <div style={containerStyle as React.CSSProperties}>
           <div style={overlayStyle as React.CSSProperties} />
           {config.titleText && (
@@ -63,7 +63,7 @@ export function ThumbnailCanvas({ config, selectedImageUrl, onChange }: Props) {
       </div>
 
       {/* Controls */}
-      <div className="grid grid-cols-1 gap-3">
+      <div className="grid grid-cols-1 gap-3 px-5 pb-5 pt-4">
         {/* Title text */}
         <div>
           <label className="text-[9px] uppercase tracking-[0.15em] text-white/30 block mb-1.5">

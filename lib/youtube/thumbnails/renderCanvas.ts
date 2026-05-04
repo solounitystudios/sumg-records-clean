@@ -39,7 +39,6 @@ export function buildCanvasPreviewStyle(config: CanvasConfig, imageUrl?: string)
     aspectRatio: '16/9',
     background: imageUrl ? `url(${imageUrl}) center/cover no-repeat` : '#0d1016',
     overflow: 'hidden',
-    borderRadius: '8px',
   }
 
   const overlayStyle: React.CSSProperties = {
