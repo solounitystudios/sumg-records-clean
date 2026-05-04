@@ -116,9 +116,9 @@ function toJob(r: any): YtUploadJob {
     thumbnailAssetId: r.thumbnail_asset_id ?? null,
     accentColor:      r.accent_color ?? null,
     channelHandle:    r.yt_channels?.channel_handle ?? null,
-    assetFilename:    r.assets?.filename ?? null,
-    assetMimeType:    r.assets?.mime_type ?? null,
-    assetUrl:         r.assets?.url ?? null,
+    assetFilename:    r.asset?.filename ?? null,
+    assetMimeType:    r.asset?.mime_type ?? null,
+    assetUrl:         r.asset?.url ?? null,
     thumbnailAssetUrl: null,
   }
 }
@@ -186,7 +186,7 @@ export async function getChannelById(id: string): Promise<YtChannel | null> {
 export async function getAllJobs(limit = 100): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("*, yt_channels(channel_handle), assets(filename, mime_type, url)")
+    .select("*, yt_channels(channel_handle), asset:assets!yt_upload_jobs_asset_id_fkey(filename, mime_type, url)")
     .order("created_at", { ascending: false })
     .limit(limit)
   if (error) throw new Error(`getAllJobs: ${error.message}`)
@@ -196,7 +196,7 @@ export async function getAllJobs(limit = 100): Promise<YtUploadJob[]> {
 export async function getQueuedJobs(): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("*, yt_channels(channel_handle), assets(filename, mime_type, url)")
+    .select("*, yt_channels(channel_handle), asset:assets!yt_upload_jobs_asset_id_fkey(filename, mime_type, url)")
     .in("status", ["needs_asset", "needs_render", "rendering", "scheduled", "pending", "processing"])
     .order("created_at", { ascending: false })
   if (error) throw new Error(`getQueuedJobs: ${error.message}`)
@@ -206,7 +206,7 @@ export async function getQueuedJobs(): Promise<YtUploadJob[]> {
 export async function getJobsNeedingRender(): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("*, yt_channels(channel_handle), assets(filename, mime_type, url)")
+    .select("*, yt_channels(channel_handle), asset:assets!yt_upload_jobs_asset_id_fkey(filename, mime_type, url)")
     .eq("status", "needs_render")
     .order("created_at", { ascending: true })
   if (error) return []
@@ -216,7 +216,7 @@ export async function getJobsNeedingRender(): Promise<YtUploadJob[]> {
 export async function getJobsRendering(): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("*, yt_channels(channel_handle), assets(filename, mime_type, url)")
+    .select("*, yt_channels(channel_handle), asset:assets!yt_upload_jobs_asset_id_fkey(filename, mime_type, url)")
     .eq("status", "rendering")
     .order("updated_at", { ascending: false })
   if (error) return []
@@ -226,7 +226,7 @@ export async function getJobsRendering(): Promise<YtUploadJob[]> {
 export async function getRecentUploads(limit = 10): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("*, yt_channels(channel_handle), assets(filename, mime_type, url)")
+    .select("*, yt_channels(channel_handle), asset:assets!yt_upload_jobs_asset_id_fkey(filename, mime_type, url)")
     .eq("status", "uploaded")
     .order("uploaded_at", { ascending: false })
     .limit(limit)
@@ -237,7 +237,7 @@ export async function getRecentUploads(limit = 10): Promise<YtUploadJob[]> {
 export async function getFailedJobs(): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("*, yt_channels(channel_handle), assets(filename, mime_type, url)")
+    .select("*, yt_channels(channel_handle), asset:assets!yt_upload_jobs_asset_id_fkey(filename, mime_type, url)")
     .eq("status", "failed")
     .order("updated_at", { ascending: false })
   if (error) return []
@@ -247,7 +247,7 @@ export async function getFailedJobs(): Promise<YtUploadJob[]> {
 export async function getJobsByProducer(producerSlug: string): Promise<YtUploadJob[]> {
   const { data, error } = await supabase
     .from("yt_upload_jobs")
-    .select("*, yt_channels(channel_handle), assets(filename, mime_type, url)")
+    .select("*, yt_channels(channel_handle), asset:assets!yt_upload_jobs_asset_id_fkey(filename, mime_type, url)")
     .eq("producer_slug", producerSlug)
     .order("created_at", { ascending: false })
   if (error) throw new Error(`getJobsByProducer: ${error.message}`)
