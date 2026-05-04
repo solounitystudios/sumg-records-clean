@@ -243,9 +243,6 @@ export function ThumbnailPromptPanel({
               </button>
             )}
           </div>
-          <p className="text-[10px] text-white/20 text-center">
-            Copy → paste into Midjourney → download → add URL below
-          </p>
         </div>
       )}
 
