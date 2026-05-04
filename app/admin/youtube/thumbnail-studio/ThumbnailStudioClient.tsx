@@ -788,8 +788,8 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
 
           ) : (
             <>
-              {/* Quick Prompt */}
-              <div className="shrink-0 px-5 pt-5 pb-0">
+              {/* Quick Prompt — always visible, never scrolls */}
+              <div className="shrink-0 px-5 pt-5 pb-3 border-b border-white/[0.04]">
                 <label className="text-[9px] uppercase tracking-[0.2em] text-white/25 block mb-1.5">Quick Prompt</label>
                 <textarea
                   value={quickPrompt}
@@ -823,49 +823,54 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
                 </div>
               </div>
 
-              {/* Canvas preview */}
-              <div className="shrink-0 px-5 pt-4 pb-3">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[9px] uppercase tracking-[0.2em] text-white/25">Preview</p>
-                  <p className="text-[10px] text-white/20 truncate max-w-[60%] text-right">
-                    {selectedJob.title ?? "Untitled"}
-                  </p>
-                </div>
-                <ThumbnailCanvas
-                  config={canvasConfig}
-                  selectedImageUrl={selectedVersion?.image_url}
-                  onChange={setCanvasConfig}
-                />
-              </div>
+              {/* Single scrollable zone: canvas preview sticks, controls + versions scroll beneath */}
+              <div className="flex-1 min-h-0 overflow-y-auto">
 
-              {/* Error banner */}
-              {(genError || mjError) && (
-                <div className="shrink-0 mx-5 mb-1">
-                  <div className="rounded-xl bg-red-500/[0.07] border border-red-500/20 px-3 py-2 text-[11px] text-red-400/80 flex items-center justify-between gap-2">
-                    <span>{genError ?? mjError}</span>
-                    <button
-                      type="button"
-                      onClick={() => { setGenError(null); setMjError(null) }}
-                      className="shrink-0 text-red-400/40 hover:text-red-400 transition-colors"
-                    >
-                      ×
-                    </button>
+                {/* Canvas */}
+                <div className="px-5 pt-4 pb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[9px] uppercase tracking-[0.2em] text-white/25">Preview</p>
+                    <p className="text-[10px] text-white/20 truncate max-w-[60%] text-right">
+                      {selectedJob.title ?? "Untitled"}
+                    </p>
                   </div>
+                  <ThumbnailCanvas
+                    config={canvasConfig}
+                    selectedImageUrl={selectedVersion?.image_url}
+                    onChange={setCanvasConfig}
+                  />
                 </div>
-              )}
 
-              {/* Version grid — scrollable */}
-              <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4 pt-1">
-                <ThumbnailVersionGrid
-                  projectId={project.id}
-                  versions={versions}
-                  selectedVersionId={selectedVersionId}
-                  generatingCount={generating ? genCount : 0}
-                  mjPending={!!mjPendingId}
-                  onVersionsChange={setVersions}
-                  onVersionSelect={(v) => setSelectedVersionId(v.id)}
-                  onApprove={handleApprove}
-                />
+                {/* Error banner */}
+                {(genError || mjError) && (
+                  <div className="mx-5 mb-3">
+                    <div className="rounded-xl bg-red-500/[0.07] border border-red-500/20 px-3 py-2 text-[11px] text-red-400/80 flex items-center justify-between gap-2">
+                      <span>{genError ?? mjError}</span>
+                      <button
+                        type="button"
+                        onClick={() => { setGenError(null); setMjError(null) }}
+                        className="shrink-0 text-red-400/40 hover:text-red-400 transition-colors"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Version grid */}
+                <div className="px-5 pb-4 pt-1">
+                  <ThumbnailVersionGrid
+                    projectId={project.id}
+                    versions={versions}
+                    selectedVersionId={selectedVersionId}
+                    generatingCount={generating ? genCount : 0}
+                    mjPending={!!mjPendingId}
+                    onVersionsChange={setVersions}
+                    onVersionSelect={(v) => setSelectedVersionId(v.id)}
+                    onApprove={handleApprove}
+                  />
+                </div>
+
               </div>
             </>
           )}
