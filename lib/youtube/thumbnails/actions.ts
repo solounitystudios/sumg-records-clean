@@ -886,6 +886,55 @@ export async function deleteGenerationJob(id: string): Promise<{ error?: string 
   return error ? { error: error.message } : {}
 }
 
+export async function getMidjourneyJobStatus(jobId: string, projectId?: string): Promise<{
+  status: string  // 'pending' | 'complete' | 'failed'
+  imageUrl: string | null
+  versionId: string | null
+  assetId: string | null
+}> {
+  const supabase = await createServiceClient()
+
+  const { data: job } = await supabase
+    .from("thumbnail_generation_jobs")
+    .select("status, completed_thumbnail_asset_id")
+    .eq("id", jobId)
+    .single()
+
+  const status = (job as { status: string; completed_thumbnail_asset_id: string | null } | null)?.status ?? "pending"
+  const completedAssetId = (job as { status: string; completed_thumbnail_asset_id: string | null } | null)?.completed_thumbnail_asset_id
+
+  if (status !== "complete" || !completedAssetId) {
+    return { status, imageUrl: null, versionId: null, assetId: null }
+  }
+
+  // Get image URL from thumbnail_assets
+  const { data: ta } = await supabase
+    .from("thumbnail_assets")
+    .select("image_url, asset_id")
+    .eq("id", completedAssetId)
+    .single()
+
+  const taRow = ta as { image_url: string; asset_id: string | null } | null
+  let versionId: string | null = null
+
+  if (projectId && taRow?.asset_id) {
+    const { data: ver } = await supabase
+      .from("thumbnail_versions")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("asset_id", taRow.asset_id)
+      .maybeSingle()
+    versionId = (ver as { id: string } | null)?.id ?? null
+  }
+
+  return {
+    status: "complete",
+    imageUrl: taRow?.image_url ?? null,
+    versionId,
+    assetId: taRow?.asset_id ?? null,
+  }
+}
+
 export async function deleteThumbnailAsset(id: string): Promise<{ error?: string }> {
   await requireAdmin()
   const supabase = await createServiceClient()

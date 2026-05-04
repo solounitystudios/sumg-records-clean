@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useRef, useTransition } from "react"
+import { useState, useRef, useTransition, useEffect } from "react"
 import { buildThumbnailPrompt } from "@/lib/youtube/thumbnails/prompts"
 import {
   createPrompt,
   saveFreeCreateAsset,
   createMidjourneyPendingAsset,
   completeMidjourneyAsset,
+  getMidjourneyJobStatus,
 } from "@/lib/youtube/thumbnails/actions"
 import { getPresetsForProducer } from "@/lib/youtube/thumbnails/presets"
 import { generateThumbnailImages } from "@/app/actions/generateThumbnailImage"
@@ -159,6 +160,7 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
   const [mjUrlInput,   setMjUrlInput]   = useState("")
   const [mjUrlWarning, setMjUrlWarning] = useState<string | null>(null)
   const [mjUploading,  setMjUploading]  = useState(false)
+  const [mjCopied,     setMjCopied]     = useState(false)
   const mjFileRef = useRef<HTMLInputElement>(null)
 
   // Manual import state
@@ -207,7 +209,33 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
     setMjError(null)
     setMjUrlInput("")
     setMjUrlWarning(null)
+    setMjCopied(false)
   }
+
+  // Poll for external Midjourney completion when mjPendingId is set
+  useEffect(() => {
+    if (!mjPendingId) return
+    const timer = setInterval(async () => {
+      try {
+        const status = await getMidjourneyJobStatus(mjPendingId)
+        if (status.status === "complete" && status.imageUrl) {
+          setGenResults((prev) => [...prev, {
+            imageUrl:  status.imageUrl!,
+            assetId:   status.assetId ?? `mj-ext-${Date.now()}`,
+            provider:  "midjourney" as const,
+          }])
+          setMjPendingId(null)
+          setMjUrlInput("")
+          setMjCopied(false)
+        } else if (status.status === "failed") {
+          setMjError("Midjourney job failed")
+          setMjPendingId(null)
+        }
+      } catch { /* ignore poll errors */ }
+    }, 5000)
+    return () => clearInterval(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mjPendingId])
 
   function handleProviderChange(p: GenProvider) {
     setGenProvider(p)
@@ -709,51 +737,66 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
               {/* ── Midjourney panel ── */}
               {genProvider === "midjourney" && (
                 <div className="space-y-3">
-                  {!mjPendingId ? (
+                  {!mjPendingId && !mjSending && (
                     <>
-                      <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.05] px-4 py-3">
-                        <p className="text-[11px] text-sky-300/70 leading-relaxed">
-                          Sends this prompt to the Midjourney queue. Copy the prompt → generate in Midjourney → paste the finished image URL below.
-                        </p>
-                      </div>
+                      <p className="text-[11px] text-sky-300/60 leading-relaxed">
+                        Midjourney works in 2 steps — we queue the prompt, you generate in Discord, paste the URL back.
+                      </p>
                       {mjError && (
                         <p className="text-[11px] text-red-400/70">{mjError}</p>
                       )}
                       <button
                         type="button"
                         onClick={handleSendToMidjourneyQueue}
-                        disabled={mjSending || !builtPrompt.trim() || !producerSlug}
+                        disabled={!builtPrompt.trim() || !producerSlug}
                         className="w-full py-3.5 rounded-xl bg-sky-700/60 hover:bg-sky-700/80 active:scale-[0.98] text-white font-semibold text-sm disabled:opacity-40 transition-all border border-sky-500/30"
                       >
-                        {mjSending ? "Sending…" : "Send to Midjourney Queue →"}
+                        Generate with Midjourney →
                       </button>
                       {!producerSlug && (
                         <p className="text-[10px] text-white/30 text-center">Select a producer first</p>
                       )}
                     </>
-                  ) : (
+                  )}
+
+                  {mjSending && (
+                    <div className="flex items-center gap-2 py-2">
+                      <svg className="w-4 h-4 text-sky-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span className="text-[11px] text-sky-300/70">Creating Midjourney job…</span>
+                    </div>
+                  )}
+
+                  {mjPendingId && (
                     /* Pending card — prompt queued, awaiting image */
                     <div className="rounded-2xl border border-sky-500/25 bg-sky-500/[0.04] p-4 space-y-3">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                        <p className="text-[10px] uppercase tracking-[0.18em] text-sky-300/60">Queued — Awaiting Image</p>
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-sky-300/60">Queued — generating in Midjourney</p>
                       </div>
 
                       <div className="bg-black/30 rounded-lg px-3 py-2.5">
-                        <p className="text-[11px] text-white/50 font-mono leading-relaxed line-clamp-3">{builtPrompt}</p>
+                        <p className="text-[11px] text-white/50 font-mono leading-relaxed line-clamp-4 break-words">{builtPrompt}</p>
                       </div>
 
                       <button
                         type="button"
-                        onClick={handleCopyMjPrompt}
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(builtPrompt)
+                          setMjCopied(true)
+                          setTimeout(() => setMjCopied(false), 2000)
+                        }}
                         className="w-full py-2.5 rounded-xl border border-sky-500/30 bg-sky-600/10 text-sky-300 hover:bg-sky-600/20 text-sm font-medium transition-colors"
                       >
-                        {copied ? "Copied!" : "Copy Prompt for Midjourney"}
+                        {mjCopied ? "Copy Prompt ✓" : "Copy Prompt"}
                       </button>
 
-                      <div className="h-px bg-white/[0.06]" />
+                      <p className="text-[9px] text-white/25 leading-snug">
+                        Step 1: Copy prompt → Generate in Midjourney → Step 2: Paste URL below
+                      </p>
 
-                      <p className="text-[9px] uppercase tracking-[0.18em] text-white/25">Paste Finished Image URL</p>
                       <div className="flex gap-2">
                         <input
                           type="text"
@@ -769,7 +812,7 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
                           disabled={mjCompleting || !mjUrlInput.trim()}
                           className="px-4 py-2.5 rounded-xl bg-sky-700/60 hover:bg-sky-700/80 text-sm text-white disabled:opacity-40 transition-colors whitespace-nowrap"
                         >
-                          {mjCompleting ? "Saving…" : "Complete"}
+                          {mjCompleting ? "Saving…" : "Done"}
                         </button>
                       </div>
                       {mjUrlWarning && <p className="text-[10px] text-amber-300/70">{mjUrlWarning}</p>}
