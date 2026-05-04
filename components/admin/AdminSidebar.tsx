@@ -34,8 +34,9 @@ const NAV: NavSection[] = [
     ),
     items: [
       { label: "Command Center", href: "/admin", exact: true },
-      { label: "Notifications", href: "/admin/alerts" },
-      { label: "Activity Feed", href: "/admin/activity" },
+      { label: "Live Dashboard", href: "/admin/dashboard" },
+      { label: "Alerts", href: "/admin/alerts" },
+      { label: "Activity", href: "/admin/activity" },
     ],
   },
   {
@@ -50,34 +51,44 @@ const NAV: NavSection[] = [
     items: [
       { label: "Audio Inbox", href: "/admin/youtube/inbox" },
       { label: "Thumbnail Studio", href: "/admin/youtube/thumbnail-studio" },
-      { label: "Upload Jobs", href: "/admin/youtube/jobs" },
+      { label: "Upload Queue", href: "/admin/youtube/queue" },
       { label: "Publishing Calendar", href: "/admin/youtube/schedule" },
-      { label: "YouTube Hub", href: "/admin/youtube", exact: true },
-      { label: "Render", href: "/admin/youtube/render" },
-      { label: "Engine", href: "/admin/youtube/engine" },
-      { label: "Optimizer", href: "/admin/youtube/optimizer" },
-      { label: "Channels", href: "/admin/youtube/channels" },
-      { label: "Monetization", href: "/admin/youtube/monetization" },
     ],
   },
   {
-    key: "library",
-    label: "MEDIA LIBRARY",
+    key: "catalog",
+    label: "CATALOG",
     icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <path d="M2 4a1 1 0 011-1h3l1.5 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V4z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+        <rect x="2" y="2" width="5" height="5" rx="0.75" stroke="currentColor" strokeWidth="1.2" />
+        <rect x="9" y="2" width="5" height="5" rx="0.75" stroke="currentColor" strokeWidth="1.2" />
+        <rect x="2" y="9" width="5" height="5" rx="0.75" stroke="currentColor" strokeWidth="1.2" />
+        <rect x="9" y="9" width="5" height="5" rx="0.75" stroke="currentColor" strokeWidth="1.2" />
+      </svg>
+    ),
+    items: [
+      { label: "Artists", href: "/admin/artists" },
+      { label: "Producers", href: "/admin/producers" },
+      { label: "Songs", href: "/admin/songs" },
+      { label: "Releases", href: "/admin/releases" },
+      { label: "Lyrics", href: "/admin/lyrics" },
+      { label: "Brands", href: "/admin/brands" },
+    ],
+  },
+  {
+    key: "media",
+    label: "MEDIA",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" strokeWidth="1.2" />
+        <circle cx="5.5" cy="6.5" r="1.25" stroke="currentColor" strokeWidth="1.1" />
+        <path d="M2 11l3.5-3 2.5 2 2-1.5L14 11" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
     items: [
       { label: "Assets", href: "/admin/assets" },
-      { label: "Catalog", href: "/admin/catalog" },
-      { label: "Songs", href: "/admin/songs" },
-      { label: "Releases", href: "/admin/releases" },
-      { label: "Producers", href: "/admin/producers" },
-      { label: "Artists", href: "/admin/artists" },
-      { label: "Lyrics", href: "/admin/lyrics" },
-      { label: "Brands", href: "/admin/brands" },
-      { label: "News", href: "/admin/news" },
+      { label: "Messages", href: "/admin/messages" },
+      { label: "Imports", href: "/admin/imports" },
     ],
   },
   {
@@ -91,11 +102,25 @@ const NAV: NavSection[] = [
     ),
     items: [
       { label: "Analytics", href: "/admin/analytics" },
-      { label: "Intelligence", href: "/admin/intelligence" },
-      { label: "Content Gen", href: "/admin/content-gen" },
-      { label: "Messages", href: "/admin/messages" },
-      { label: "Spotify", href: "/admin/spotify" },
-      { label: "Apple Music", href: "/admin/apple-music" },
+      { label: "SEO", href: "/admin/seo" },
+      { label: "Memberships", href: "/admin/memberships" },
+      { label: "Social Accounts", href: "/admin/social" },
+    ],
+  },
+  {
+    key: "commerce",
+    label: "COMMERCE",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M3 3h1.5l1.8 7h6.2l1.5-5H5.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="7.5" cy="12.5" r="1" stroke="currentColor" strokeWidth="1.1" />
+        <circle cx="11.5" cy="12.5" r="1" stroke="currentColor" strokeWidth="1.1" />
+      </svg>
+    ),
+    items: [
+      { label: "Storefront", href: "/admin/storefront" },
+      { label: "Orders", href: "/admin/orders" },
+      { label: "Products", href: "/admin/products" },
     ],
   },
   {
@@ -111,57 +136,41 @@ const NAV: NavSection[] = [
       { label: "Revenue", href: "/admin/revenue" },
       { label: "Royalties", href: "/admin/royalties" },
       { label: "Rights", href: "/admin/rights" },
-      { label: "Contracts", href: "/admin/contracts" },
       { label: "Finance", href: "/admin/finance" },
-      { label: "Publishing", href: "/admin/publishing" },
-      { label: "Documents", href: "/admin/documents" },
-      { label: "Parties", href: "/admin/contributors" },
+      { label: "Contracts", href: "/admin/contracts" },
     ],
   },
   {
-    key: "ai",
-    label: "AI SYSTEMS",
+    key: "integrations",
+    label: "INTEGRATIONS",
     icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <path d="M8 2l1.5 3.5L13 7l-3.5 1.5L8 12l-1.5-3.5L3 7l3.5-1.5L8 2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+        <circle cx="4" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2" />
+        <circle cx="12" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M6.5 8h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
       </svg>
     ),
     items: [
-      { label: "DNA Engine", href: "/admin/dna", exact: true },
-      { label: "DNA Builder", href: "/admin/dna/builder" },
-      { label: "DNA Packs", href: "/admin/dna/packs" },
-      { label: "Variations", href: "/admin/dna/variations" },
-      { label: "Artists DNA", href: "/admin/dna/artists" },
-      { label: "Producers DNA", href: "/admin/dna/producers" },
+      { label: "Music Platforms", href: "/admin/integrations/music" },
+      { label: "Social Platforms", href: "/admin/integrations/social" },
+      { label: "AI Providers", href: "/admin/integrations/ai" },
+      { label: "Payments", href: "/admin/integrations/payments" },
     ],
   },
   {
-    key: "website",
-    label: "WEBSITE",
+    key: "system",
+    label: "SYSTEM",
     icon: (
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2" />
-        <path d="M8 2c-1.5 2-2 3.5-2 6s.5 4 2 6M8 2c1.5 2 2 3.5 2 6s-.5 4-2 6M2 8h12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.2" />
+        <path d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14M3.8 3.8l1.1 1.1M11.1 11.1l1.1 1.1M3.8 12.2l1.1-1.1M11.1 4.9l1.1-1.1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
       </svg>
     ),
     items: [
-      { label: "CMS", href: "/admin/cms", exact: true },
-      { label: "Homepage", href: "/admin/cms/homepage" },
-      { label: "Imports", href: "/admin/imports" },
-    ],
-  },
-  {
-    key: "admin",
-    label: "ADMIN",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <path d="M8 2L3 4.5v4c0 2.8 2 5.2 5 6 3-0.8 5-3.2 5-6v-4L8 2z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-      </svg>
-    ),
-    items: [
-      { label: "Tasks", href: "/admin/tasks" },
-      { label: "Integrity", href: "/admin/integrity" },
       { label: "Settings", href: "/admin/settings" },
+      { label: "Users", href: "/admin/users" },
+      { label: "Security", href: "/admin/security" },
+      { label: "Logs", href: "/admin/logs" },
     ],
   },
 ];

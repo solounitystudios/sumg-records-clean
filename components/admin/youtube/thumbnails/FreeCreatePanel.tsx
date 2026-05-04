@@ -6,7 +6,6 @@ import {
   createPrompt,
   saveFreeCreateAsset,
   createMidjourneyPendingAsset,
-  completeMidjourneyAsset,
   getMidjourneyJobStatus,
 } from "@/lib/youtube/thumbnails/actions"
 import { getPresetsForProducer } from "@/lib/youtube/thumbnails/presets"
@@ -153,15 +152,9 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
   const [genResults, setGenResults] = useState<GenResult[]>([])
 
   // Midjourney queue state
-  const [mjSending,    setMjSending]    = useState(false)
-  const [mjPendingId,  setMjPendingId]  = useState<string | null>(null)
-  const [mjError,      setMjError]      = useState<string | null>(null)
-  const [mjCompleting, setMjCompleting] = useState(false)
-  const [mjUrlInput,   setMjUrlInput]   = useState("")
-  const [mjUrlWarning, setMjUrlWarning] = useState<string | null>(null)
-  const [mjUploading,  setMjUploading]  = useState(false)
-  const [mjCopied,     setMjCopied]     = useState(false)
-  const mjFileRef = useRef<HTMLInputElement>(null)
+  const [mjSending,   setMjSending]   = useState(false)
+  const [mjPendingId, setMjPendingId] = useState<string | null>(null)
+  const [mjError,     setMjError]     = useState<string | null>(null)
 
   // Manual import state
   const [imageUrl,      setImageUrl]      = useState("")
@@ -207,9 +200,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
   function resetMjState() {
     setMjPendingId(null)
     setMjError(null)
-    setMjUrlInput("")
-    setMjUrlWarning(null)
-    setMjCopied(false)
   }
 
   // Poll for external Midjourney completion when mjPendingId is set
@@ -225,8 +215,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
             provider:  "midjourney" as const,
           }])
           setMjPendingId(null)
-          setMjUrlInput("")
-          setMjCopied(false)
         } else if (status.status === "failed") {
           setMjError("Midjourney job failed")
           setMjPendingId(null)
@@ -251,13 +239,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
   }
 
   async function handleCopy() {
-    if (!builtPrompt) return
-    await navigator.clipboard.writeText(builtPrompt)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  async function handleCopyMjPrompt() {
     if (!builtPrompt) return
     await navigator.clipboard.writeText(builtPrompt)
     setCopied(true)
@@ -319,76 +300,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
       return
     }
     setMjPendingId(result.id)
-  }
-
-  async function handleMjCompleteByUrl() {
-    const url = mjUrlInput.trim()
-    if (!url || !mjPendingId) return
-    if (!isValidHttpImageUrl(url)) {
-      setMjUrlWarning("Paste a direct image URL (https://…), not a prompt.")
-      return
-    }
-    setMjUrlWarning(null)
-    setMjCompleting(true)
-    const result = await completeMidjourneyAsset({
-      id:           mjPendingId,
-      imageUrl:     url,
-      producerSlug: producerSlug || undefined,
-    })
-    setMjCompleting(false)
-    if ("error" in result) {
-      setMjError(result.error)
-      return
-    }
-    setGenResults((prev) => [...prev, {
-      imageUrl:  result.permanentUrl,
-      assetId:   result.assetId,
-      provider:  "midjourney" as const,
-    }])
-    setMjPendingId(null)
-    setMjUrlInput("")
-  }
-
-  async function handleMjFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || !mjPendingId) return
-    setMjUploading(true)
-    setMjError(null)
-    const fd = new FormData()
-    fd.append("file", file)
-    fd.append("type", "image")
-    if (producerSlug) fd.append("producer_slug", producerSlug)
-    try {
-      const { uploadAssetFile } = await import("@/app/actions/assets")
-      const uploadResult = await uploadAssetFile(fd)
-      if ("error" in uploadResult) {
-        setMjError((uploadResult as { error: string }).error)
-        return
-      }
-      const r = uploadResult as { id: string; url: string }
-      const result = await completeMidjourneyAsset({
-        id:              mjPendingId,
-        imageUrl:        r.url,
-        existingAssetId: r.id,
-        producerSlug:    producerSlug || undefined,
-      })
-      if ("error" in result) {
-        setMjError(result.error)
-        return
-      }
-      setGenResults((prev) => [...prev, {
-        imageUrl:  result.permanentUrl,
-        assetId:   result.assetId,
-        provider:  "midjourney" as const,
-      }])
-      setMjPendingId(null)
-      setMjUrlInput("")
-    } catch (err) {
-      setMjError(err instanceof Error ? err.message : "Upload failed")
-    } finally {
-      setMjUploading(false)
-      if (mjFileRef.current) mjFileRef.current.value = ""
-    }
   }
 
   // ── Manual Import ──────────────────────────────────────────────────────────
@@ -739,9 +650,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
                 <div className="space-y-3">
                   {!mjPendingId && !mjSending && (
                     <>
-                      <p className="text-[11px] text-sky-300/60 leading-relaxed">
-                        Midjourney works in 2 steps — we queue the prompt, you generate in Discord, paste the URL back.
-                      </p>
                       {mjError && (
                         <p className="text-[11px] text-red-400/70">{mjError}</p>
                       )}
@@ -759,80 +667,14 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
                     </>
                   )}
 
-                  {mjSending && (
-                    <div className="flex items-center gap-2 py-2">
-                      <svg className="w-4 h-4 text-sky-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                  {(mjSending || mjPendingId) && (
+                    <div className="flex flex-col items-center gap-3 py-6">
+                      <svg className="w-6 h-6 text-sky-400 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
-                      <span className="text-[11px] text-sky-300/70">Creating Midjourney job…</span>
-                    </div>
-                  )}
-
-                  {mjPendingId && (
-                    /* Pending card — prompt queued, awaiting image */
-                    <div className="rounded-2xl border border-sky-500/25 bg-sky-500/[0.04] p-4 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                        <p className="text-[10px] uppercase tracking-[0.18em] text-sky-300/60">Queued — generating in Midjourney</p>
-                      </div>
-
-                      <div className="bg-black/30 rounded-lg px-3 py-2.5">
-                        <p className="text-[11px] text-white/50 font-mono leading-relaxed line-clamp-4 break-words">{builtPrompt}</p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(builtPrompt)
-                          setMjCopied(true)
-                          setTimeout(() => setMjCopied(false), 2000)
-                        }}
-                        className="w-full py-2.5 rounded-xl border border-sky-500/30 bg-sky-600/10 text-sky-300 hover:bg-sky-600/20 text-sm font-medium transition-colors"
-                      >
-                        {mjCopied ? "Copy Prompt ✓" : "Copy Prompt"}
-                      </button>
-
-                      <p className="text-[9px] text-white/25 leading-snug">
-                        Step 1: Copy prompt → Generate in Midjourney → Step 2: Paste URL below
-                      </p>
-
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={mjUrlInput}
-                          onChange={(e) => { setMjUrlInput(e.target.value); setMjUrlWarning(null) }}
-                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleMjCompleteByUrl() } }}
-                          placeholder="https://cdn.midjourney.com/…"
-                          className={`flex-1 bg-black/30 border rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/20 focus:outline-none transition-colors ${mjUrlWarning ? "border-amber-500/50" : "border-white/[0.08] focus:border-sky-500/50"}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleMjCompleteByUrl}
-                          disabled={mjCompleting || !mjUrlInput.trim()}
-                          className="px-4 py-2.5 rounded-xl bg-sky-700/60 hover:bg-sky-700/80 text-sm text-white disabled:opacity-40 transition-colors whitespace-nowrap"
-                        >
-                          {mjCompleting ? "Saving…" : "Done"}
-                        </button>
-                      </div>
-                      {mjUrlWarning && <p className="text-[10px] text-amber-300/70">{mjUrlWarning}</p>}
-
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-px bg-white/[0.06]" />
-                        <span className="text-[10px] text-white/20">or upload</span>
-                        <div className="flex-1 h-px bg-white/[0.06]" />
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => mjFileRef.current?.click()}
-                        disabled={mjUploading}
-                        className="w-full py-2.5 rounded-xl border border-dashed border-white/[0.1] text-sm text-white/40 hover:text-white/70 hover:border-white/20 disabled:opacity-40 transition-colors"
-                      >
-                        {mjUploading ? "Uploading…" : "Upload Finished Image"}
-                      </button>
-                      <input ref={mjFileRef} type="file" accept="image/*" className="hidden" onChange={handleMjFileUpload} />
-
+                      <p className="text-sm text-sky-300/70 font-medium">Generating with Midjourney…</p>
+                      <p className="text-[10px] text-white/25">This may take 60–90 seconds</p>
                       {mjError && <p className="text-[11px] text-red-400/70">{mjError}</p>}
                     </div>
                   )}
@@ -973,7 +815,7 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
         </div>
       )}
 
-      {/* Loading state placeholder */}
+      {/* Loading skeletons — OpenAI */}
       {isGenerating && genResults.length === 0 && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
           {Array.from({ length: genCount }).map((_, i) => (
@@ -982,6 +824,20 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
               className="rounded-xl border border-white/[0.07] bg-white/[0.02] aspect-video animate-pulse flex items-center justify-center"
             >
               <p className="text-[10px] text-white/20">Generating…</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Loading skeletons — Midjourney polling */}
+      {mjPendingId && genResults.length === 0 && (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+          {[0, 1].map((i) => (
+            <div
+              key={i}
+              className="rounded-xl border border-sky-500/[0.12] bg-sky-500/[0.03] aspect-video animate-pulse flex items-center justify-center"
+            >
+              <p className="text-[10px] text-sky-400/30">Generating…</p>
             </div>
           ))}
         </div>

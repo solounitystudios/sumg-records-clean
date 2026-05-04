@@ -18,7 +18,6 @@ import {
   rejectVersion,
   getImageAssetsForPicker,
   createMidjourneyPendingAsset,
-  completeMidjourneyAsset,
   getMidjourneyJobStatus,
 } from "@/lib/youtube/thumbnails/actions"
 
@@ -61,13 +60,9 @@ export function ThumbnailVersionGrid({
   const [genProvider, setGenProvider] = useState<"openai" | "midjourney">("openai")
 
   // Midjourney queue state within this panel
-  const [mjSending,    setMjSending]    = useState(false)
-  const [mjPendingId,  setMjPendingId]  = useState<string | null>(null)
-  const [mjError,      setMjError]      = useState<string | null>(null)
-  const [mjUrlInput,   setMjUrlInput]   = useState("")
-  const [mjUrlWarn,    setMjUrlWarn]    = useState<string | null>(null)
-  const [mjCompleting, setMjCompleting] = useState(false)
-  const [mjCopied,     setMjCopied]     = useState(false)
+  const [mjSending,   setMjSending]   = useState(false)
+  const [mjPendingId, setMjPendingId] = useState<string | null>(null)
+  const [mjError,     setMjError]     = useState<string | null>(null)
 
   // Keep genPrompt in sync when builtPrompt changes from parent
   const [lastBuiltPrompt, setLastBuiltPrompt] = useState(builtPrompt)
@@ -212,39 +207,6 @@ export function ThumbnailVersionGrid({
     setMjSending(false)
     if ("error" in result) { setMjError(result.error); return }
     setMjPendingId(result.id)
-  }
-
-  async function handleMjComplete() {
-    const url = mjUrlInput.trim()
-    if (!url || !mjPendingId) return
-    if (!isValidHttpImageUrl(url)) { setMjUrlWarn("Paste a direct image URL, not a prompt."); return }
-    setMjUrlWarn(null); setMjCompleting(true)
-    const result = await completeMidjourneyAsset({
-      id:           mjPendingId,
-      imageUrl:     url,
-      producerSlug: producerSlug,
-      projectId,
-    })
-    setMjCompleting(false)
-    if ("error" in result) { setMjError(result.error); return }
-    const newVer: ThumbnailVersion = {
-      id:             result.versionId ?? `mj-${Date.now()}`,
-      project_id:     projectId,
-      asset_id:       result.assetId,
-      image_url:      result.permanentUrl,
-      prompt:         genPrompt.trim(),
-      provider:       "midjourney",
-      style_bucket:   null,
-      version_number: versions.length + 1,
-      selected:       false,
-      rejected:       false,
-      ctr_score:      null,
-      notes:          null,
-      created_at:     new Date().toISOString(),
-    }
-    onVersionsChange([...versions, newVer])
-    onVersionSelect(newVer)
-    setMjPendingId(null); setMjUrlInput(""); setShowAddForm(false)
   }
 
   async function handleGenerate() {
@@ -466,9 +428,6 @@ export function ThumbnailVersionGrid({
                 <>
                   {!mjPendingId && !mjSending && (
                     <>
-                      <p className="text-[9px] text-white/30 leading-relaxed">
-                        Midjourney works in 2 steps — we queue the prompt, you generate in Discord, paste the URL back.
-                      </p>
                       {mjError && <p className="text-[10px] text-red-400/70 leading-snug">{mjError}</p>}
                       <button
                         type="button"
@@ -481,63 +440,13 @@ export function ThumbnailVersionGrid({
                     </>
                   )}
 
-                  {mjSending && (
-                    <div className="flex items-center gap-2 py-2">
-                      <svg className="w-3.5 h-3.5 text-sky-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                  {(mjSending || mjPendingId) && (
+                    <div className="flex flex-col items-center gap-2 py-4">
+                      <svg className="w-5 h-5 text-sky-400 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
-                      <span className="text-[10px] text-sky-300/70">Creating Midjourney job…</span>
-                    </div>
-                  )}
-
-                  {mjPendingId && (
-                    <div className="space-y-2 rounded-lg border border-sky-500/20 bg-sky-500/[0.04] p-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                        <span className="text-[9px] text-sky-300/60 uppercase tracking-[0.15em]">Queued — generating in Midjourney</span>
-                      </div>
-
-                      <div className="bg-black/30 rounded-md px-2.5 py-2">
-                        <p className="text-[10px] text-white/45 font-mono leading-relaxed line-clamp-4 break-words">{genPrompt}</p>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(genPrompt)
-                          setMjCopied(true)
-                          setTimeout(() => setMjCopied(false), 2000)
-                        }}
-                        className="w-full py-1.5 rounded-md border border-sky-500/25 bg-sky-600/10 text-[10px] text-sky-300 hover:bg-sky-600/20 transition"
-                      >
-                        {mjCopied ? "Copy Prompt ✓" : "Copy Prompt"}
-                      </button>
-
-                      <p className="text-[9px] text-white/25 leading-snug">
-                        Step 1: Copy prompt → Generate in Midjourney → Step 2: Paste URL below
-                      </p>
-
-                      <div className="flex gap-1.5">
-                        <input
-                          type="text"
-                          value={mjUrlInput}
-                          onChange={(e) => { setMjUrlInput(e.target.value); setMjUrlWarn(null) }}
-                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleMjComplete() } }}
-                          placeholder="Paste finished image URL…"
-                          className={`flex-1 bg-black/30 border rounded-md px-2.5 py-1.5 text-[11px] text-white placeholder:text-white/20 focus:outline-none transition-colors ${mjUrlWarn ? "border-amber-500/50" : "border-white/[0.08] focus:border-sky-500/50"}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleMjComplete}
-                          disabled={mjCompleting || !mjUrlInput.trim()}
-                          className="px-3 py-1.5 rounded-md bg-sky-600/60 hover:bg-sky-600/80 text-[11px] text-white disabled:opacity-40 transition whitespace-nowrap"
-                        >
-                          {mjCompleting ? "…" : "Done"}
-                        </button>
-                      </div>
-
-                      {mjUrlWarn && <p className="text-[9px] text-amber-300/70">{mjUrlWarn}</p>}
+                      <span className="text-[10px] text-sky-300/70">Generating with Midjourney…</span>
                       {mjError && <p className="text-[9px] text-red-400/70">{mjError}</p>}
                     </div>
                   )}
