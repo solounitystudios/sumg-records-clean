@@ -2,7 +2,6 @@
 
 import { useState, useTransition, useEffect, useRef } from "react"
 import Link from "next/link"
-import { ThumbnailCanvas }       from "@/components/admin/youtube/thumbnails/ThumbnailCanvas"
 import { ThumbnailVersionGrid }  from "@/components/admin/youtube/thumbnails/ThumbnailVersionGrid"
 import { buildThumbnailPrompt }  from "@/lib/youtube/thumbnails/prompts"
 import { generateThumbnailImages } from "@/app/actions/generateThumbnailImage"
@@ -825,15 +824,6 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
 
               {/* Single scrollable zone */}
               <div className="flex-1 min-h-0 overflow-y-auto">
-
-                {/* Canvas — full-bleed, only rendered when a version is selected */}
-                {selectedVersion && (
-                  <ThumbnailCanvas
-                    config={canvasConfig}
-                    selectedImageUrl={selectedVersion.image_url}
-                    onChange={setCanvasConfig}
-                  />
-                )}
 
                 {/* Error banner */}
                 {(genError || mjError) && (
