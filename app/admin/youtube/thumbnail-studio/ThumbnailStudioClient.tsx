@@ -75,6 +75,7 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
   const [isPending, startTransition]              = useTransition()
   const [statusMsg, setStatusMsg]                 = useState<string | null>(null)
   const [error, setError]                         = useState<string | null>(null)
+  const [showMobileQueue, setShowMobileQueue]     = useState(false)
 
   // Cross-tab handoff: prompt injected into Free Create from Library
   const [freeCreateInitialPrompt, setFreeCreateInitialPrompt] = useState<string | undefined>()
@@ -280,159 +281,191 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
 
       {/* Job Queue */}
       {studioTab === "queue" && (
-        <div className="flex h-[calc(100vh-12rem)] gap-0 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#08090d]">
+        <div className="rounded-2xl border border-white/[0.07] bg-[#08090d] overflow-hidden">
 
-          {/* Left panel: Queue */}
-          <div className="w-56 shrink-0 flex flex-col border-r border-white/[0.06]">
-            <div className="px-4 py-3 border-b border-white/[0.06] shrink-0">
-              <p className="text-[9px] uppercase tracking-[0.2em] text-white/30">
-                Jobs ({jobs.length})
-              </p>
+          {/* Mobile/tablet queue toggle bar — hidden on desktop */}
+          <div className="flex lg:hidden items-center justify-between border-b border-white/[0.06] px-4 py-2.5 gap-3">
+            <p className="text-xs text-white/50 truncate min-w-0">
+              {selectedJob
+                ? <span className="text-white/80">{selectedJob.title ?? "Untitled"}</span>
+                : <span>{jobs.length} jobs in queue</span>
+              }
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowMobileQueue((p) => !p)}
+              className="shrink-0 px-3 py-1.5 rounded-lg border border-white/[0.1] text-[11px] text-white/50 hover:text-white hover:border-white/25 transition-colors"
+            >
+              {showMobileQueue ? "× Close" : "☰ Jobs"}
+            </button>
+          </div>
+
+          {/* Mobile queue dropdown */}
+          {showMobileQueue && (
+            <div className="lg:hidden border-b border-white/[0.06] max-h-56 overflow-y-auto">
+              <ThumbnailQueue
+                jobs={jobs}
+                selectedJobId={selectedJob?.id ?? null}
+                onSelect={(j) => { handleSelectJob(j); setShowMobileQueue(false) }}
+              />
             </div>
-            <ThumbnailQueue
-              jobs={jobs}
-              selectedJobId={selectedJob?.id ?? null}
-              onSelect={handleSelectJob}
-            />
-          </div>
+          )}
 
-          {/* Center panel: Audio → Video → Canvas */}
-          <div className="flex-1 min-w-0 flex flex-col border-r border-white/[0.06] overflow-y-auto">
-            {loadingProject ? (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-white/30 text-sm">Loading project…</p>
-              </div>
-            ) : !selectedJob ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-white/20 text-sm">Select a job from the queue</p>
-                  <p className="text-white/10 text-xs mt-1">to open the thumbnail studio</p>
-                </div>
-              </div>
-            ) : (
-              <div className="p-5 space-y-4">
-                <div>
-                  <h2 className="text-sm font-semibold">{selectedJob.title ?? "Untitled"}</h2>
-                  <p className="text-xs text-white/35 mt-0.5">
-                    {selectedJob.producer_slug ?? "No producer"} · {selectedJob.status}
-                    {selectedJob.thumbnail_status === "approved" && (
-                      <span className="ml-2 text-emerald-400/70">● approved</span>
-                    )}
-                    {selectedJob.thumbnail_status === "skipped" && (
-                      <span className="ml-2 text-white/30">● skipped</span>
-                    )}
-                  </p>
-                </div>
+          {/* Main layout: 3-column on desktop, vertical on mobile */}
+          <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-14rem)] lg:overflow-hidden">
 
-                {audioUrl && <AudioPlayer url={audioUrl} />}
-                {renderUrl && <VideoPreview url={renderUrl} />}
-
-                {error && (
-                  <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-400 flex items-start justify-between gap-2">
-                    <span>{error}</span>
-                    <button type="button" onClick={() => setError(null)} className="shrink-0 text-red-400/60 hover:text-red-400">×</button>
-                  </div>
-                )}
-                {statusMsg && (
-                  <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-xs text-emerald-400">
-                    {statusMsg}
-                  </div>
-                )}
-
-                {project && (
-                  <ThumbnailCanvas
-                    config={canvasConfig}
-                    selectedImageUrl={selectedVersion?.image_url}
-                    preset={selectedPreset}
-                    onChange={setCanvasConfig}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Right panel: Presets → Prompt → Versions → Actions */}
-          <div className="w-72 shrink-0 flex flex-col overflow-y-auto">
-            {hasJob && project ? (
-              <div className="p-4 space-y-5">
-
-                {presets.length > 0 && (
-                  <>
-                    <ThumbnailPresetPicker
-                      presets={presets}
-                      selectedSlug={selectedPreset?.preset_slug ?? null}
-                      onSelect={handlePresetSelect}
-                    />
-                    <div className="border-t border-white/[0.06]" />
-                  </>
-                )}
-
-                <div>
-                  <p className="text-[9px] uppercase tracking-[0.2em] text-white/30 mb-3">
-                    Prompt Builder
-                  </p>
-                  <ThumbnailPromptPanel
-                    producerSlug={selectedJob.producer_slug ?? "nightwire"}
-                    jobTitle={selectedJob.title}
-                    preset={selectedPreset}
-                    savedPrompts={savedPrompts}
-                    projectId={project.id}
-                    initialPrompt={builtPrompt || undefined}
-                    onPromptBuilt={setBuiltPrompt}
-                  />
-                </div>
-
-                <div className="border-t border-white/[0.06]" />
-
-                <ThumbnailVersionGrid
-                  projectId={project.id}
-                  versions={versions}
-                  selectedVersionId={selectedVersionId}
-                  builtPrompt={builtPrompt}
-                  generationEnabled={generationEnabled}
-                  producerSlug={selectedJob.producer_slug ?? undefined}
-                  onVersionsChange={setVersions}
-                  onVersionSelect={(v) => setSelectedVersionId(v.id)}
-                />
-
-                <div className="border-t border-white/[0.06]" />
-
-                {/* Action buttons */}
-                <div className="flex gap-2 pb-2">
-                  <button
-                    type="button"
-                    onClick={handleSaveDraft}
-                    disabled={isPending}
-                    className="flex-1 py-2.5 rounded-xl border border-white/[0.1] text-xs text-white/60 hover:text-white hover:border-white/20 disabled:opacity-40 transition-colors"
-                  >
-                    Save Draft
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleApprove}
-                    disabled={isPending || !selectedVersionId}
-                    className="flex-1 py-2.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 disabled:opacity-40 text-xs font-medium transition-colors"
-                  >
-                    {isPending ? "Approving…" : "Approve →"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSkip}
-                    disabled={isPending}
-                    className="px-4 py-2.5 rounded-xl border border-white/[0.06] text-xs text-white/25 hover:text-white/50 disabled:opacity-40 transition-colors"
-                    title="Use auto-generated placeholder instead"
-                  >
-                    Skip
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <p className="text-white/15 text-xs text-center">
-                  Select a job to see prompts and versions
+            {/* Left panel: Queue — desktop only */}
+            <div className="hidden lg:flex w-56 shrink-0 flex-col border-r border-white/[0.06]">
+              <div className="px-4 py-3 border-b border-white/[0.06] shrink-0">
+                <p className="text-[9px] uppercase tracking-[0.2em] text-white/30">
+                  Jobs ({jobs.length})
                 </p>
               </div>
-            )}
+              <ThumbnailQueue
+                jobs={jobs}
+                selectedJobId={selectedJob?.id ?? null}
+                onSelect={handleSelectJob}
+              />
+            </div>
+
+            {/* Center panel: Audio → Video → Canvas */}
+            <div className="flex-1 min-w-0 flex flex-col border-b lg:border-b-0 lg:border-r border-white/[0.06] lg:overflow-y-auto">
+              {loadingProject ? (
+                <div className="flex-1 flex items-center justify-center py-16">
+                  <p className="text-white/30 text-sm">Loading project…</p>
+                </div>
+              ) : !selectedJob ? (
+                <div className="flex-1 flex items-center justify-center py-16">
+                  <div className="text-center">
+                    <p className="text-white/20 text-sm">Select a job from the queue</p>
+                    <p className="text-white/10 text-xs mt-1">to open the thumbnail studio</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-5 space-y-4">
+                  <div>
+                    <h2 className="text-sm font-semibold">{selectedJob.title ?? "Untitled"}</h2>
+                    <p className="text-xs text-white/35 mt-0.5">
+                      {selectedJob.producer_slug ?? "No producer"} · {selectedJob.status}
+                      {selectedJob.thumbnail_status === "approved" && (
+                        <span className="ml-2 text-emerald-400/70">● approved</span>
+                      )}
+                      {selectedJob.thumbnail_status === "skipped" && (
+                        <span className="ml-2 text-white/30">● skipped</span>
+                      )}
+                    </p>
+                  </div>
+
+                  {audioUrl && <AudioPlayer url={audioUrl} />}
+                  {renderUrl && <VideoPreview url={renderUrl} />}
+
+                  {error && (
+                    <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-400 flex items-start justify-between gap-2">
+                      <span>{error}</span>
+                      <button type="button" onClick={() => setError(null)} className="shrink-0 text-red-400/60 hover:text-red-400">×</button>
+                    </div>
+                  )}
+                  {statusMsg && (
+                    <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-xs text-emerald-400">
+                      {statusMsg}
+                    </div>
+                  )}
+
+                  {project && (
+                    <ThumbnailCanvas
+                      config={canvasConfig}
+                      selectedImageUrl={selectedVersion?.image_url}
+                      preset={selectedPreset}
+                      onChange={setCanvasConfig}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Right panel: Presets → Prompt → Versions → Actions */}
+            <div className="w-full lg:w-72 shrink-0 flex flex-col lg:overflow-y-auto">
+              {hasJob && project ? (
+                <div className="p-4 space-y-5">
+
+                  {presets.length > 0 && (
+                    <>
+                      <ThumbnailPresetPicker
+                        presets={presets}
+                        selectedSlug={selectedPreset?.preset_slug ?? null}
+                        onSelect={handlePresetSelect}
+                      />
+                      <div className="border-t border-white/[0.06]" />
+                    </>
+                  )}
+
+                  <div>
+                    <p className="text-[9px] uppercase tracking-[0.2em] text-white/30 mb-3">
+                      Prompt Builder
+                    </p>
+                    <ThumbnailPromptPanel
+                      producerSlug={selectedJob.producer_slug ?? "nightwire"}
+                      jobTitle={selectedJob.title}
+                      preset={selectedPreset}
+                      savedPrompts={savedPrompts}
+                      projectId={project.id}
+                      initialPrompt={builtPrompt || undefined}
+                      onPromptBuilt={setBuiltPrompt}
+                    />
+                  </div>
+
+                  <div className="border-t border-white/[0.06]" />
+
+                  <ThumbnailVersionGrid
+                    projectId={project.id}
+                    versions={versions}
+                    selectedVersionId={selectedVersionId}
+                    builtPrompt={builtPrompt}
+                    generationEnabled={generationEnabled}
+                    producerSlug={selectedJob.producer_slug ?? undefined}
+                    onVersionsChange={setVersions}
+                    onVersionSelect={(v) => setSelectedVersionId(v.id)}
+                  />
+
+                  <div className="border-t border-white/[0.06]" />
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2 pb-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveDraft}
+                      disabled={isPending}
+                      className="flex-1 py-2.5 rounded-xl border border-white/[0.1] text-xs text-white/60 hover:text-white hover:border-white/20 disabled:opacity-40 transition-colors"
+                    >
+                      Save Draft
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleApprove}
+                      disabled={isPending || !selectedVersionId}
+                      className="flex-1 py-2.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 disabled:opacity-40 text-xs font-medium transition-colors"
+                    >
+                      {isPending ? "Approving…" : "Approve →"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSkip}
+                      disabled={isPending}
+                      className="px-4 py-2.5 rounded-xl border border-white/[0.06] text-xs text-white/25 hover:text-white/50 disabled:opacity-40 transition-colors"
+                      title="Use auto-generated placeholder instead"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center p-6 py-12">
+                  <p className="text-white/15 text-xs text-center">
+                    Select a job to see prompts and versions
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

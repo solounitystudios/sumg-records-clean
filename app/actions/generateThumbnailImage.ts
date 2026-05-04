@@ -17,7 +17,7 @@ export interface ThumbnailGenerationResult {
 
 export async function generateThumbnailImages({
   prompt,
-  count = 1,
+  count = 2,
   producerSlug,
   projectId,
 }: {

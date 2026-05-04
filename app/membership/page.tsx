@@ -4,6 +4,13 @@ import { EmailCapture } from "@/components/site/EmailCapture";
 
 export const metadata = { title: "Membership — SUMG Records" };
 
+// To activate the Inner Circle checkout, set NEXT_PUBLIC_INNER_CIRCLE_CHECKOUT_URL
+// to any payment link: Stripe Payment Link, Gumroad, LemonSqueezy, etc.
+// No code changes required — just paste the URL from your payment provider dashboard.
+const INNER_CIRCLE_URL =
+  process.env.NEXT_PUBLIC_INNER_CIRCLE_CHECKOUT_URL ??
+  "mailto:membership@sumgrecords.com?subject=Inner+Circle+Membership"
+
 const TIERS = [
   {
     id: "inner-circle",
@@ -19,8 +26,8 @@ const TIERS = [
       "Priority merch access",
       "Direct artist dispatch emails",
     ],
-    cta: "Join the Inner Circle",
-    ctaHref: "/contact?subject=Inner+Circle+Membership+Inquiry",
+    cta: "Join the Inner Circle →",
+    ctaHref: INNER_CIRCLE_URL,
     highlight: true,
   },
   {
@@ -134,8 +141,8 @@ export default function MembershipPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10 max-w-3xl">
               {[
                 {
-                  q: "When does Inner Circle launch?",
-                  a: "We're currently building the Inner Circle experience. Sign up via the inquiry link above and you'll be first to know — and first to access.",
+                  q: "How do I join the Inner Circle?",
+                  a: "Click the Join button above. You'll be taken to our secure checkout for $9/month. Access is instant — you'll receive a welcome email within minutes.",
                 },
                 {
                   q: "What payment methods are accepted?",

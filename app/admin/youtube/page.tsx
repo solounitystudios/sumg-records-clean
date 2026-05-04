@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { requireAdmin } from "@/lib/auth"
-import { getAllChannels, getJobCounts } from "@/lib/db/youtube"
+import { getAllChannels, getJobCounts, getPipelineHealth } from "@/lib/db/youtube"
 
 export const metadata = { title: "YouTube Automation — SUMG Admin" }
 
@@ -14,7 +14,7 @@ function YTIcon({ className }: { className?: string }) {
 
 export default async function YouTubeOverviewPage() {
   await requireAdmin()
-  const [channels, counts] = await Promise.all([getAllChannels(), getJobCounts()])
+  const [channels, counts, health] = await Promise.all([getAllChannels(), getJobCounts(), getPipelineHealth()])
 
   const activeChannels  = channels.filter((c) => c.status === "active").length
   const totalCapacity   = channels
@@ -71,6 +71,99 @@ export default async function YouTubeOverviewPage() {
             <div key={s}>
               <p className="text-[9px] uppercase tracking-[0.12em] text-white/25 mb-1">{s.replace("_", " ")}</p>
               <p className="text-lg font-semibold tabular-nums">{counts[s]}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Pipeline health */}
+      <div className="border border-white/[0.07] bg-[#0d1016] rounded-2xl p-6 mb-8">
+        <div className="flex items-center justify-between mb-5">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-white/35">Pipeline Health</p>
+          <p className="text-[10px] text-white/20">{health.uploadedThisWeek} uploaded this week</p>
+        </div>
+
+        <div className="space-y-2">
+          {[
+            {
+              stage:  "1 · Audio Inbox",
+              count:  health.needsAsset,
+              label:  "need audio files",
+              href:   "/admin/youtube/inbox",
+              urgent: health.needsAsset > 0,
+              action: "Upload Audio →",
+            },
+            {
+              stage:  "2 · Thumbnail Studio",
+              count:  health.needsThumbnail,
+              label:  "need thumbnail approval",
+              href:   "/admin/youtube/thumbnail-studio",
+              urgent: health.needsThumbnail > 0,
+              action: "Open Studio →",
+            },
+            {
+              stage:  "3 · Render",
+              count:  health.needsRender,
+              label:  "awaiting video render",
+              href:   "/admin/youtube/render",
+              urgent: health.needsRender > 0,
+              action: "Render Now →",
+            },
+            {
+              stage:  "4 · Upload Queue",
+              count:  health.readyToUpload,
+              label:  "ready to upload",
+              href:   "/admin/youtube/engine",
+              urgent: false,
+              action: "Run Engine →",
+              good:   health.readyToUpload > 0,
+            },
+            {
+              stage:  "⚠ Failed",
+              count:  health.failedJobs,
+              label:  "jobs failed",
+              href:   "/admin/youtube/jobs",
+              urgent: health.failedJobs > 0,
+              action: "Review →",
+              warn:   true,
+            },
+          ].map(({ stage, count, label, href, urgent, action, good, warn }) => (
+            <div
+              key={stage}
+              className={`flex items-center justify-between rounded-xl px-4 py-3 border transition-colors ${
+                warn && count > 0
+                  ? "border-red-500/20 bg-red-500/[0.04]"
+                  : good && count > 0
+                  ? "border-emerald-500/20 bg-emerald-500/[0.04]"
+                  : urgent && count > 0
+                  ? "border-amber-500/20 bg-amber-500/[0.04]"
+                  : "border-white/[0.05] bg-white/[0.01]"
+              }`}
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <span className="text-[10px] text-white/30 font-mono shrink-0">{stage}</span>
+                <span className={`text-xl font-semibold tabular-nums ${
+                  warn && count > 0 ? "text-red-400" :
+                  good && count > 0 ? "text-emerald-400" :
+                  urgent && count > 0 ? "text-amber-400" :
+                  "text-white/40"
+                }`}>{count}</span>
+                <span className="text-xs text-white/25 truncate">{label}</span>
+              </div>
+              {count > 0 && (
+                <Link
+                  href={href}
+                  className={`shrink-0 text-[10px] px-3 py-1.5 rounded-lg border transition-colors ${
+                    warn && count > 0
+                      ? "border-red-500/25 text-red-400/70 hover:text-red-400"
+                      : good && count > 0
+                      ? "border-emerald-500/25 text-emerald-400/70 hover:text-emerald-400"
+                      : "border-white/[0.1] text-white/40 hover:text-white/70"
+                  }`}
+                >
+                  {action}
+                </Link>
+              )}
             </div>
           ))}
         </div>

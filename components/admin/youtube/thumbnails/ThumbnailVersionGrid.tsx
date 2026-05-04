@@ -57,7 +57,7 @@ export function ThumbnailVersionGrid({
   const [urlError, setUrlError]       = useState<string | null>(null)
   const [genError, setGenError]       = useState<string | null>(null)
   const [genPrompt, setGenPrompt]     = useState(builtPrompt ?? "")
-  const [genCount, setGenCount]       = useState<1 | 2>(1)
+  const [genCount, setGenCount]       = useState<1 | 2 | 4>(2)
   const [genProvider, setGenProvider] = useState<"openai" | "midjourney">("openai")
 
   // Midjourney queue state within this panel
@@ -207,6 +207,7 @@ export function ThumbnailVersionGrid({
       created_at:     new Date().toISOString(),
     }
     onVersionsChange([...versions, newVer])
+    onVersionSelect(newVer)
     setMjPendingId(null); setMjUrlInput(""); setShowAddForm(false)
   }
 
@@ -232,8 +233,6 @@ export function ThumbnailVersionGrid({
       return
     }
 
-    // The server action already inserted the versions into the DB;
-    // refresh the version list by adding them locally.
     const newVersions: ThumbnailVersion[] = result.images.map((img, i) => ({
       id:             img.versionId ?? `${Date.now()}-${i}`,
       project_id:     projectId,
@@ -251,6 +250,8 @@ export function ThumbnailVersionGrid({
     }))
 
     onVersionsChange([...versions, ...newVersions])
+    // Auto-preview the first generated image in the canvas
+    if (newVersions.length > 0) onVersionSelect(newVersions[0])
     setShowAddForm(false)
   }
 
@@ -393,7 +394,7 @@ export function ThumbnailVersionGrid({
                 <>
                   <div className="flex items-center gap-2">
                     <label className="text-[9px] text-white/30 uppercase tracking-[0.15em]">Count</label>
-                    {([1, 2] as const).map((n) => (
+                    {([1, 2, 4] as const).map((n) => (
                       <button
                         type="button"
                         key={n}
@@ -415,7 +416,10 @@ export function ThumbnailVersionGrid({
                     disabled={generating || !genPrompt.trim() || !generationEnabled}
                     className="w-full py-2.5 rounded-lg bg-violet-600/80 hover:bg-violet-600 disabled:opacity-40 text-xs font-medium transition"
                   >
-                    {generating ? `Generating ${genCount > 1 ? `${genCount} images` : "image"}…` : `Generate Image${genCount > 1 ? "s" : ""} →`}
+                    {generating
+                      ? `Generating ${genCount} version${genCount !== 1 ? "s" : ""}…`
+                      : `Generate ${genCount} version${genCount !== 1 ? "s" : ""} →`
+                    }
                   </button>
                   <p className="text-[9px] text-white/20 text-center">Generated images are saved to Assets and added as versions.</p>
                 </>

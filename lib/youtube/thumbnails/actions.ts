@@ -249,7 +249,9 @@ export async function approveProject(
     producer_slug:        producerSlug ?? null,
     image_url:            imageUrl,
     prompt_used:          promptUsed ?? null,
+    asset_id:             assetId,
     linked_upload_job_id: jobId,
+    name:                 title ?? null,
   })
 
   // 3. Update project to approved

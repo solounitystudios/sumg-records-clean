@@ -5,9 +5,9 @@ import MobileNav from "./mobile-nav"
 const navLinks = [
   { href: "/artists", label: "Artists" },
   { href: "/producers", label: "Producers" },
-  { href: "/brands", label: "Brands" },
+  { href: "/beats", label: "Beats" },
   { href: "/releases", label: "Releases" },
-  { href: "/news", label: "News" },
+  { href: "/shop", label: "Shop" },
 ]
 
 export default async function Nav() {

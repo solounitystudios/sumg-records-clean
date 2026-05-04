@@ -62,6 +62,63 @@ function isValidHttpImageUrl(value: string): boolean {
   }
 }
 
+// ─── Generated preview card ───────────────────────────────────────────────────
+
+interface GenResult {
+  imageUrl:      string
+  assetId:       string
+  revisedPrompt?: string
+  provider:      "openai" | "midjourney"
+}
+
+function GeneratedCard({ img, prompt }: { img: GenResult; prompt: string }) {
+  const [urlCopied, setUrlCopied] = useState(false)
+
+  return (
+    <div className="rounded-xl border border-white/[0.08] overflow-hidden bg-[#0a0c11]">
+      <div className="aspect-video overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={img.imageUrl}
+          alt="Generated thumbnail"
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+      </div>
+      <div className="p-3 space-y-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${
+            img.provider === "openai"
+              ? "border-violet-500/30 bg-violet-600/20 text-violet-300"
+              : "border-sky-500/30 bg-sky-600/20 text-sky-300"
+          }`}>
+            {img.provider === "openai" ? "⚡ OpenAI" : "✦ Midjourney"}
+          </span>
+          <span className="text-[9px] text-emerald-400/60">✓ Saved</span>
+        </div>
+        {(img.revisedPrompt ?? prompt) && (
+          <p className="text-[10px] text-white/35 font-mono leading-relaxed line-clamp-2 break-words">
+            {img.revisedPrompt ?? prompt}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={async () => {
+            await navigator.clipboard.writeText(img.imageUrl)
+            setUrlCopied(true)
+            setTimeout(() => setUrlCopied(false), 2000)
+          }}
+          className="w-full py-1.5 rounded-lg border border-white/[0.08] text-[10px] text-white/40 hover:text-white hover:border-white/20 transition-colors"
+        >
+          {urlCopied ? "Copied!" : "Copy URL"}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 type GenProvider = "openai" | "midjourney" | "manual"
 
 interface Props {
@@ -90,30 +147,30 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
 
   // OpenAI generation state
   const [isGenerating, startGenerating] = useTransition()
-  const [genError,           setGenError]            = useState<string | null>(null)
-  const [genResults,         setGenResults]          = useState<Array<{ imageUrl: string; assetId: string }>>([])
+  const [genCount,  setGenCount]  = useState<1 | 2 | 4>(2)
+  const [genError,  setGenError]  = useState<string | null>(null)
+  const [genResults, setGenResults] = useState<GenResult[]>([])
 
   // Midjourney queue state
-  const [mjSending,     setMjSending]     = useState(false)
-  const [mjPendingId,   setMjPendingId]   = useState<string | null>(null)
-  const [mjError,       setMjError]       = useState<string | null>(null)
-  const [mjCompleting,  setMjCompleting]  = useState(false)
-  const [mjComplete,    setMjComplete]    = useState(false)
-  const [mjUrlInput,    setMjUrlInput]    = useState("")
-  const [mjUrlWarning,  setMjUrlWarning]  = useState<string | null>(null)
-  const [mjUploading,   setMjUploading]   = useState(false)
+  const [mjSending,    setMjSending]    = useState(false)
+  const [mjPendingId,  setMjPendingId]  = useState<string | null>(null)
+  const [mjError,      setMjError]      = useState<string | null>(null)
+  const [mjCompleting, setMjCompleting] = useState(false)
+  const [mjUrlInput,   setMjUrlInput]   = useState("")
+  const [mjUrlWarning, setMjUrlWarning] = useState<string | null>(null)
+  const [mjUploading,  setMjUploading]  = useState(false)
   const mjFileRef = useRef<HTMLInputElement>(null)
 
   // Manual import state
-  const [imageUrl,           setImageUrl]            = useState("")
-  const [imageUrlInput,      setImageUrlInput]       = useState("")
-  const [imageError,         setImageError]          = useState(false)
-  const [savingAsset,        setSavingAsset]         = useState(false)
-  const [savedAssetMsg,      setSavedAssetMsg]       = useState<string | null>(null)
-  const [assetError,         setAssetError]          = useState<string | null>(null)
-  const [assetName,          setAssetName]           = useState("")
-  const [promptWarning,      setPromptWarning]       = useState<string | null>(null)
-  const [uploading,          setUploading]           = useState(false)
+  const [imageUrl,      setImageUrl]      = useState("")
+  const [imageUrlInput, setImageUrlInput] = useState("")
+  const [imageError,    setImageError]    = useState(false)
+  const [savingAsset,   setSavingAsset]   = useState(false)
+  const [savedAssetMsg, setSavedAssetMsg] = useState<string | null>(null)
+  const [assetError,    setAssetError]    = useState<string | null>(null)
+  const [assetName,     setAssetName]     = useState("")
+  const [promptWarning, setPromptWarning] = useState<string | null>(null)
+  const [uploading,     setUploading]     = useState(false)
 
   const fileRef = useRef<HTMLInputElement>(null)
   const presets = getPresetsForProducer(producerSlug)
@@ -148,7 +205,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
   function resetMjState() {
     setMjPendingId(null)
     setMjError(null)
-    setMjComplete(false)
     setMjUrlInput("")
     setMjUrlWarning(null)
   }
@@ -198,24 +254,23 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
   function handleGenerateImage() {
     if (!builtPrompt.trim()) return
     setGenError(null)
+    setGenResults([])
     startGenerating(async () => {
       const result = await generateThumbnailImages({
-        prompt:      builtPrompt.trim(),
-        count:       1,
+        prompt:       builtPrompt.trim(),
+        count:        genCount,
         producerSlug: producerSlug || undefined,
       })
       if ("error" in result) {
         setGenError(result.error)
         return
       }
-      setGenResults(result.images)
-      if (result.images[0]) {
-        setImageUrl(result.images[0].imageUrl)
-        setImageUrlInput(result.images[0].imageUrl)
-        setImageError(false)
-        setSavedAssetMsg("Image generated and saved to Assets.")
-        setAssetError(null)
-      }
+      setGenResults(result.images.map((img) => ({
+        imageUrl:      img.imageUrl,
+        assetId:       img.assetId,
+        revisedPrompt: img.revisedPrompt,
+        provider:      "openai" as const,
+      })))
     })
   }
 
@@ -257,12 +312,13 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
       setMjError(result.error)
       return
     }
-    setMjComplete(true)
-    setImageUrl(result.permanentUrl)
-    setImageUrlInput(result.permanentUrl)
-    setImageError(false)
-    setSavedAssetMsg("Midjourney image saved to Assets and Thumbnail Library ✓")
+    setGenResults((prev) => [...prev, {
+      imageUrl:  result.permanentUrl,
+      assetId:   result.assetId,
+      provider:  "midjourney" as const,
+    }])
     setMjPendingId(null)
+    setMjUrlInput("")
   }
 
   async function handleMjFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -292,12 +348,13 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
         setMjError(result.error)
         return
       }
-      setMjComplete(true)
-      setImageUrl(result.permanentUrl)
-      setImageUrlInput(result.permanentUrl)
-      setImageError(false)
-      setSavedAssetMsg("Midjourney image saved to Assets and Thumbnail Library ✓")
+      setGenResults((prev) => [...prev, {
+        imageUrl:  result.permanentUrl,
+        assetId:   result.assetId,
+        provider:  "midjourney" as const,
+      }])
       setMjPendingId(null)
+      setMjUrlInput("")
     } catch (err) {
       setMjError(err instanceof Error ? err.message : "Upload failed")
     } finally {
@@ -322,7 +379,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
     setImageError(false)
     setAssetError(null)
     setSavedAssetMsg(null)
-    setGenResults([])
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -340,7 +396,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
       if (result && "url" in result) {
         setImageUrl(result.url as string)
         setImageUrlInput(result.url as string)
-        setGenResults([])
       } else if (result && "error" in result) {
         setAssetError((result as { error: string }).error)
       }
@@ -377,7 +432,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
     setImageUrlInput("")
     setImageError(false)
     setSavedAssetMsg(null)
-    setGenResults([])
   }
 
   return (
@@ -601,14 +655,41 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
               {genProvider === "openai" && (
                 <div className="space-y-3">
                   {generationEnabled ? (
-                    <button
-                      type="button"
-                      onClick={handleGenerateImage}
-                      disabled={isGenerating || !builtPrompt.trim()}
-                      className="w-full py-3.5 rounded-xl bg-violet-700/70 hover:bg-violet-700 active:scale-[0.98] text-white font-semibold text-sm disabled:opacity-40 transition-all border border-violet-500/30"
-                    >
-                      {isGenerating ? "Generating image…" : "Generate Image (OpenAI DALL-E 3) →"}
-                    </button>
+                    <>
+                      {/* Count selector */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] text-white/30 uppercase tracking-[0.15em] shrink-0">Count</span>
+                        {([1, 2, 4] as const).map((n) => (
+                          <button
+                            type="button"
+                            key={n}
+                            onClick={() => setGenCount(n)}
+                            className={`w-8 h-8 rounded-lg text-[11px] font-mono transition-colors border ${
+                              genCount === n
+                                ? "bg-violet-600/40 border-violet-500/40 text-white"
+                                : "border-white/[0.08] text-white/35 hover:text-white/60 hover:border-white/20"
+                            }`}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                        <span className="text-[9px] text-white/20 ml-1">
+                          image{genCount !== 1 ? "s" : ""} · DALL-E 3
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleGenerateImage}
+                        disabled={isGenerating || !builtPrompt.trim()}
+                        className="w-full py-3.5 rounded-xl bg-violet-700/70 hover:bg-violet-700 active:scale-[0.98] text-white font-semibold text-sm disabled:opacity-40 transition-all border border-violet-500/30"
+                      >
+                        {isGenerating
+                          ? `Generating ${genCount} thumbnail version${genCount !== 1 ? "s" : ""}…`
+                          : `Generate ${genCount} version${genCount !== 1 ? "s" : ""} (DALL-E 3) →`
+                        }
+                      </button>
+                    </>
                   ) : (
                     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
                       <p className="text-[10px] text-white/30 leading-relaxed">
@@ -616,27 +697,10 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
                       </p>
                     </div>
                   )}
+
                   {genError && (
                     <div className="rounded-xl bg-red-500/[0.07] border border-red-500/20 px-3 py-2.5">
                       <p className="text-[11px] text-red-400/80 leading-relaxed">{genError}</p>
-                    </div>
-                  )}
-                  {genResults.length > 1 && (
-                    <div>
-                      <p className="text-[9px] uppercase tracking-[0.18em] text-white/30 mb-2">Generated Options — click to select</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {genResults.map((img, i) => (
-                          <button
-                            type="button"
-                            key={img.assetId}
-                            onClick={() => { setImageUrl(img.imageUrl); setImageUrlInput(img.imageUrl); setImageError(false) }}
-                            className={`aspect-video rounded-xl overflow-hidden border transition-colors ${imageUrl === img.imageUrl ? "border-violet-500/70 ring-1 ring-violet-500/30" : "border-white/[0.08] hover:border-white/20"}`}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={img.imageUrl} alt={`Option ${i + 1}`} className="w-full h-full object-cover" />
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   )}
                 </div>
@@ -645,7 +709,7 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
               {/* ── Midjourney panel ── */}
               {genProvider === "midjourney" && (
                 <div className="space-y-3">
-                  {!mjPendingId && !mjComplete ? (
+                  {!mjPendingId ? (
                     <>
                       <div className="rounded-xl border border-sky-500/20 bg-sky-500/[0.05] px-4 py-3">
                         <p className="text-[11px] text-sky-300/70 leading-relaxed">
@@ -667,7 +731,7 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
                         <p className="text-[10px] text-white/30 text-center">Select a producer first</p>
                       )}
                     </>
-                  ) : mjPendingId ? (
+                  ) : (
                     /* Pending card — prompt queued, awaiting image */
                     <div className="rounded-2xl border border-sky-500/25 bg-sky-500/[0.04] p-4 space-y-3">
                       <div className="flex items-center gap-2">
@@ -728,7 +792,7 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
 
                       {mjError && <p className="text-[11px] text-red-400/70">{mjError}</p>}
                     </div>
-                  ) : null}
+                  )}
                 </div>
               )}
 
@@ -827,11 +891,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
                   )}
                 </div>
               )}
-
-              {/* Success message for completed Midjourney image */}
-              {savedAssetMsg && (genProvider === "openai" || mjComplete) && (
-                <p className="text-[11px] text-emerald-400/80 text-center">{savedAssetMsg}</p>
-              )}
             </>
           ) : (
             <div className="h-36 flex items-center justify-center rounded-2xl border border-dashed border-white/[0.06]">
@@ -840,6 +899,50 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
           )}
         </div>
       </div>
+
+      {/* ── Generated Versions grid (full width, shown after any generation) ── */}
+      {genResults.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[9px] uppercase tracking-[0.18em] text-white/30">
+              Generated Versions
+              <span className="ml-1.5 tabular-nums text-white/20">({genResults.length})</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => setGenResults([])}
+              className="text-[9px] text-white/25 hover:text-white/50 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+          <div className={`grid gap-4 ${
+            genResults.length === 4
+              ? "grid-cols-2 sm:grid-cols-4"
+              : genResults.length === 1
+              ? "grid-cols-1 sm:grid-cols-2"
+              : "grid-cols-2"
+          }`}>
+            {genResults.map((img) => (
+              <GeneratedCard key={img.assetId} img={img} prompt={builtPrompt} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Loading state placeholder */}
+      {isGenerating && genResults.length === 0 && (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+          {Array.from({ length: genCount }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-xl border border-white/[0.07] bg-white/[0.02] aspect-video animate-pulse flex items-center justify-center"
+            >
+              <p className="text-[10px] text-white/20">Generating…</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

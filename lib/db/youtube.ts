@@ -277,6 +277,50 @@ export async function getProcessableJobCount(): Promise<number> {
   return count ?? 0
 }
 
+// ─── Pipeline health ──────────────────────────────────────────────────────────
+
+export interface PipelineHealth {
+  needsAsset:           number  // job exists, no audio yet
+  needsThumbnail:       number  // has audio, thumbnail not approved/skipped
+  needsRender:          number  // thumbnail done, video not rendered
+  readyToUpload:        number  // rendered, pending/scheduled
+  uploadedThisWeek:     number
+  failedJobs:           number
+}
+
+export async function getPipelineHealth(): Promise<PipelineHealth> {
+  const { data } = await supabase
+    .from("yt_upload_jobs")
+    .select("status, thumbnail_status, created_at")
+    .not("status", "in", '("cancelled")')
+
+  const rows = (data ?? []) as Array<{
+    status: string
+    thumbnail_status: string | null
+    created_at: string
+  }>
+
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  let needsAsset = 0, needsThumbnail = 0, needsRender = 0, readyToUpload = 0,
+      uploadedThisWeek = 0, failedJobs = 0
+
+  for (const r of rows) {
+    if (r.status === "needs_asset")  { needsAsset++;      continue }
+    if (r.status === "failed")       { failedJobs++;      continue }
+    if (r.status === "uploaded") {
+      if (r.created_at >= oneWeekAgo) uploadedThisWeek++
+      continue
+    }
+    const thumbDone = r.thumbnail_status === "approved" || r.thumbnail_status === "skipped"
+    if (!thumbDone)                  { needsThumbnail++;  continue }
+    if (r.status === "needs_render" || r.status === "rendering") { needsRender++; continue }
+    if (r.status === "pending" || r.status === "scheduled")      { readyToUpload++; continue }
+  }
+
+  return { needsAsset, needsThumbnail, needsRender, readyToUpload, uploadedThisWeek, failedJobs }
+}
+
 // ─── Engine log queries ────────────────────────────────────────────────────────
 
 export async function getRecentLogs(limit = 25): Promise<EngineLog[]> {
