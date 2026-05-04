@@ -37,9 +37,7 @@ export function buildCanvasPreviewStyle(config: CanvasConfig, imageUrl?: string)
     position: 'relative',
     width: '100%',
     aspectRatio: '16/9',
-    background: imageUrl
-      ? `url(${imageUrl}) center/cover no-repeat`
-      : 'linear-gradient(135deg, #0d1016 0%, #1a0a2e 100%)',
+    background: imageUrl ? `url(${imageUrl}) center/cover no-repeat` : '#0d1016',
     overflow: 'hidden',
     borderRadius: '8px',
   }

@@ -46,29 +46,17 @@ export function ThumbnailCanvas({ config, selectedImageUrl, onChange }: Props) {
       {/* 16:9 Preview — sticky so it stays visible as controls/versions scroll beneath */}
       <div className="sticky top-0 z-10 bg-[#060810] pb-2">
         <div style={containerStyle as React.CSSProperties}>
-          {/* Overlays — only rendered once an image is selected */}
-          {selectedImageUrl && (
-            <>
-              <div style={overlayStyle as React.CSSProperties} />
-              {config.titleText && (
-                <div style={titlePosition as React.CSSProperties}>
-                  <span style={titleStyle as React.CSSProperties}>{config.titleText}</span>
-                </div>
-              )}
-              {config.logoPosition !== 'none' && (
-                <div style={logoPosition as React.CSSProperties}>
-                  <div className="bg-white/10 border border-white/20 rounded px-2 py-1 text-[9px] text-white/40 backdrop-blur-sm">
-                    LOGO
-                  </div>
-                </div>
-              )}
-            </>
+          <div style={overlayStyle as React.CSSProperties} />
+          {config.titleText && (
+            <div style={titlePosition as React.CSSProperties}>
+              <span style={titleStyle as React.CSSProperties}>{config.titleText}</span>
+            </div>
           )}
-
-          {/* Empty state */}
-          {!selectedImageUrl && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <p className="text-white/20 text-sm">Select a version to preview</p>
+          {config.logoPosition !== 'none' && (
+            <div style={logoPosition as React.CSSProperties}>
+              <div className="bg-white/10 border border-white/20 rounded px-2 py-1 text-[9px] text-white/40 backdrop-blur-sm">
+                LOGO
+              </div>
             </div>
           )}
         </div>

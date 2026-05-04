@@ -283,7 +283,7 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
 
       const vers = await getProjectVersions(proj.id)
       setVersions(vers)
-      const sel = vers.find((v) => v.selected)
+      const sel = vers.find((v) => v.selected) ?? vers.find((v) => !v.rejected)
       if (sel) setSelectedVersionId(sel.id)
     } catch (e) {
       setToast({ msg: e instanceof Error ? e.message : "Failed to load project", type: "error" })
@@ -823,23 +823,25 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
                 </div>
               </div>
 
-              {/* Single scrollable zone: canvas preview sticks, controls + versions scroll beneath */}
+              {/* Single scrollable zone */}
               <div className="flex-1 min-h-0 overflow-y-auto">
 
-                {/* Canvas */}
-                <div className="px-5 pt-4 pb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[9px] uppercase tracking-[0.2em] text-white/25">Preview</p>
-                    <p className="text-[10px] text-white/20 truncate max-w-[60%] text-right">
-                      {selectedJob.title ?? "Untitled"}
-                    </p>
+                {/* Canvas — only rendered when a version is selected */}
+                {selectedVersion && (
+                  <div className="px-5 pt-4 pb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[9px] uppercase tracking-[0.2em] text-white/25">Preview</p>
+                      <p className="text-[10px] text-white/20 truncate max-w-[60%] text-right">
+                        {selectedJob.title ?? "Untitled"}
+                      </p>
+                    </div>
+                    <ThumbnailCanvas
+                      config={canvasConfig}
+                      selectedImageUrl={selectedVersion.image_url}
+                      onChange={setCanvasConfig}
+                    />
                   </div>
-                  <ThumbnailCanvas
-                    config={canvasConfig}
-                    selectedImageUrl={selectedVersion?.image_url}
-                    onChange={setCanvasConfig}
-                  />
-                </div>
+                )}
 
                 {/* Error banner */}
                 {(genError || mjError) && (
@@ -857,8 +859,8 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
                   </div>
                 )}
 
-                {/* Version grid */}
-                <div className="px-5 pb-4 pt-1">
+                {/* Version grid — always visible */}
+                <div className="px-5 pb-4 pt-3">
                   <ThumbnailVersionGrid
                     projectId={project.id}
                     versions={versions}
