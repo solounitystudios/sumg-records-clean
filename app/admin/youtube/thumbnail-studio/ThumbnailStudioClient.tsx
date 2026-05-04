@@ -145,8 +145,12 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
   const [selectedPresetSlug, setSelectedPresetSlug] = useState("")
   const [showRefiners,     setShowRefiners]     = useState(false)
   const [builtPrompt,      setBuiltPrompt]      = useState("")
+  const [quickPrompt,      setQuickPrompt]      = useState("")
   const [showPrompt,       setShowPrompt]       = useState(false)
   const [promptSaved,      setPromptSaved]      = useState(false)
+
+  // Tracks which prompt was sent to Midjourney (captured at submit time)
+  const mjPromptRef = useRef("")
 
   // Generation — OpenAI
   const [genCount,    setGenCount]    = useState<1 | 2 | 4>(2)
@@ -169,7 +173,8 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
   const currentThumbStatus = selectedJob
     ? (jobs.find((j) => j.id === selectedJob.id)?.thumbnail_status ?? "pending")
     : null
-  const hasNoPrompt      = !builtPrompt.trim()
+  const effectivePrompt  = quickPrompt.trim() || builtPrompt.trim()
+  const hasNoPrompt      = !effectivePrompt
   const isGeneratingAny  = generating || mjSending || !!mjPendingId
 
   // ── Auto-dismiss toast ───────────────────────────────────────────────────
@@ -206,7 +211,7 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
             project_id:     project.id,
             asset_id:       status.assetId,
             image_url:      status.imageUrl,
-            prompt:         builtPrompt,
+            prompt:         mjPromptRef.current,
             provider:       "midjourney",
             style_bucket:   null,
             version_number: versions.length + 1,
@@ -241,6 +246,7 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
     setSelectedPreset(null)
     setSelectedPresetSlug("")
     setBuiltPrompt("")
+    setQuickPrompt("")
     setRawIdea("")
     setMood("")
     setScene("")
@@ -324,13 +330,13 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
   // ── Generation ───────────────────────────────────────────────────────────
 
   async function handleGenerateOpenAI(count?: 1 | 2 | 4) {
-    if (!builtPrompt.trim() || !project) return
+    if (!effectivePrompt || !project) return
     const n = count ?? genCount
     setGenerating(true)
     setGenError(null)
 
     const result = await generateThumbnailImages({
-      prompt:       builtPrompt.trim(),
+      prompt:       effectivePrompt,
       count:        n,
       producerSlug: selectedJob?.producer_slug ?? undefined,
       projectId:    project.id,
@@ -349,7 +355,7 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
       project_id:     project.id,
       asset_id:       img.assetId,
       image_url:      img.imageUrl,
-      prompt:         img.revisedPrompt ?? builtPrompt.trim(),
+      prompt:         img.revisedPrompt ?? effectivePrompt,
       provider:       "openai",
       style_bucket:   null,
       version_number: versions.length + 1 + i,
@@ -365,13 +371,14 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
   }
 
   async function handleGenerateMidjourney() {
-    if (!builtPrompt.trim() || !selectedJob?.producer_slug || !project) return
+    if (!effectivePrompt || !selectedJob?.producer_slug || !project) return
+    mjPromptRef.current = effectivePrompt
     setMjSending(true)
     setMjError(null)
 
     const result = await createMidjourneyPendingAsset({
       producerSlug:      selectedJob.producer_slug,
-      prompt:            builtPrompt.trim(),
+      prompt:            effectivePrompt,
       styleBucket:       styleBucket || undefined,
       linkedUploadJobId: selectedJob.id,
     })
@@ -781,8 +788,43 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
 
           ) : (
             <>
+              {/* Quick Prompt */}
+              <div className="shrink-0 px-5 pt-5 pb-0">
+                <label className="text-[9px] uppercase tracking-[0.2em] text-white/25 block mb-1.5">Quick Prompt</label>
+                <textarea
+                  value={quickPrompt}
+                  onChange={(e) => setQuickPrompt(e.target.value)}
+                  placeholder="Type a custom thumbnail idea… (overrides builder)"
+                  rows={2}
+                  className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/40 resize-none leading-relaxed transition-colors"
+                />
+                <div className="flex items-center gap-3 mt-1.5 min-h-[1.25rem]">
+                  {builtPrompt && (
+                    <button
+                      type="button"
+                      onClick={() => setQuickPrompt(builtPrompt)}
+                      className="text-[10px] text-violet-400/50 hover:text-violet-400 transition-colors"
+                    >
+                      Use Builder Prompt
+                    </button>
+                  )}
+                  {quickPrompt && (
+                    <button
+                      type="button"
+                      onClick={() => setQuickPrompt("")}
+                      className="text-[10px] text-white/20 hover:text-white/50 transition-colors ml-auto"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  {quickPrompt && builtPrompt && (
+                    <span className="text-[9px] text-amber-400/50 font-mono">overriding builder</span>
+                  )}
+                </div>
+              </div>
+
               {/* Canvas preview */}
-              <div className="shrink-0 px-5 pt-5 pb-3">
+              <div className="shrink-0 px-5 pt-4 pb-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-[9px] uppercase tracking-[0.2em] text-white/25">Preview</p>
                   <p className="text-[10px] text-white/20 truncate max-w-[60%] text-right">
