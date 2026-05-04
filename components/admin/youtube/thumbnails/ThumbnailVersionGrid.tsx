@@ -32,10 +32,12 @@ export function ThumbnailVersionGrid({
   const totalCards = active.length + generatingCount + (mjPending ? 2 : 0)
 
   function handleSelect(v: ThumbnailVersion) {
+    // Update UI immediately so the canvas preview doesn't wait for the server
+    onVersionSelect(v)
+    onVersionsChange(versions.map((ver) => ({ ...ver, selected: ver.id === v.id })))
+    // Persist selection in the background
     startTransition(async () => {
       await selectVersion(projectId, v.id)
-      onVersionSelect(v)
-      onVersionsChange(versions.map((ver) => ({ ...ver, selected: ver.id === v.id })))
     })
   }
 
