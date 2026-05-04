@@ -20,6 +20,11 @@ import type {
 
 export async function getJobsForStudio(): Promise<UploadJobForStudio[]> {
   const supabase = await createServiceClient()
+
+  const projectRef = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "")
+    .replace("https://", "")
+    .split(".")[0] || "unknown"
+
   const { data, error } = await supabase
     .from("yt_upload_jobs")
     .select(
@@ -30,11 +35,18 @@ export async function getJobsForStudio(): Promise<UploadJobForStudio[]> {
     .limit(100)
 
   if (error) {
-    console.error("[getJobsForStudio] query error:", error.message)
+    console.error(`[getJobsForStudio] project:${projectRef} error:`, error.message)
     return []
   }
+
   const rows = (data ?? []) as UploadJobForStudio[]
-  console.log(`[getJobsForStudio] returned ${rows.length} rows — statuses: ${[...new Set(rows.map(r => r.status))].join(", ") || "none"}`)
+  const statuses = [...new Set(rows.map(r => r.status))].join(", ") || "none"
+  const thumbStatuses = [...new Set(rows.map(r => r.thumbnail_status ?? "null"))].join(", ") || "none"
+  console.log(`[getJobsForStudio] project:${projectRef} count:${rows.length} statuses:[${statuses}] thumb:[${thumbStatuses}]`)
+  if (rows.length > 0) {
+    const preview = rows.slice(0, 5).map(r => `${r.id.slice(0, 8)} "${r.title ?? "?"}" ${r.status}`).join(" | ")
+    console.log(`[getJobsForStudio] first ${Math.min(5, rows.length)}: ${preview}`)
+  }
   return rows
 }
 
