@@ -33,12 +33,20 @@ function parseLine(line: string, delim: "," | "\t"): string[] {
 }
 
 export function parseCSVText(text: string): ParsedCSV {
-  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0)
+  // Split on \r\n (Windows), \r (old Mac / DistroKid TSV), or \n (Unix).
+  // \r?\n only handles the first two; bare \r breaks DistroKid exports.
+  const lines = text.split(/\r\n|\r|\n/).filter(l => l.trim().length > 0)
   if (lines.length === 0) return { headers: [], rows: [], totalRows: 0, delimiter: "," }
 
   const delim = detectDelimiter(lines[0])
   const headers = parseLine(lines[0], delim)
   const rows = lines.slice(1).map(l => parseLine(l, delim))
+
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[parseCSVText] delimiter:", delim === "\t" ? "TAB" : "COMMA",
+      "| rows:", rows.length, "| cols:", headers.length,
+      "| first header:", headers[0] ?? "(none)")
+  }
 
   return { headers, rows, totalRows: rows.length, delimiter: delim }
 }
