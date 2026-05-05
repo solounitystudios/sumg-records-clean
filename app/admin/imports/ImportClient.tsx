@@ -627,8 +627,8 @@ export function ImportClient() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
                     { label: 'Total Rows', value: result.totalRows, color: undefined },
-                    { label: 'Matched',    value: result.matched,   color: 'text-sky-400' },
-                    { label: 'Updated',    value: result.updated,   color: 'text-emerald-400' },
+                    { label: 'Created',    value: result.created,   color: result.created > 0 ? 'text-violet-400' : 'text-white/40' },
+                    { label: 'Updated',    value: result.updated,   color: result.updated > 0 ? 'text-emerald-400' : 'text-white/40' },
                     { label: 'Skipped',    value: result.skipped,   color: result.skipped > 0 ? 'text-amber-400' : 'text-white/40' },
                   ].map(({ label, value, color }) => (
                     <div key={label}>
@@ -637,6 +637,20 @@ export function ImportClient() {
                     </div>
                   ))}
                 </div>
+                {(result.createdArtists !== undefined || result.createdReleases !== undefined || result.createdSongs !== undefined || result.updatedSongs !== undefined) && (
+                  <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-white/[0.04] pt-3">
+                    {[
+                      { label: 'Artists created',  value: result.createdArtists  ?? 0 },
+                      { label: 'Releases created', value: result.createdReleases ?? 0 },
+                      { label: 'Songs created',    value: result.createdSongs    ?? 0 },
+                      { label: 'Songs updated',    value: result.updatedSongs    ?? 0 },
+                    ].map(({ label, value }) => (
+                      <span key={label} className="text-[10px] font-mono text-white/30">
+                        <span className="text-white/60">{value}</span> {label}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {result.logId && (
                   <p className="text-[9px] text-white/20 mt-4 font-mono">Log: <span>{result.logId}</span></p>
                 )}
@@ -681,6 +695,22 @@ export function ImportClient() {
                   {result.errors.slice(0, 10).map((e, i) => (
                     <p key={i} className="text-[11px] text-amber-400/60">{e}</p>
                   ))}
+                </div>
+              )}
+
+              {result.skippedReasons && result.skippedReasons.length > 0 && (
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+                  <p className="text-[10px] font-mono text-white/30 tracking-wider mb-2">
+                    {result.skippedReasons.length} skipped row{result.skippedReasons.length !== 1 ? 's' : ''}
+                  </p>
+                  <div className="space-y-0.5 max-h-32 overflow-y-auto">
+                    {result.skippedReasons.slice(0, 20).map((r, i) => (
+                      <p key={i} className="text-[10px] text-white/25 font-mono">{r}</p>
+                    ))}
+                    {result.skippedReasons.length > 20 && (
+                      <p className="text-[10px] text-white/20 font-mono">…and {result.skippedReasons.length - 20} more</p>
+                    )}
+                  </div>
                 </div>
               )}
 

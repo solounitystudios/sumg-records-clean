@@ -5,7 +5,8 @@ import { supabase } from "@/lib/db/supabase"
 import { requireAdmin } from "@/lib/auth"
 import { parseCSVText, csvToObjects } from "@/lib/imports/csv"
 import { parseBMIRows, bmiStatusToRightsStatus } from "@/lib/imports/bmi"
-import { parseDistroRows } from "@/lib/imports/distro"
+import { parseDistroRows, type DistroRow } from "@/lib/imports/distro"
+import { slugify } from "@/lib/imports/conflict-detector"
 
 export type ImportType = "bmi" | "distro" | "soundexchange"
 
@@ -19,6 +20,12 @@ export interface ImportResult {
   errors: string[]
   logId: string | null
   updatedEntities?: { id: string; title: string; slug?: string }[]
+  // distro import breakdown
+  createdArtists?: number
+  createdReleases?: number
+  createdSongs?: number
+  updatedSongs?: number
+  skippedReasons?: string[]
 }
 
 // ─── BMI Import ───────────────────────────────────────────────────────────────
@@ -122,60 +129,135 @@ export async function processDistroImport(formData: FormData): Promise<ImportRes
 
   const text = await file.text()
   const parsed = parseCSVText(text)
-
   if (parsed.headers.length === 0) return errorResult("distro", "Could not parse CSV headers.")
 
   const rows = parseDistroRows(parsed.headers, parsed.rows)
   if (rows.length === 0) return errorResult("distro", "No valid rows found.")
 
+  // DistroKid produces one row per store × country × period for the same track.
+  // Deduplicate by ISRC (preferred) or normalized title so we don't create
+  // duplicate songs. Streams and earnings are aggregated across rows.
+  type AggRow = DistroRow & { rowCount: number }
+  const songMap = new Map<string, AggRow>()
+  for (const row of rows) {
+    const key = row.isrc?.toUpperCase().trim() || distroNormalize(row.title)
+    if (!key) continue
+    const prev = songMap.get(key)
+    if (prev) {
+      prev.streams     = (prev.streams     ?? 0) + (row.streams     ?? 0)
+      prev.earningsUsd = (prev.earningsUsd ?? 0) + (row.earningsUsd ?? 0)
+      prev.rowCount++
+    } else {
+      songMap.set(key, { ...row, rowCount: 1 })
+    }
+  }
+
   let matched = 0, updated = 0, created = 0, skipped = 0
+  let createdArtists = 0, createdReleases = 0, createdSongs = 0, updatedSongs = 0
   const errors: string[] = []
+  const skippedReasons: string[] = []
   const updatedEntities: { id: string; title: string; slug?: string }[] = []
 
-  for (const row of rows) {
-    try {
-      if (row.isrc) {
-        const { data: song } = await supabase
-          .from("songs")
-          .select("id, title, slug, isrc")
-          .eq("isrc", row.isrc)
-          .limit(1)
-          .maybeSingle()
+  for (const [, row] of songMap) {
+    if (!row.title?.trim() && !row.isrc?.trim()) {
+      skipped++
+      skippedReasons.push("No title or ISRC")
+      continue
+    }
 
-        if (song) {
-          matched++
-          // ISRC match — song already has the correct ISRC. No update needed.
-          // Period stream counts belong on a future song_streams_by_period table,
-          // not on songs.streams (which does not exist on this schema).
-          continue
+    try {
+      // 1. Find or create artist
+      let artistSlug: string | null = null
+      const artistName = row.artistName?.trim() ?? null
+      if (artistName) {
+        const ar = await distroFindOrCreateArtist(artistName)
+        artistSlug = ar.slug
+        if (ar.created) createdArtists++
+      }
+
+      // 2. Find or create release (only when UPC or album title available)
+      let releaseSlug: string | null = null
+      if (row.upc?.trim() || row.albumTitle?.trim()) {
+        const rel = await distroFindOrCreateRelease({
+          upc:        row.upc?.trim()        ?? null,
+          albumTitle: row.albumTitle?.trim() ?? null,
+          artistName,
+          artistSlug,
+        })
+        if (rel) {
+          releaseSlug = rel.slug
+          if (rel.created) createdReleases++
         }
       }
 
-      if (row.title) {
-        const { data: song } = await supabase
+      // 3. Match by ISRC
+      if (row.isrc?.trim()) {
+        const isrc = row.isrc.trim().toUpperCase()
+        const { data: existing } = await supabase
           .from("songs")
-          .select("id, title, isrc, slug")
-          .ilike("title", row.title)
+          .select("id, title, slug, isrc, artist_slug, release_slug")
+          .eq("isrc", isrc)
           .limit(1)
           .maybeSingle()
 
-        if (song) {
+        if (existing) {
           matched++
-          if (!(song as { isrc?: string }).isrc && row.isrc) {
-            await supabase
-              .from("songs")
-              .update({ isrc: row.isrc, updated_at: new Date().toISOString() })
-              .eq("id", song.id)
-            updated++
-            updatedEntities.push({ id: song.id, title: song.title, slug: (song as { slug?: string }).slug })
+          const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+          if (!(existing as { artist_slug?: string }).artist_slug  && artistSlug)  patch.artist_slug  = artistSlug
+          if (!(existing as { release_slug?: string }).release_slug && releaseSlug) patch.release_slug = releaseSlug
+          if (Object.keys(patch).length > 1) {
+            await supabase.from("songs").update(patch).eq("id", (existing as { id: string }).id)
+            updated++; updatedSongs++
+            updatedEntities.push({ id: (existing as { id: string }).id, title: (existing as { title: string }).title, slug: (existing as { slug?: string }).slug ?? undefined })
           }
           continue
         }
       }
 
-      skipped++
+      // 4. Match by title (ilike)
+      if (row.title?.trim()) {
+        const { data: existing } = await supabase
+          .from("songs")
+          .select("id, title, slug, isrc, artist_slug, release_slug")
+          .ilike("title", row.title.trim())
+          .limit(1)
+          .maybeSingle()
+
+        if (existing) {
+          matched++
+          const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+          if (!(existing as { isrc?: string }).isrc          && row.isrc)    patch.isrc         = row.isrc.trim().toUpperCase()
+          if (!(existing as { artist_slug?: string }).artist_slug  && artistSlug)  patch.artist_slug  = artistSlug
+          if (!(existing as { release_slug?: string }).release_slug && releaseSlug) patch.release_slug = releaseSlug
+          if (Object.keys(patch).length > 1) {
+            await supabase.from("songs").update(patch).eq("id", (existing as { id: string }).id)
+            updated++; updatedSongs++
+            updatedEntities.push({ id: (existing as { id: string }).id, title: (existing as { title: string }).title, slug: (existing as { slug?: string }).slug ?? undefined })
+          }
+          continue
+        }
+      }
+
+      // 5. No match — create new song
+      if (!row.title?.trim()) {
+        skipped++
+        skippedReasons.push(`No title (ISRC: ${row.isrc ?? "none"}) — cannot create`)
+        continue
+      }
+
+      const newSong = await distroCreateSong({
+        title:       row.title.trim(),
+        artistName:  artistName ?? "",
+        artistSlug,
+        releaseSlug,
+        isrc:        row.isrc?.trim().toUpperCase() ?? null,
+        upc:         row.upc?.trim() ?? null,
+      })
+      created++; createdSongs++
+      updatedEntities.push({ id: newSong.id, title: newSong.title, slug: newSong.slug })
+
     } catch (e) {
-      errors.push(`Error processing row: ${String(e)}`)
+      errors.push(`"${row.title ?? row.isrc}": ${e instanceof Error ? e.message : String(e)}`)
       skipped++
     }
   }
@@ -183,9 +265,127 @@ export async function processDistroImport(formData: FormData): Promise<ImportRes
   const logId = await saveImportLog("distro", file.name, rows.length, matched, updated, created, skipped, errors)
 
   revalidatePath("/admin/imports")
-  revalidatePath("/admin/rights")
+  revalidatePath("/admin/songs")
+  revalidatePath("/admin/artists")
+  revalidatePath("/admin/releases")
 
-  return { importType: "distro", totalRows: rows.length, matched, created, updated, skipped, errors, logId, updatedEntities }
+  return {
+    importType: "distro",
+    totalRows: rows.length,
+    matched,
+    created,
+    updated,
+    skipped,
+    errors,
+    logId,
+    updatedEntities,
+    createdArtists,
+    createdReleases,
+    createdSongs,
+    updatedSongs,
+    skippedReasons,
+  }
+}
+
+// ─── Distro helpers ───────────────────────────────────────────────────────────
+
+function distroNormalize(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "").trim()
+}
+
+async function distroUniqueSlug(base: string, table: string): Promise<string> {
+  let candidate = base || "untitled"
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const { data } = await supabase.from(table).select("id").eq("slug", candidate).limit(1).maybeSingle()
+    if (!data) return candidate
+    candidate = `${base}-${attempt + 2}`
+  }
+  return `${base}-${Date.now()}`
+}
+
+async function distroFindOrCreateArtist(name: string): Promise<{ slug: string; created: boolean }> {
+  const { data } = await supabase.from("artists").select("slug").ilike("name", name).limit(1).maybeSingle()
+  if (data) return { slug: (data as { slug: string }).slug, created: false }
+
+  const slug = await distroUniqueSlug(slugify(name), "artists")
+  const { data: created, error } = await supabase
+    .from("artists")
+    .insert({
+      name, slug, status: "active", bio: "", genre: "", role: "artist",
+      featured: false, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    })
+    .select("slug").single()
+  if (error) throw new Error(`Create artist "${name}": ${error.message}`)
+  return { slug: (created as { slug: string }).slug, created: true }
+}
+
+interface DistroReleaseInput {
+  upc:        string | null
+  albumTitle: string | null
+  artistName: string | null
+  artistSlug: string | null
+}
+
+async function distroFindOrCreateRelease(
+  input: DistroReleaseInput,
+): Promise<{ slug: string; created: boolean } | null> {
+  if (input.upc) {
+    const { data } = await supabase.from("releases").select("slug").eq("upc", input.upc).limit(1).maybeSingle()
+    if (data) return { slug: (data as { slug: string }).slug, created: false }
+  }
+
+  if (input.albumTitle) {
+    const { data } = await supabase.from("releases").select("slug").ilike("title", input.albumTitle).limit(1).maybeSingle()
+    if (data) return { slug: (data as { slug: string }).slug, created: false }
+
+    const base = input.artistName
+      ? `${slugify(input.artistName)}-${slugify(input.albumTitle)}`
+      : slugify(input.albumTitle)
+    const slug = await distroUniqueSlug(base, "releases")
+    const { data: created, error } = await supabase
+      .from("releases")
+      .insert({
+        title: input.albumTitle, slug,
+        artist_name: input.artistName ?? "", artist_slug: input.artistSlug,
+        upc: input.upc ?? null, status: "published", type: "Album",
+        genre: "", description: "", is_visible: false,
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      })
+      .select("slug").single()
+    if (error) throw new Error(`Create release "${input.albumTitle}": ${error.message}`)
+    return { slug: (created as { slug: string }).slug, created: true }
+  }
+
+  return null
+}
+
+interface DistroSongInput {
+  title:       string
+  artistName:  string
+  artistSlug:  string | null
+  releaseSlug: string | null
+  isrc:        string | null
+  upc:         string | null
+}
+
+async function distroCreateSong(input: DistroSongInput): Promise<{ id: string; title: string; slug: string }> {
+  const base = input.artistName
+    ? `${slugify(input.artistName)}-${slugify(input.title)}`
+    : slugify(input.title)
+  const slug = await distroUniqueSlug(base, "songs")
+  const { data, error } = await supabase
+    .from("songs")
+    .insert({
+      title: input.title, slug,
+      artist_name: input.artistName, artist_slug: input.artistSlug,
+      release_slug: input.releaseSlug, isrc: input.isrc,
+      status: "published", is_visible: false, genre: "",
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    })
+    .select("id, title, slug").single()
+  if (error) throw new Error(`Create song "${input.title}": ${error.message}`)
+  const row = data as { id: string; title: string; slug: string }
+  return { id: row.id, title: row.title, slug: row.slug }
 }
 
 // ─── Log ──────────────────────────────────────────────────────────────────────

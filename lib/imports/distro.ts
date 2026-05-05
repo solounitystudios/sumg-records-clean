@@ -20,6 +20,7 @@
 export interface DistroRow {
   title: string
   artistName: string | null
+  albumTitle: string | null
   isrc: string | null
   upc: string | null
   streams: number | null
@@ -39,6 +40,7 @@ export interface DistroImportSummary {
 
 const TITLE_ALIASES  = ["title", "song title", "track title", "track name", "song", "work title"]
 const ARTIST_ALIASES = ["artists", "artist", "artist name", "performer"]
+const ALBUM_ALIASES  = ["album", "album title", "release title", "album name", "release name", "release", "ep title"]
 const ISRC_ALIASES   = ["isrc"]
 const UPC_ALIASES    = ["upc", "ean"]
 const STREAM_ALIASES = ["quantity", "streams", "plays", "units"]
@@ -73,6 +75,7 @@ export function parseDistroRows(
   const ci = {
     title:   findCol(headers, TITLE_ALIASES),
     artist:  findCol(headers, ARTIST_ALIASES),
+    album:   findCol(headers, ALBUM_ALIASES),
     isrc:    findCol(headers, ISRC_ALIASES),
     upc:     findCol(headers, UPC_ALIASES),
     streams: findCol(headers, STREAM_ALIASES),
@@ -87,6 +90,7 @@ export function parseDistroRows(
     .map(row => ({
       title:      ci.title  !== -1 ? row[ci.title]?.trim()  ?? "" : "",
       artistName: ci.artist !== -1 ? row[ci.artist]?.trim() ?? null : null,
+      albumTitle: ci.album  !== -1 ? row[ci.album]?.trim()  ?? null : null,
       isrc:       ci.isrc   !== -1 ? row[ci.isrc]?.trim().toUpperCase() ?? null : null,
       upc:        ci.upc    !== -1 ? row[ci.upc]?.trim()   ?? null : null,
       streams:    ci.streams !== -1 ? parseNum(row[ci.streams]) : null,
