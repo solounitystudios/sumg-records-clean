@@ -40,7 +40,7 @@ export interface DistroImportSummary {
 
 const TITLE_ALIASES  = ["title", "song title", "track title", "track name", "song", "work title"]
 const ARTIST_ALIASES = ["artists", "artist", "artist name", "performer"]
-const ALBUM_ALIASES  = ["album", "album title", "release title", "album name", "release name", "release", "ep title"]
+const ALBUM_ALIASES  = ["song/album", "album", "album title", "release title", "album name", "release name", "release", "ep title", "lp title"]
 const ISRC_ALIASES   = ["isrc"]
 const UPC_ALIASES    = ["upc", "ean"]
 const STREAM_ALIASES = ["quantity", "streams", "plays", "units"]

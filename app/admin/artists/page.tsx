@@ -2,8 +2,9 @@ import Link from "next/link"
 import { Suspense } from "react"
 import { getArtists } from "@/lib/db/artists"
 import { getReleases } from "@/lib/db/releases"
-import { archiveArtist, restoreArtist } from "@/app/actions/artists"
+import { archiveArtist, restoreArtist, deleteArtist } from "@/app/actions/artists"
 import ArtistPhotoUpload from "./ArtistPhotoUpload"
+import ArtistActionMenu from "./ArtistActionMenu"
 import { SpotifyStatsWidget } from "@/components/admin/SpotifyStatsWidget"
 
 export const metadata = { title: "Artist Management — SUMG Admin" }
@@ -90,6 +91,7 @@ export default async function ArtistsAdminPage({
 
           const archiveAction = archiveArtist.bind(null, artist.slug)
           const restoreAction = restoreArtist.bind(null, artist.slug)
+          const deleteAction  = deleteArtist.bind(null, artist.slug)
 
           const hasHeroImage    = !!artist.heroImageUrl
           const hasProfileImage = !!artist.profileImageUrl
@@ -126,34 +128,14 @@ export default async function ArtistsAdminPage({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <Link
-                        href={`/admin/artists/${artist.slug}/edit`}
-                        className="text-[10px] font-mono text-white/30 hover:text-white transition-colors duration-150 tracking-wider border border-white/[0.08] hover:border-white/20 px-2.5 py-1 rounded"
-                      >
-                        Edit
-                      </Link>
-                      {!isArchived && (
-                        <Link
-                          href={`/artists/${artist.slug}`}
-                          className="text-[10px] font-mono text-white/25 hover:text-white transition-colors duration-150 tracking-wider"
-                        >
-                          Public →
-                        </Link>
-                      )}
-                      {isArchived ? (
-                        <form action={restoreAction}>
-                          <button type="submit" className="text-[10px] font-mono text-emerald-400/60 hover:text-emerald-400 transition-colors duration-150">
-                            Restore
-                          </button>
-                        </form>
-                      ) : (
-                        <form action={archiveAction}>
-                          <button type="submit" className="text-[10px] font-mono text-red-400/40 hover:text-red-400 transition-colors duration-150">
-                            Archive
-                          </button>
-                        </form>
-                      )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <ArtistActionMenu
+                        slug={artist.slug}
+                        isArchived={isArchived}
+                        archiveAction={archiveAction}
+                        restoreAction={restoreAction}
+                        deleteAction={deleteAction}
+                      />
                     </div>
                   </div>
 

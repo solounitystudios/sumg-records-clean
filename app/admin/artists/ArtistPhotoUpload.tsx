@@ -44,10 +44,10 @@ export default function ArtistPhotoUpload({
         <img
           src={currentImageUrl}
           alt=""
-          className="w-12 h-12 rounded-2xl object-cover"
+          className="w-16 h-16 md:w-20 md:h-20 rounded-2xl object-cover"
         />
       ) : (
-        <div className="w-12 h-12 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center text-lg font-semibold text-white/60">
+        <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center text-xl md:text-2xl font-semibold text-white/60">
           {artistInitial}
         </div>
       )}
@@ -71,7 +71,7 @@ export default function ArtistPhotoUpload({
       />
 
       {error && (
-        <div className="absolute top-14 left-0 z-10 w-52 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+        <div className="absolute top-[88px] left-0 z-10 w-52 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
           {error}
         </div>
       )}

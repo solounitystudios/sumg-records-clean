@@ -260,3 +260,11 @@ export async function restoreArtist(slug: string): Promise<void> {
   revalidatePath(`/artists/${slug}`)
   redirect("/admin/artists")
 }
+
+export async function deleteArtist(slug: string): Promise<void> {
+  await requireAdmin()
+  const { error } = await supabase.from("artists").delete().eq("slug", slug)
+  if (error) throw new Error(error.message)
+  revalidatePath("/admin/artists")
+  redirect("/admin/artists")
+}

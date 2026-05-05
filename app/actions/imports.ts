@@ -247,12 +247,13 @@ export async function processDistroImport(formData: FormData): Promise<ImportRes
       }
 
       const newSong = await distroCreateSong({
-        title:       row.title.trim(),
-        artistName:  artistName ?? "",
+        title:        row.title.trim(),
+        artistName:   artistName ?? "",
         artistSlug,
         releaseSlug,
-        isrc:        row.isrc?.trim().toUpperCase() ?? null,
-        upc:         row.upc?.trim() ?? null,
+        releaseTitle: row.albumTitle?.trim() ?? null,
+        isrc:         row.isrc?.trim().toUpperCase() ?? null,
+        upc:          row.upc?.trim() ?? null,
       })
       created++; createdSongs++
       updatedEntities.push({ id: newSong.id, title: newSong.title, slug: newSong.slug })
@@ -305,8 +306,19 @@ async function distroUniqueSlug(base: string, table: string): Promise<string> {
 }
 
 async function distroFindOrCreateArtist(name: string): Promise<{ slug: string; created: boolean }> {
-  const { data } = await supabase.from("artists").select("slug").ilike("name", name).limit(1).maybeSingle()
+  // Exact case-insensitive match first
+  const { data } = await supabase.from("artists").select("slug, name").ilike("name", name).limit(1).maybeSingle()
   if (data) return { slug: (data as { slug: string }).slug, created: false }
+
+  // Normalized match to catch spacing/punctuation variants ("Mar Rick" == "Marrick")
+  const norm = distroNormalize(name)
+  const { data: all } = await supabase.from("artists").select("slug, name")
+  if (all) {
+    const match = (all as { slug: string; name: string }[]).find(
+      (a) => distroNormalize(a.name) === norm,
+    )
+    if (match) return { slug: match.slug, created: false }
+  }
 
   const slug = await distroUniqueSlug(slugify(name), "artists")
   const { data: created, error } = await supabase
@@ -350,7 +362,7 @@ async function distroFindOrCreateRelease(
         title: input.albumTitle, slug,
         artist_name: input.artistName ?? "", artist_slug: input.artistSlug,
         upc: input.upc ?? null, status: "published", type: "Album",
-        genre: "", description: "", is_visible: false,
+        genre: "", description: "", is_visible: true,
         created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       })
       .select("slug").single()
@@ -362,12 +374,13 @@ async function distroFindOrCreateRelease(
 }
 
 interface DistroSongInput {
-  title:       string
-  artistName:  string
-  artistSlug:  string | null
-  releaseSlug: string | null
-  isrc:        string | null
-  upc:         string | null
+  title:        string
+  artistName:   string
+  artistSlug:   string | null
+  releaseSlug:  string | null
+  releaseTitle: string | null
+  isrc:         string | null
+  upc:          string | null
 }
 
 async function distroCreateSong(input: DistroSongInput): Promise<{ id: string; title: string; slug: string }> {
@@ -381,8 +394,9 @@ async function distroCreateSong(input: DistroSongInput): Promise<{ id: string; t
       id: randomUUID(),
       title: input.title, slug,
       artist_name: input.artistName, artist_slug: input.artistSlug,
-      release_slug: input.releaseSlug, isrc: input.isrc,
-      status: "published", is_visible: false, genre: "",
+      release_slug: input.releaseSlug, release_name: input.releaseTitle,
+      isrc: input.isrc,
+      status: "published", is_visible: true, genre: "",
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     })
     .select("id, title, slug").single()
