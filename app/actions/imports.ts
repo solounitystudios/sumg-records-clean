@@ -1,5 +1,6 @@
 "use server"
 
+import { randomUUID } from "crypto"
 import { revalidatePath } from "next/cache"
 import { supabase } from "@/lib/db/supabase"
 import { requireAdmin } from "@/lib/auth"
@@ -345,6 +346,7 @@ async function distroFindOrCreateRelease(
     const { data: created, error } = await supabase
       .from("releases")
       .insert({
+        id: randomUUID(),
         title: input.albumTitle, slug,
         artist_name: input.artistName ?? "", artist_slug: input.artistSlug,
         upc: input.upc ?? null, status: "published", type: "Album",
@@ -376,6 +378,7 @@ async function distroCreateSong(input: DistroSongInput): Promise<{ id: string; t
   const { data, error } = await supabase
     .from("songs")
     .insert({
+      id: randomUUID(),
       title: input.title, slug,
       artist_name: input.artistName, artist_slug: input.artistSlug,
       release_slug: input.releaseSlug, isrc: input.isrc,
