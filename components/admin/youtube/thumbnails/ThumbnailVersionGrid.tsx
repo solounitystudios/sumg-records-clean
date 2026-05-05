@@ -2,7 +2,24 @@
 
 import { useTransition } from "react"
 import { selectVersion, rejectVersion } from "@/lib/youtube/thumbnails/actions"
-import type { ThumbnailVersion } from "@/lib/youtube/thumbnails/types"
+import type { ThumbnailVersion, ThumbnailOutputMeta } from "@/lib/youtube/thumbnails/types"
+
+function parseOutputMeta(notes: string | null): ThumbnailOutputMeta | null {
+  if (!notes) return null
+  try {
+    const parsed = JSON.parse(notes)
+    // Minimal shape check — must have at least a platformLabel to be useful
+    if (typeof parsed === 'object' && parsed !== null && 'platformLabel' in parsed) {
+      return parsed as ThumbnailOutputMeta
+    }
+    return null
+  } catch (err) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[ThumbnailVersionGrid] invalid notes JSON on version:', notes, err)
+    }
+    return null
+  }
+}
 
 interface Props {
   projectId:         string
@@ -133,6 +150,13 @@ export function ThumbnailVersionGrid({
 
               {/* Bottom info bar */}
               <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-2.5 pt-4 pb-2">
+                {/* Platform label row */}
+                {(() => {
+                  const meta = parseOutputMeta(v.notes)
+                  if (!meta) return null
+                  const label = `${meta.platformLabel} · ${meta.requestedWidth}×${meta.requestedHeight} · ${meta.aspectRatio}`
+                  return <p className="text-[8px] text-white/30 font-mono mb-0.5 truncate">{label}</p>
+                })()}
                 <div className="flex items-center justify-between">
                   <span className="text-[9px] text-white/35 font-mono">v{v.version_number}</span>
                   <div className="flex items-center gap-1">

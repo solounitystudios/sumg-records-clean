@@ -1,4 +1,4 @@
-import type { BuildPromptOptions } from './types'
+import type { BuildPromptOptions, PersonaSubject } from './types'
 
 // ─── NightWire DNA Constants ──────────────────────────────────────────────────
 
@@ -139,53 +139,85 @@ export function routeTitleToStyleBucket(title: string): string {
   return 'MindLoft Sessions'
 }
 
+// ─── Persona descriptors (name → display string) ─────────────────────────────
+
+const PERSONA_DISPLAY: Record<string, string> = {
+  'zyson':    'Zyson',
+  'lysandra': 'Lysandra',
+  'sorin':    'Sorin',
+  'marrick':  'Marrick',
+  'turkz':    'Turkz',
+}
+
+function buildSubjectFragment(
+  persona?: PersonaSubject,
+  custom?: string,
+  role?: string,
+  pose?: string,
+  wardrobe?: string,
+  expression?: string,
+): string {
+  if (!persona || persona === 'none') return ''
+
+  const name = persona === 'custom'
+    ? (custom?.trim() ?? 'a creative individual')
+    : (PERSONA_DISPLAY[persona] ?? persona)
+
+  const parts: string[] = [name]
+  if (role) parts.push(role)
+  if (pose) parts.push(pose)
+  if (wardrobe) parts.push(`wearing ${wardrobe}`)
+  if (expression) parts.push(`expression of ${expression}`)
+
+  return parts.join(', ')
+}
+
 // ─── Master Prompt Formula ────────────────────────────────────────────────────
 
-const BASE_SUFFIX = 'Black culture energy, jazz psychedelic trap atmosphere, cinematic realism, high CTR YouTube thumbnail, sharp focus, premium composition, emotional realism, designed to stop scrolling, mobile optimized --ar 16:9'
+const BASE_STYLE_CORE = 'Black culture energy, jazz psychedelic trap atmosphere, cinematic realism, sharp focus, premium composition, emotional realism'
+
+function buildSuffix(opts: BuildPromptOptions): string {
+  const mjAr = opts.mjAspectRatio ?? '16:9'
+
+  if (opts.coverArtMode) {
+    const styleHint = opts.coverArtStyle
+      ? `, ${opts.coverArtStyle.toLowerCase()} style`
+      : ''
+    return `${BASE_STYLE_CORE}${styleHint}, album cover, centered composition, high resolution artwork, no borders, no artificial sharpness, no overprocessed AI look, realistic texture --ar ${mjAr}`
+  }
+
+  const composition = opts.compositionHint ?? 'horizontal cinematic frame'
+  return `${BASE_STYLE_CORE}, ${composition}, designed to stop scrolling, mobile optimized --ar ${mjAr}`
+}
 
 export function buildThumbnailPrompt(opts: BuildPromptOptions): string {
-  const { producerSlug, title, mood, sceneType, cameraStyle, presetSlug, rawIdea } = opts
+  const {
+    title, mood, sceneType, cameraStyle, presetSlug, rawIdea,
+    personaSubject, personaCustom, subjectRole, pose, wardrobe, expression,
+  } = opts
 
-  if (producerSlug === 'nightwire') {
-    return buildNightWirePrompt({ title, mood, sceneType, cameraStyle, presetSlug, rawIdea })
-  }
-
-  if (rawIdea) {
-    const camera = cameraStyle ?? 'cinematic'
-    return `${rawIdea.trim()}, captured in ${camera}, ${BASE_SUFFIX}`
-  }
-
-  const subject = 'music producer'
-  const location = sceneType ?? 'studio'
-  const camera = cameraStyle ?? 'cinematic'
-  const emotion = mood ?? 'creative energy'
-  return `${subject} in ${location}, captured in ${camera}, mood of ${emotion}, ${BASE_SUFFIX}`
-}
-
-function buildNightWirePrompt(opts: {
-  title?: string
-  mood?: string
-  sceneType?: string
-  cameraStyle?: string
-  presetSlug?: string
-  rawIdea?: string
-}): string {
-  const { title, mood, sceneType, cameraStyle, presetSlug, rawIdea } = opts
-
+  // Use title routing only to derive sensible camera/mood/location defaults —
+  // no subject DNA is injected automatically from the producer profile.
   const styleBucket = title ? routeTitleToStyleBucket(title) : 'MindLoft Sessions'
-  const camera = cameraStyle ?? bucketToDefaultCamera(styleBucket, presetSlug)
+  const camera  = cameraStyle ?? bucketToDefaultCamera(styleBucket, presetSlug)
   const emotion = mood ?? bucketToDefaultMood(styleBucket)
+  const suffix  = buildSuffix(opts)
 
   if (rawIdea) {
-    return `${rawIdea.trim()}, captured in ${camera}, mood of ${emotion}, ${BASE_SUFFIX}`
+    return `${rawIdea.trim()}, captured in ${camera}, mood of ${emotion}, ${suffix}`
   }
 
-  const subject = NW_SUBJECTS[Math.floor(Math.random() * NW_SUBJECTS.length)]
   const location = sceneType ?? bucketToDefaultLocation(styleBucket)
-  const details = bucketToDefaultDetails(styleBucket)
+  const subject  = buildSubjectFragment(personaSubject, personaCustom, subjectRole, pose, wardrobe, expression)
 
-  return `${subject} in ${location}, captured in ${camera}, mood of ${emotion}, with ${details}, ${BASE_SUFFIX}`
+  if (subject) {
+    return `${subject} in ${location}, captured in ${camera}, mood of ${emotion}, ${suffix}`
+  }
+
+  // Scene-only prompt — no subject
+  return `${location}, captured in ${camera}, mood of ${emotion}, ${suffix}`
 }
+
 
 function bucketToDefaultLocation(bucket: string): string {
   const map: Record<string, string> = {

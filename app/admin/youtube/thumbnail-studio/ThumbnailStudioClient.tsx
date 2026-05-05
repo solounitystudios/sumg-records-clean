@@ -15,14 +15,34 @@ import {
   createMidjourneyPendingAsset,
   getMidjourneyJobStatus,
   savePromptToLibrary,
+  createThumbnailJob,
+  autoCreateJobAndProject,
 } from "@/lib/youtube/thumbnails/actions"
 import { getPresetsForProducer } from "@/lib/youtube/thumbnails/presets"
+import {
+  PLATFORM_PRESETS,
+  PRESET_GROUPS,
+  DEFAULT_OUTPUT_SETTINGS,
+  COVER_ART_OUTPUT_DEFAULTS,
+  COVER_ART_STYLE_PRESETS,
+  getPreset,
+  qualityToDalle,
+  enforceCoverArtQuality,
+  orientationToCompositionHint,
+  buildOutputMeta,
+  type PlatformPresetKey,
+  type OutputSettings,
+  type QualityLevel,
+  type StudioMode,
+} from "@/lib/youtube/thumbnails/output-presets"
 import type {
   UploadJobForStudio,
   ThumbnailProject,
   ThumbnailVersion,
   ThumbnailPreset,
   CanvasConfig,
+  PersonaSubject,
+  ThumbnailOutputMeta,
 } from "@/lib/youtube/thumbnails/types"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -148,6 +168,16 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
   const [showPrompt,       setShowPrompt]       = useState(false)
   const [promptSaved,      setPromptSaved]      = useState(false)
 
+  // Persona / Artist Subject
+  const [personaSubject,   setPersonaSubject]   = useState<PersonaSubject>("none")
+  const [personaCustom,    setPersonaCustom]    = useState("")
+  const [subjectRole,      setSubjectRole]      = useState("")
+  const [pose,             setPose]             = useState("")
+  const [wardrobe,         setWardrobe]         = useState("")
+  const [expression,       setExpression]       = useState("")
+  const [faceRefLock,      setFaceRefLock]      = useState(false)
+  const [showPersona,      setShowPersona]      = useState(false)
+
   // Tracks which prompt was sent to Midjourney (captured at submit time)
   const mjPromptRef = useRef("")
 
@@ -167,6 +197,21 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
   // UI
   const [toast,      setToast]      = useState<Toast | null>(null)
   const [showInputs, setShowInputs] = useState(false)
+
+  // Output settings
+  const [outputSettings, setOutputSettings] = useState<OutputSettings>(DEFAULT_OUTPUT_SETTINGS)
+  const [coverArtStyle,  setCoverArtStyle]  = useState("")
+  const [promptRequired, setPromptRequired] = useState(false)
+
+  // Create job modal
+  const [showCreate,       setShowCreate]       = useState(false)
+  const [createName,       setCreateName]       = useState("")
+  const [createProducer,   setCreateProducer]   = useState("")
+  const [createSong,       setCreateSong]       = useState("")
+  const [createChannel,    setCreateChannel]    = useState("")
+  const [createNotes,      setCreateNotes]      = useState("")
+  const [createSubmitting, setCreateSubmitting] = useState(false)
+  const [createError,      setCreateError]      = useState<string | null>(null)
 
   const selectedVersion  = versions.find((v) => v.id === selectedVersionId) ?? null
   const currentThumbStatus = selectedJob
@@ -251,6 +296,15 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
     setScene("")
     setCamera("")
     setStyleBucket("")
+    setPersonaSubject("none")
+    setPersonaCustom("")
+    setSubjectRole("")
+    setPose("")
+    setWardrobe("")
+    setExpression("")
+    setFaceRefLock(false)
+    setOutputSettings(DEFAULT_OUTPUT_SETTINGS)
+    setCoverArtStyle("")
     setGenError(null)
     setMjError(null)
     setMjPendingId(null)
@@ -294,20 +348,109 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
   // ── Prompt building ──────────────────────────────────────────────────────
 
   function handleBuildPrompt() {
+    const preset = getPreset(outputSettings.platformPreset)
     const prompt = buildThumbnailPrompt({
-      producerSlug: selectedJob?.producer_slug ?? "nightwire",
-      title:        selectedJob?.title ?? undefined,
-      mood:         mood || undefined,
-      sceneType:    scene || undefined,
-      cameraStyle:  camera || undefined,
-      presetSlug:   selectedPresetSlug || selectedPreset?.preset_slug,
-      rawIdea:      rawIdea.trim() || undefined,
+      producerSlug:    selectedJob?.producer_slug ?? "nightwire",
+      title:           selectedJob?.title ?? undefined,
+      mood:            mood || undefined,
+      sceneType:       scene || undefined,
+      cameraStyle:     camera || undefined,
+      presetSlug:      selectedPresetSlug || selectedPreset?.preset_slug,
+      rawIdea:         rawIdea.trim() || undefined,
+      personaSubject:  personaSubject !== "none" ? personaSubject : undefined,
+      personaCustom:   personaCustom.trim() || undefined,
+      subjectRole:     subjectRole.trim() || undefined,
+      pose:            pose.trim() || undefined,
+      wardrobe:        wardrobe.trim() || undefined,
+      expression:      expression.trim() || undefined,
+      faceReferenceLock: faceRefLock || undefined,
+      compositionHint: orientationToCompositionHint(outputSettings.orientation),
+      mjAspectRatio:   preset.mjAr,
+      coverArtMode:    outputSettings.studioMode === 'cover-art' || undefined,
+      coverArtStyle:   coverArtStyle || undefined,
     })
     setBuiltPrompt(prompt)
     setShowPrompt(false)
     setPromptSaved(false)
     setGenError(null)
     setMjError(null)
+  }
+
+  function handlePlatformPresetChange(key: PlatformPresetKey) {
+    const def = getPreset(key)
+    setOutputSettings((prev) => ({
+      ...prev,
+      platformPreset: key,
+      width:          def.width,
+      height:         def.height,
+      aspectRatio:    def.aspectRatio,
+      orientation:    def.orientation,
+    }))
+  }
+
+  function handleStudioModeChange(mode: StudioMode) {
+    if (mode === 'cover-art') {
+      setOutputSettings((prev) => ({
+        ...prev,
+        studioMode: 'cover-art',
+        ...COVER_ART_OUTPUT_DEFAULTS,
+      }))
+    } else {
+      setOutputSettings((prev) => ({
+        ...prev,
+        studioMode: 'thumbnail',
+        platformPreset: DEFAULT_OUTPUT_SETTINGS.platformPreset,
+        width:          DEFAULT_OUTPUT_SETTINGS.width,
+        height:         DEFAULT_OUTPUT_SETTINGS.height,
+        aspectRatio:    DEFAULT_OUTPUT_SETTINGS.aspectRatio,
+        orientation:    DEFAULT_OUTPUT_SETTINGS.orientation,
+        qualityLevel:   DEFAULT_OUTPUT_SETTINGS.qualityLevel,
+      }))
+      setCoverArtStyle("")
+    }
+  }
+
+  /** Build and serialize the ThumbnailOutputMeta stored on each generated version. */
+  function buildMeta(): { meta: ThumbnailOutputMeta; json: string } {
+    const isCoverArt = outputSettings.studioMode === 'cover-art'
+    const effectiveQuality = enforceCoverArtQuality(outputSettings.qualityLevel, isCoverArt)
+    const preset = getPreset(outputSettings.platformPreset)
+    const compositionHint = orientationToCompositionHint(outputSettings.orientation)
+
+    const meta = buildOutputMeta({
+      outputSettings:  { ...outputSettings, qualityLevel: effectiveQuality },
+      dalleSize:       preset.dalleSize,
+      coverArtStyle:   coverArtStyle || undefined,
+      compositionHint,
+    })
+    return { meta, json: JSON.stringify(meta) }
+  }
+
+  /** Ensures a job + project exist; auto-creates if missing. Returns null and shows error if it fails. */
+  async function ensureJobAndProject(): Promise<{ job: UploadJobForStudio; proj: ThumbnailProject } | null> {
+    if (selectedJob && project) return { job: selectedJob, proj: project }
+
+    const result = await autoCreateJobAndProject({
+      promptSnippet: effectivePrompt,
+      producerSlug:  undefined,
+    })
+
+    if ("error" in result) {
+      setToast({ msg: result.error, type: "error" })
+      return null
+    }
+
+    const { job, project: proj } = result
+    setJobs((prev) => [job, ...prev])
+    setSelectedJob(job)
+    setProject(proj)
+    setVersions([])
+    setSelectedVersionId(null)
+    setSelectedPreset(null)
+    setSelectedPresetSlug("")
+    setPresets(getPresetsForProducer(""))
+    setCanvasConfig({ ...DEFAULT_CANVAS, titleText: job.title ?? "" })
+    return { job, proj }
   }
 
   async function handleSavePromptToLibrary() {
@@ -329,16 +472,32 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
   // ── Generation ───────────────────────────────────────────────────────────
 
   async function handleGenerateOpenAI(count?: 1 | 2 | 4) {
-    if (!effectivePrompt || !project) return
+    if (!effectivePrompt) {
+      setPromptRequired(true)
+      setTimeout(() => setPromptRequired(false), 4000)
+      return
+    }
+
     const n = count ?? genCount
     setGenerating(true)
     setGenError(null)
 
+    const ctx = await ensureJobAndProject()
+    if (!ctx) { setGenerating(false); return }
+
+    const isCoverArt = outputSettings.studioMode === 'cover-art'
+    const { meta, json: outputMetaJson } = buildMeta()
+    const preset = getPreset(outputSettings.platformPreset)
+
     const result = await generateThumbnailImages({
-      prompt:       effectivePrompt,
-      count:        n,
-      producerSlug: selectedJob?.producer_slug ?? undefined,
-      projectId:    project.id,
+      prompt:          effectivePrompt,
+      count:           n,
+      producerSlug:    ctx.job.producer_slug ?? undefined,
+      projectId:       ctx.proj.id,
+      dalleSize:       preset.dalleSize,
+      dalleQuality:    qualityToDalle(meta.qualityLevel as QualityLevel),
+      isCoverArt,
+      outputMetaJson,
     })
 
     setGenerating(false)
@@ -351,7 +510,7 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
 
     const newVersions: ThumbnailVersion[] = result.images.map((img, i) => ({
       id:             img.versionId ?? `oai-${Date.now()}-${i}`,
-      project_id:     project.id,
+      project_id:     ctx.proj.id,
       asset_id:       img.assetId,
       image_url:      img.imageUrl,
       prompt:         img.revisedPrompt ?? effectivePrompt,
@@ -361,7 +520,7 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
       selected:       false,
       rejected:       false,
       ctr_score:      null,
-      notes:          null,
+      notes:          outputMetaJson,
       created_at:     new Date().toISOString(),
     }))
 
@@ -370,16 +529,24 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
   }
 
   async function handleGenerateMidjourney() {
-    if (!effectivePrompt || !selectedJob?.producer_slug || !project) return
+    if (!effectivePrompt) {
+      setPromptRequired(true)
+      setTimeout(() => setPromptRequired(false), 4000)
+      return
+    }
+
     mjPromptRef.current = effectivePrompt
     setMjSending(true)
     setMjError(null)
 
+    const ctx = await ensureJobAndProject()
+    if (!ctx) { setMjSending(false); return }
+
     const result = await createMidjourneyPendingAsset({
-      producerSlug:      selectedJob.producer_slug,
+      producerSlug:      ctx.job.producer_slug ?? "studio",
       prompt:            effectivePrompt,
       styleBucket:       styleBucket || undefined,
-      linkedUploadJobId: selectedJob.id,
+      linkedUploadJobId: ctx.job.id,
     })
 
     setMjSending(false)
@@ -450,12 +617,183 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
     })
   }
 
+  function openCreateModal() {
+    setCreateName("")
+    setCreateProducer("")
+    setCreateSong("")
+    setCreateChannel("")
+    setCreateNotes("")
+    setCreateError(null)
+    setShowCreate(true)
+  }
+
+  async function handleCreateJob(e: React.FormEvent) {
+    e.preventDefault()
+    if (!createName.trim()) return
+    setCreateSubmitting(true)
+    setCreateError(null)
+
+    const result = await createThumbnailJob({
+      title:        createName.trim(),
+      producerSlug: createProducer || undefined,
+      songRelease:  createSong    || undefined,
+      channelId:    createChannel || undefined,
+      notes:        createNotes   || undefined,
+    })
+
+    setCreateSubmitting(false)
+
+    if ("error" in result) {
+      setCreateError(result.error)
+      return
+    }
+
+    setShowCreate(false)
+    setJobs((prev) => [result, ...prev])
+    await handleSelectJob(result)
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col h-[calc(100dvh-7rem)] lg:h-[calc(100dvh-4rem)] overflow-hidden">
+
+      {/* ── Create Job Modal ────────────────────────────────────────────── */}
+      {showCreate && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCreate(false) }}
+        >
+          <div className="w-full max-w-md bg-[#0d1017] border border-white/[0.1] rounded-2xl shadow-2xl overflow-hidden">
+
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+              <h2 className="text-[13px] font-semibold text-white/80 tracking-tight">New Thumbnail Job</h2>
+              <button
+                type="button"
+                onClick={() => setShowCreate(false)}
+                className="text-white/25 hover:text-white/60 transition-colors p-1 -mr-1"
+                aria-label="Close"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal form */}
+            <form onSubmit={handleCreateJob} className="p-6 space-y-4">
+
+              {/* Job Name — required */}
+              <div>
+                <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">
+                  Job Name <span className="text-violet-400/60">required</span>
+                </label>
+                <input
+                  type="text"
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  placeholder="e.g. Late Night Velvet — v1"
+                  required
+                  autoFocus
+                  className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
+                />
+              </div>
+
+              {/* Producer */}
+              <div>
+                <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">Producer</label>
+                {producers.length > 0 ? (
+                  <select
+                    value={createProducer}
+                    onChange={(e) => setCreateProducer(e.target.value)}
+                    className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-violet-500/50 appearance-none transition-colors"
+                  >
+                    <option value="">— None —</option>
+                    {producers.map((p) => (
+                      <option key={p.slug} value={p.slug}>{p.name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={createProducer}
+                    onChange={(e) => setCreateProducer(e.target.value)}
+                    placeholder="Producer slug"
+                    className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
+                  />
+                )}
+              </div>
+
+              {/* Song / Release + Channel — side by side */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">Song / Release</label>
+                  <input
+                    type="text"
+                    value={createSong}
+                    onChange={(e) => setCreateSong(e.target.value)}
+                    placeholder="Track or album name"
+                    className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/15 focus:outline-none focus:border-violet-500/50 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">Channel ID</label>
+                  <input
+                    type="text"
+                    value={createChannel}
+                    onChange={(e) => setCreateChannel(e.target.value)}
+                    placeholder="yt_channel id"
+                    className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/15 focus:outline-none focus:border-violet-500/50 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">Notes</label>
+                <textarea
+                  value={createNotes}
+                  onChange={(e) => setCreateNotes(e.target.value)}
+                  placeholder="Any context for this thumbnail…"
+                  rows={2}
+                  className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50 resize-none leading-relaxed transition-colors"
+                />
+              </div>
+
+              {/* Error */}
+              {createError && (
+                <p className="text-[11px] text-red-400/80 px-1">{createError}</p>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowCreate(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-white/[0.08] text-sm text-white/40 hover:text-white/65 hover:border-white/15 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createSubmitting || !createName.trim()}
+                  className="flex-[2] flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-40 text-sm font-semibold text-white transition-all shadow-[0_0_20px_rgba(16,185,129,0.18)]"
+                >
+                  {createSubmitting ? (
+                    <><Spinner className="w-3.5 h-3.5" /><span>Creating…</span></>
+                  ) : (
+                    "Create Job →"
+                  )}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── Toast ───────────────────────────────────────────────────────── */}
       {toast && (
@@ -559,6 +897,14 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
           )}
           <button
             type="button"
+            onClick={openCreateModal}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600/75 hover:bg-emerald-600 active:scale-[0.97] text-[12px] font-semibold text-white transition-all shadow-[0_0_14px_rgba(16,185,129,0.18)]"
+          >
+            <span className="text-emerald-300 text-[11px]">+</span>
+            <span className="hidden sm:inline">New Thumbnail</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setShowInputs((p) => !p)}
             className="lg:hidden text-[11px] border border-white/[0.1] px-3 py-1.5 rounded-lg text-white/45 hover:text-white/70 hover:border-white/20 transition-colors"
           >
@@ -574,12 +920,151 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
         <aside className={`${showInputs ? "flex" : "hidden"} lg:flex flex-col w-full lg:w-[330px] xl:w-[360px] shrink-0 border-b lg:border-b-0 lg:border-r border-white/[0.06] overflow-y-auto bg-[#08090d]`}>
           {!selectedJob ? (
             <div className="flex-1 flex items-center justify-center p-10">
-              <p className="text-sm text-white/20 text-center leading-relaxed">
-                Select a job from the dropdown above<br />to start building a thumbnail
-              </p>
+              <div className="text-center">
+                <p className="text-sm text-white/20 leading-relaxed mb-4">
+                  No thumbnail job selected
+                </p>
+                <button
+                  type="button"
+                  onClick={openCreateModal}
+                  className="flex items-center gap-2 mx-auto px-4 py-2 rounded-xl bg-emerald-600/60 hover:bg-emerald-600/80 active:scale-[0.97] text-[12px] font-semibold text-white transition-all"
+                >
+                  <span className="text-emerald-300">+</span>
+                  New Thumbnail
+                </button>
+              </div>
             </div>
           ) : (
             <div className="p-5 space-y-6 pb-10">
+
+              {/* ── Studio Mode switcher ──────────────────────────────── */}
+              <div className="flex rounded-xl border border-white/[0.08] overflow-hidden">
+                {(['thumbnail', 'cover-art'] as StudioMode[]).map((m) => (
+                  <button
+                    type="button"
+                    key={m}
+                    onClick={() => handleStudioModeChange(m)}
+                    className={`flex-1 py-2 text-[11px] font-medium transition-colors ${
+                      outputSettings.studioMode === m
+                        ? "bg-violet-600/30 text-white border-r border-white/[0.06] last:border-r-0"
+                        : "text-white/35 hover:text-white/60 border-r border-white/[0.06] last:border-r-0"
+                    }`}
+                  >
+                    {m === 'thumbnail' ? 'Thumbnail' : 'Cover Art'}
+                  </button>
+                ))}
+              </div>
+
+              {/* ── Output Settings ───────────────────────────────────── */}
+              <div className="space-y-3">
+                <label className="text-[9px] uppercase tracking-[0.2em] text-white/25 block">Output Settings</label>
+
+                {/* Platform Preset — grouped select */}
+                <div>
+                  <label className="text-[9px] uppercase tracking-[0.15em] text-white/20 block mb-1">Platform</label>
+                  <select
+                    value={outputSettings.platformPreset}
+                    onChange={(e) => handlePlatformPresetChange(e.target.value as PlatformPresetKey)}
+                    className="w-full bg-black/25 border border-white/[0.07] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-violet-500/35 appearance-none"
+                  >
+                    {PRESET_GROUPS.map((group) => (
+                      <optgroup key={group} label={group}>
+                        {PLATFORM_PRESETS.filter((p) => p.group === group).map((p) => (
+                          <option key={p.key} value={p.key}>{p.label} — {p.width}×{p.height}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <p className="text-[9px] text-white/20 mt-1 font-mono">
+                    {outputSettings.width}×{outputSettings.height} · {outputSettings.aspectRatio} · {outputSettings.orientation}
+                  </p>
+                </div>
+
+                {/* Orientation toggle */}
+                <div>
+                  <label className="text-[9px] uppercase tracking-[0.15em] text-white/20 block mb-1.5">Orientation</label>
+                  <div className="flex gap-1.5">
+                    {(['horizontal', 'vertical', 'square'] as const).map((o) => (
+                      <button
+                        type="button"
+                        key={o}
+                        onClick={() => setOutputSettings((p) => ({ ...p, orientation: o }))}
+                        className={`flex-1 py-1.5 rounded-lg border text-[10px] transition-colors capitalize ${
+                          outputSettings.orientation === o
+                            ? "border-violet-500/50 bg-violet-600/20 text-white"
+                            : "border-white/[0.07] text-white/35 hover:text-white/60"
+                        }`}
+                      >
+                        {o === 'horizontal' ? 'H' : o === 'vertical' ? 'V' : '■'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quality */}
+                <div>
+                  <label className="text-[9px] uppercase tracking-[0.15em] text-white/20 block mb-1.5">Quality</label>
+                  <div className="flex gap-1.5">
+                    {(['draft', 'standard', 'high', 'ultra'] as QualityLevel[]).map((q) => (
+                      <button
+                        type="button"
+                        key={q}
+                        onClick={() => setOutputSettings((p) => ({ ...p, qualityLevel: q }))}
+                        className={`flex-1 py-1.5 rounded-lg border text-[10px] transition-colors capitalize ${
+                          outputSettings.qualityLevel === q
+                            ? "border-violet-500/50 bg-violet-600/20 text-white"
+                            : "border-white/[0.07] text-white/35 hover:text-white/60"
+                        }`}
+                      >
+                        {q.charAt(0).toUpperCase() + q.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Upscale + Multi-platform — stubs pending backend */}
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1">
+                    <div className="py-1.5 rounded-lg border border-white/[0.05] text-[10px] text-white/20 text-center cursor-not-allowed select-none">
+                      ↑ Auto Upscale
+                    </div>
+                    <span className="absolute -top-1.5 -right-1 text-[7px] bg-white/[0.06] text-white/30 px-1 py-px rounded font-mono tracking-wide">
+                      soon
+                    </span>
+                  </div>
+                  <div className="relative flex-1">
+                    <div className="py-1.5 rounded-lg border border-white/[0.05] text-[10px] text-white/20 text-center cursor-not-allowed select-none">
+                      ⊞ Multi-Platform
+                    </div>
+                    <span className="absolute -top-1.5 -right-1 text-[7px] bg-white/[0.06] text-white/30 px-1 py-px rounded font-mono tracking-wide">
+                      soon
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Cover Art Style Presets (only in cover-art mode) ──── */}
+              {outputSettings.studioMode === 'cover-art' && (
+                <div>
+                  <label className="text-[9px] uppercase tracking-[0.2em] text-white/25 block mb-2">Cover Art Style</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {COVER_ART_STYLE_PRESETS.map((s) => (
+                      <button
+                        type="button"
+                        key={s}
+                        onClick={() => setCoverArtStyle(coverArtStyle === s ? "" : s)}
+                        className={`px-2.5 py-1 rounded-full text-[10px] border transition-colors ${
+                          coverArtStyle === s
+                            ? "border-violet-500/50 bg-violet-600/20 text-violet-200"
+                            : "border-white/[0.08] text-white/35 hover:text-white/65"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Producer */}
               <div>
@@ -649,6 +1134,133 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
                   rows={4}
                   className="w-full bg-black/25 border border-white/[0.07] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/35 resize-none leading-relaxed"
                 />
+              </div>
+
+              {/* Persona / Artist Subject */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowPersona((p) => !p)}
+                  className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.15em] text-white/25 hover:text-white/50 transition-colors w-full"
+                >
+                  <svg
+                    width="9" height="9" viewBox="0 0 9 9" fill="none"
+                    className={`transition-transform duration-200 ${showPersona ? "rotate-90" : ""}`}
+                    aria-hidden="true"
+                  >
+                    <path d="M2.5 1.5l4 3-4 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Persona / Artist Subject
+                  {personaSubject !== "none" && (
+                    <span className="ml-auto text-[8px] text-violet-400/60 font-mono normal-case tracking-normal">
+                      {personaSubject === "custom" ? personaCustom || "custom" : personaSubject}
+                    </span>
+                  )}
+                </button>
+
+                {showPersona && (
+                  <div className="mt-3 space-y-3">
+                    {/* Persona selector */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {(["none", "zyson", "lysandra", "sorin", "marrick", "turkz", "custom"] as PersonaSubject[]).map((p) => (
+                        <button
+                          type="button"
+                          key={p}
+                          onClick={() => setPersonaSubject(p)}
+                          className={`px-2.5 py-1 rounded-full text-[10px] border transition-colors capitalize ${
+                            personaSubject === p
+                              ? "border-violet-500/50 bg-violet-600/20 text-violet-200"
+                              : "border-white/[0.08] text-white/40 hover:text-white/70 hover:border-white/20"
+                          }`}
+                        >
+                          {p === "none" ? "None" : p.charAt(0).toUpperCase() + p.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+
+                    {personaSubject !== "none" && (
+                      <div className="space-y-2.5 pl-0.5">
+                        {/* Custom subject name */}
+                        {personaSubject === "custom" && (
+                          <div>
+                            <label className="text-[9px] uppercase tracking-[0.15em] text-white/20 block mb-1">Custom Subject</label>
+                            <input
+                              type="text"
+                              value={personaCustom}
+                              onChange={(e) => setPersonaCustom(e.target.value)}
+                              placeholder="e.g. a hooded figure, young woman…"
+                              className="w-full bg-black/20 border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/35"
+                            />
+                          </div>
+                        )}
+
+                        {/* Subject role */}
+                        <div>
+                          <label className="text-[9px] uppercase tracking-[0.15em] text-white/20 block mb-1">Role / Description</label>
+                          <input
+                            type="text"
+                            value={subjectRole}
+                            onChange={(e) => setSubjectRole(e.target.value)}
+                            placeholder="e.g. music producer, artist, beatmaker…"
+                            className="w-full bg-black/20 border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/35"
+                          />
+                        </div>
+
+                        {/* Pose / Action */}
+                        <div>
+                          <label className="text-[9px] uppercase tracking-[0.15em] text-white/20 block mb-1">Pose / Action</label>
+                          <input
+                            type="text"
+                            value={pose}
+                            onChange={(e) => setPose(e.target.value)}
+                            placeholder="e.g. leaning on a wall, looking away…"
+                            className="w-full bg-black/20 border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/35"
+                          />
+                        </div>
+
+                        {/* Wardrobe */}
+                        <div>
+                          <label className="text-[9px] uppercase tracking-[0.15em] text-white/20 block mb-1">Wardrobe</label>
+                          <input
+                            type="text"
+                            value={wardrobe}
+                            onChange={(e) => setWardrobe(e.target.value)}
+                            placeholder="e.g. black turtleneck, streetwear…"
+                            className="w-full bg-black/20 border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/35"
+                          />
+                        </div>
+
+                        {/* Expression */}
+                        <div>
+                          <label className="text-[9px] uppercase tracking-[0.15em] text-white/20 block mb-1">Expression</label>
+                          <input
+                            type="text"
+                            value={expression}
+                            onChange={(e) => setExpression(e.target.value)}
+                            placeholder="e.g. calm confidence, intense focus…"
+                            className="w-full bg-black/20 border border-white/[0.06] rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/35"
+                          />
+                        </div>
+
+                        {/* Face reference lock */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] uppercase tracking-[0.15em] text-white/20">Face Reference Lock</span>
+                          <button
+                            type="button"
+                            onClick={() => setFaceRefLock((p) => !p)}
+                            className={`px-3 py-1 rounded-lg border text-[10px] transition-colors ${
+                              faceRefLock
+                                ? "border-violet-500/50 bg-violet-500/10 text-violet-300"
+                                : "border-white/[0.08] text-white/30 hover:text-white/50"
+                            }`}
+                          >
+                            {faceRefLock ? "On" : "Off"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Camera Style */}
@@ -775,8 +1387,25 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
                     <path d="M10 5l8 4-8 4V5Z" fill="currentColor" />
                   </svg>
                 </div>
-                <p className="text-white/20 text-sm">Select a job to open the studio</p>
-                <p className="text-white/10 text-xs mt-1">{jobs.length} job{jobs.length !== 1 ? "s" : ""} available</p>
+                <p className="text-white/30 text-sm font-medium">No thumbnail job selected</p>
+                <p className="text-white/15 text-xs mt-1 mb-5">{jobs.length} job{jobs.length !== 1 ? "s" : ""} available</p>
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setJobDropdownOpen(true)}
+                    className="px-4 py-2.5 rounded-xl border border-white/[0.1] text-sm text-white/40 hover:text-white/70 hover:border-white/20 transition-all"
+                  >
+                    Select Existing Job
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openCreateModal}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600/75 hover:bg-emerald-600 active:scale-[0.97] text-sm font-semibold text-white transition-all shadow-[0_0_20px_rgba(16,185,129,0.18)]"
+                  >
+                    <span className="text-emerald-300">+</span>
+                    New Thumbnail
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -889,7 +1518,7 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
         <button
           type="button"
           onClick={() => handleGenerateOpenAI()}
-          disabled={hasNoPrompt || isGeneratingAny || !project || !generationEnabled}
+          disabled={isGeneratingAny || !generationEnabled}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600/75 hover:bg-violet-600 active:scale-[0.97] disabled:opacity-30 text-sm font-medium text-white transition-all shadow-[0_0_16px_rgba(124,58,237,0.2)]"
         >
           {generating ? (
@@ -903,7 +1532,7 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
         <button
           type="button"
           onClick={handleGenerateMidjourney}
-          disabled={hasNoPrompt || isGeneratingAny || !project || !selectedJob?.producer_slug}
+          disabled={isGeneratingAny}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-700/55 hover:bg-sky-700/75 border border-sky-500/20 active:scale-[0.97] disabled:opacity-30 text-sm font-medium text-white transition-all"
         >
           {mjSending || mjPendingId ? (
@@ -917,14 +1546,20 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
         <button
           type="button"
           onClick={() => handleGenerateOpenAI(4)}
-          disabled={hasNoPrompt || isGeneratingAny || !project || !generationEnabled}
+          disabled={isGeneratingAny || !generationEnabled}
           className="hidden xl:flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-white/[0.08] text-sm text-white/40 hover:text-white/70 hover:border-white/15 active:scale-[0.97] disabled:opacity-30 transition-all"
         >
           <span className="text-[10px] text-white/25">4×</span>
           <span>Batch</span>
         </button>
 
-        {!generationEnabled && (
+        {promptRequired && (
+          <span className="hidden sm:block text-[10px] text-amber-400/80 font-medium animate-pulse">
+            Add a visual direction before generating
+          </span>
+        )}
+
+        {!generationEnabled && !promptRequired && (
           <span className="hidden lg:block text-[9px] text-amber-400/45 font-mono">OPENAI_API_KEY not set</span>
         )}
 

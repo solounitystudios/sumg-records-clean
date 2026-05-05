@@ -170,6 +170,8 @@ export interface UploadJobForStudio {
   yt_channel_id: string | null
 }
 
+export type PersonaSubject = 'none' | 'zyson' | 'lysandra' | 'sorin' | 'marrick' | 'turkz' | 'custom'
+
 export interface BuildPromptOptions {
   producerSlug: string
   title?: string
@@ -178,4 +180,45 @@ export interface BuildPromptOptions {
   cameraStyle?: string
   presetSlug?: string
   rawIdea?: string
+  // Persona / Artist Subject — only included in prompt when explicitly selected
+  personaSubject?: PersonaSubject
+  personaCustom?: string
+  subjectRole?: string
+  pose?: string
+  wardrobe?: string
+  expression?: string
+  faceReferenceLock?: boolean
+  // Output / composition hints — injected at prompt build time
+  compositionHint?: string
+  mjAspectRatio?:   string
+  coverArtMode?:    boolean
+  coverArtStyle?:   string
+}
+
+/** Stored as JSON in thumbnail_versions.notes. Carries the full truth of what was requested vs. what was generated. */
+export interface ThumbnailOutputMeta {
+  // Studio mode
+  mode:                   'thumbnail' | 'cover-art'
+  // Platform
+  platformPreset:         string
+  platformLabel:          string
+  aspectRatio:            string
+  orientation:            string
+  // Dimensions — three layers of truth
+  requestedWidth:         number   // what the platform spec demands (e.g. 3000 for Spotify)
+  requestedHeight:        number
+  generatedWidth:         number   // what the engine actually produced (e.g. 1024 for DALL-E)
+  generatedHeight:        number
+  finalExportWidth:       number   // target after any post-processing (= requested once upscale runs)
+  finalExportHeight:      number
+  // Quality
+  qualityLevel:           string
+  // Upscale
+  upscaleRequested:       boolean
+  upscaleApplied:         boolean  // always false until backend exists
+  // Multi-platform
+  multiPlatformRequested: boolean  // always false until backend exists
+  // Optional enrichments
+  coverArtStyle?:         string
+  compositionHint?:       string
 }

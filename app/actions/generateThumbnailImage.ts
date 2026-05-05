@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/auth"
 import { supabase } from "@/lib/db/supabase"
 import { generateWithOpenAI, isImageGenerationConfigured } from "@/lib/image-generation"
+import type { DalleSize } from "@/lib/image-generation/types"
 
 export interface GeneratedThumbnailImage {
   imageUrl:       string
@@ -20,11 +21,19 @@ export async function generateThumbnailImages({
   count = 2,
   producerSlug,
   projectId,
+  dalleSize,
+  dalleQuality,
+  isCoverArt,
+  outputMetaJson,
 }: {
-  prompt:       string
-  count?:       1 | 2 | 3 | 4
-  producerSlug?: string
-  projectId?:   string
+  prompt:          string
+  count?:          1 | 2 | 3 | 4
+  producerSlug?:   string
+  projectId?:      string
+  dalleSize?:      DalleSize
+  dalleQuality?:   "standard" | "hd"
+  isCoverArt?:     boolean
+  outputMetaJson?: string
 }): Promise<ThumbnailGenerationResult | { error: string }> {
   await requireAdmin()
 
@@ -39,11 +48,14 @@ export async function generateThumbnailImages({
   }
 
   try {
+    // Cover art must be hd regardless of what the client requested
+    const resolvedQuality = isCoverArt ? "hd" : (dalleQuality ?? "hd")
+
     const result = await generateWithOpenAI({
       prompt,
       count,
-      size:    "1792x1024",
-      quality: "hd",
+      size:    dalleSize ?? "1792x1024",
+      quality: resolvedQuality,
       style:   "vivid",
     })
 
@@ -136,6 +148,7 @@ export async function generateThumbnailImages({
             provider:       "openai",
             style_bucket:   null,
             version_number: nextVersionNum++,
+            notes:          outputMetaJson ?? null,
           })
           .select("id")
           .single()

@@ -115,6 +115,85 @@ export async function getPromptsFromLibrary(producerSlug: string): Promise<Thumb
   return (data ?? []) as ThumbnailPromptRow[]
 }
 
+/** Creates a job + project in one round trip. Used when generate is clicked with no active job. */
+export async function autoCreateJobAndProject(data: {
+  promptSnippet: string
+  producerSlug?: string
+}): Promise<{ job: UploadJobForStudio; project: ThumbnailProject } | { error: string }> {
+  await requireAdmin()
+  const supabase = adminDb
+
+  const title = data.promptSnippet.slice(0, 80).trim() || "New Thumbnail"
+
+  const { data: jobRow, error: jobErr } = await supabase
+    .from("yt_upload_jobs")
+    .insert({
+      title,
+      producer_slug: data.producerSlug || null,
+      description:   data.promptSnippet,
+      status:        "pending",
+      tags:          [],
+      retry_count:   0,
+    })
+    .select("id, title, producer_slug, status, thumbnail_mode, thumbnail_status, thumbnail_asset_id, thumbnail_project_id, scheduled_at, created_at, yt_channel_id")
+    .single()
+
+  if (jobErr) return { error: jobErr.message }
+  const job = jobRow as UploadJobForStudio
+
+  const { data: projRow, error: projErr } = await supabase
+    .from("thumbnail_projects")
+    .insert({
+      upload_job_id: job.id,
+      producer_slug: job.producer_slug,
+      title:         job.title,
+      status:        "draft",
+      canvas_json:   {},
+    })
+    .select("*")
+    .single()
+
+  if (projErr) return { error: projErr.message }
+
+  revalidatePath("/admin/youtube/thumbnail-studio")
+  return { job, project: projRow as ThumbnailProject }
+}
+
+export async function createThumbnailJob(data: {
+  title: string
+  producerSlug?: string
+  songRelease?: string
+  channelId?: string
+  notes?: string
+}): Promise<UploadJobForStudio | { error: string }> {
+  await requireAdmin()
+  const supabase = adminDb
+
+  const description = [
+    data.songRelease ? `Song/Release: ${data.songRelease}` : null,
+    data.notes       ? data.notes                          : null,
+  ].filter(Boolean).join("\n") || null
+
+  const { data: row, error } = await supabase
+    .from("yt_upload_jobs")
+    .insert({
+      title:            data.title.trim(),
+      producer_slug:    data.producerSlug || null,
+      yt_channel_id:    data.channelId   || null,
+      description,
+      status:           "pending",
+      thumbnail_status: null,
+      tags:             [],
+      retry_count:      0,
+    })
+    .select("id, title, producer_slug, status, thumbnail_mode, thumbnail_status, thumbnail_asset_id, thumbnail_project_id, scheduled_at, created_at, yt_channel_id")
+    .single()
+
+  if (error) return { error: error.message }
+  revalidatePath("/admin/youtube/thumbnail-studio")
+  return row as UploadJobForStudio
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export async function saveProjectDraft(
