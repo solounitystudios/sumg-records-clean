@@ -203,8 +203,10 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
   const [coverArtStyle,  setCoverArtStyle]  = useState("")
   const [promptRequired, setPromptRequired] = useState(false)
 
-  // Create job modal
+  // Create job modal — two modes: quick_generate (default) and youtube_automation
   const [showCreate,       setShowCreate]       = useState(false)
+  const [createMode,       setCreateMode]       = useState<'quick_generate' | 'youtube_automation'>('quick_generate')
+  const [createPrompt,     setCreatePrompt]     = useState("")
   const [createName,       setCreateName]       = useState("")
   const [createProducer,   setCreateProducer]   = useState("")
   const [createSong,       setCreateSong]       = useState("")
@@ -618,6 +620,8 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
   }
 
   function openCreateModal() {
+    setCreateMode('quick_generate')
+    setCreatePrompt("")
     setCreateName("")
     setCreateProducer("")
     setCreateSong("")
@@ -629,16 +633,27 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
 
   async function handleCreateJob(e: React.FormEvent) {
     e.preventDefault()
-    if (!createName.trim()) return
-    setCreateSubmitting(true)
     setCreateError(null)
 
+    if (createMode === 'quick_generate' && !createPrompt.trim()) {
+      setCreateError("Prompt is required.")
+      return
+    }
+    if (createMode === 'youtube_automation' && !createName.trim()) {
+      setCreateError("Job name is required.")
+      return
+    }
+
+    setCreateSubmitting(true)
+
     const result = await createThumbnailJob({
-      title:        createName.trim(),
-      producerSlug: createProducer || undefined,
-      songRelease:  createSong    || undefined,
-      channelId:    createChannel || undefined,
-      notes:        createNotes   || undefined,
+      jobType:      createMode,
+      title:        createName.trim() || undefined,
+      prompt:       createMode === 'quick_generate' ? createPrompt.trim() : undefined,
+      producerSlug: createMode === 'youtube_automation' ? (createProducer || undefined) : undefined,
+      songRelease:  createMode === 'youtube_automation' ? (createSong    || undefined) : undefined,
+      channelId:    createMode === 'youtube_automation' ? (createChannel || undefined) : undefined,
+      notes:        createNotes || undefined,
     })
 
     setCreateSubmitting(false)
@@ -646,6 +661,11 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
     if ("error" in result) {
       setCreateError(result.error)
       return
+    }
+
+    // Carry the prompt into the studio so the user can immediately generate.
+    if (createMode === 'quick_generate') {
+      setQuickPrompt(createPrompt.trim())
     }
 
     setShowCreate(false)
@@ -670,7 +690,9 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
 
             {/* Modal header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
-              <h2 className="text-[13px] font-semibold text-white/80 tracking-tight">New Thumbnail Job</h2>
+              <h2 className="text-[13px] font-semibold text-white/80 tracking-tight">
+                {createMode === 'quick_generate' ? 'Create Thumbnail' : 'New YouTube Automation Job'}
+              </h2>
               <button
                 type="button"
                 onClick={() => setShowCreate(false)}
@@ -683,85 +705,175 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
               </button>
             </div>
 
+            {/* Mode tabs */}
+            <div role="tablist" className="grid grid-cols-2 gap-1 mx-6 mt-4 p-1 rounded-xl bg-black/30 border border-white/[0.06]">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={createMode === 'quick_generate'}
+                onClick={() => { setCreateMode('quick_generate'); setCreateError(null) }}
+                className={`text-[12px] py-2 rounded-lg transition-colors ${
+                  createMode === 'quick_generate'
+                    ? "bg-violet-600/30 text-white border border-violet-500/40"
+                    : "text-white/45 hover:text-white/70 border border-transparent"
+                }`}
+              >
+                Quick Generate
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={createMode === 'youtube_automation'}
+                onClick={() => { setCreateMode('youtube_automation'); setCreateError(null) }}
+                className={`text-[12px] py-2 rounded-lg transition-colors ${
+                  createMode === 'youtube_automation'
+                    ? "bg-rose-600/30 text-white border border-rose-500/40"
+                    : "text-white/45 hover:text-white/70 border border-transparent"
+                }`}
+              >
+                YouTube Automation
+              </button>
+            </div>
+
             {/* Modal form */}
             <form onSubmit={handleCreateJob} className="p-6 space-y-4">
 
-              {/* Job Name — required */}
-              <div>
-                <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">
-                  Job Name <span className="text-violet-400/60">required</span>
-                </label>
-                <input
-                  type="text"
-                  value={createName}
-                  onChange={(e) => setCreateName(e.target.value)}
-                  placeholder="e.g. Late Night Velvet — v1"
-                  required
-                  autoFocus
-                  className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
-                />
-              </div>
+              {createMode === 'quick_generate' ? (
+                <>
+                  {/* Mode hint */}
+                  <p className="text-[11px] text-white/35 leading-relaxed -mt-1">
+                    Fast creative generation. Just describe the image — everything else is optional.
+                  </p>
 
-              {/* Producer */}
-              <div>
-                <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">Producer</label>
-                {producers.length > 0 ? (
-                  <select
-                    value={createProducer}
-                    onChange={(e) => setCreateProducer(e.target.value)}
-                    className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-violet-500/50 appearance-none transition-colors"
-                  >
-                    <option value="">— None —</option>
-                    {producers.map((p) => (
-                      <option key={p.slug} value={p.slug}>{p.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    value={createProducer}
-                    onChange={(e) => setCreateProducer(e.target.value)}
-                    placeholder="Producer slug"
-                    className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
-                  />
-                )}
-              </div>
+                  {/* Prompt — required */}
+                  <div>
+                    <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">
+                      Prompt <span className="text-violet-400/60">required</span>
+                    </label>
+                    <textarea
+                      value={createPrompt}
+                      onChange={(e) => setCreatePrompt(e.target.value)}
+                      placeholder="e.g. cinematic close-up of a vinyl record on velvet, smoke, magazine flash"
+                      rows={3}
+                      autoFocus
+                      required
+                      className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50 resize-none leading-relaxed transition-colors"
+                    />
+                  </div>
 
-              {/* Song / Release + Channel — side by side */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">Song / Release</label>
-                  <input
-                    type="text"
-                    value={createSong}
-                    onChange={(e) => setCreateSong(e.target.value)}
-                    placeholder="Track or album name"
-                    className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/15 focus:outline-none focus:border-violet-500/50 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">Channel ID</label>
-                  <input
-                    type="text"
-                    value={createChannel}
-                    onChange={(e) => setCreateChannel(e.target.value)}
-                    placeholder="yt_channel id"
-                    className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/15 focus:outline-none focus:border-violet-500/50 transition-colors"
-                  />
-                </div>
-              </div>
+                  {/* Optional name */}
+                  <div>
+                    <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">
+                      Job Name <span className="text-white/25">optional</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={createName}
+                      onChange={(e) => setCreateName(e.target.value)}
+                      placeholder="Auto from prompt if empty"
+                      className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50 transition-colors"
+                    />
+                  </div>
 
-              {/* Notes */}
-              <div>
-                <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">Notes</label>
-                <textarea
-                  value={createNotes}
-                  onChange={(e) => setCreateNotes(e.target.value)}
-                  placeholder="Any context for this thumbnail…"
-                  rows={2}
-                  className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50 resize-none leading-relaxed transition-colors"
-                />
-              </div>
+                  {/* Notes */}
+                  <div>
+                    <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">
+                      Notes <span className="text-white/25">optional</span>
+                    </label>
+                    <textarea
+                      value={createNotes}
+                      onChange={(e) => setCreateNotes(e.target.value)}
+                      placeholder="Aspect ratio, output size, provider, and quality are configured in the studio after creation."
+                      rows={2}
+                      className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-violet-500/50 resize-none leading-relaxed transition-colors"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Mode hint */}
+                  <p className="text-[11px] text-rose-400/70 leading-relaxed -mt-1">
+                    Tied to the SUMG YouTube automation pipeline. Producer, song, and channel link this job to upload jobs and metadata.
+                  </p>
+
+                  {/* Job Name — required */}
+                  <div>
+                    <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">
+                      Job Name <span className="text-rose-400/60">required</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={createName}
+                      onChange={(e) => setCreateName(e.target.value)}
+                      placeholder="e.g. Late Night Velvet — v1"
+                      required
+                      autoFocus
+                      className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-rose-500/50 transition-colors"
+                    />
+                  </div>
+
+                  {/* Producer */}
+                  <div>
+                    <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">Producer</label>
+                    {producers.length > 0 ? (
+                      <select
+                        value={createProducer}
+                        onChange={(e) => setCreateProducer(e.target.value)}
+                        className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-rose-500/50 appearance-none transition-colors"
+                      >
+                        <option value="">— None —</option>
+                        {producers.map((p) => (
+                          <option key={p.slug} value={p.slug}>{p.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={createProducer}
+                        onChange={(e) => setCreateProducer(e.target.value)}
+                        placeholder="Producer slug"
+                        className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-rose-500/50 transition-colors"
+                      />
+                    )}
+                  </div>
+
+                  {/* Song / Release + Channel — side by side */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">Song / Release</label>
+                      <input
+                        type="text"
+                        value={createSong}
+                        onChange={(e) => setCreateSong(e.target.value)}
+                        placeholder="Track or album name"
+                        className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/15 focus:outline-none focus:border-rose-500/50 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">Channel ID</label>
+                      <input
+                        type="text"
+                        value={createChannel}
+                        onChange={(e) => setCreateChannel(e.target.value)}
+                        placeholder="yt_channel id"
+                        className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/15 focus:outline-none focus:border-rose-500/50 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="text-[9px] uppercase tracking-[0.18em] text-white/30 block mb-1.5">Notes</label>
+                    <textarea
+                      value={createNotes}
+                      onChange={(e) => setCreateNotes(e.target.value)}
+                      placeholder="Any context for this thumbnail…"
+                      rows={2}
+                      className="w-full bg-black/30 border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-rose-500/50 resize-none leading-relaxed transition-colors"
+                    />
+                  </div>
+                </>
+              )}
 
               {/* Error */}
               {createError && (
@@ -779,11 +891,21 @@ export function ThumbnailStudioClient({ initialJobs, producers, generationEnable
                 </button>
                 <button
                   type="submit"
-                  disabled={createSubmitting || !createName.trim()}
-                  className="flex-[2] flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600/80 hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-40 text-sm font-semibold text-white transition-all shadow-[0_0_20px_rgba(16,185,129,0.18)]"
+                  disabled={
+                    createSubmitting ||
+                    (createMode === 'quick_generate'     && !createPrompt.trim()) ||
+                    (createMode === 'youtube_automation' && !createName.trim())
+                  }
+                  className={`flex-[2] flex items-center justify-center gap-2 py-2.5 rounded-xl active:scale-[0.98] disabled:opacity-40 text-sm font-semibold text-white transition-all ${
+                    createMode === 'quick_generate'
+                      ? "bg-violet-600/80 hover:bg-violet-600 shadow-[0_0_20px_rgba(139,92,246,0.18)]"
+                      : "bg-rose-600/80 hover:bg-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.18)]"
+                  }`}
                 >
                   {createSubmitting ? (
                     <><Spinner className="w-3.5 h-3.5" /><span>Creating…</span></>
+                  ) : createMode === 'quick_generate' ? (
+                    "Create Thumbnail →"
                   ) : (
                     "Create Job →"
                   )}

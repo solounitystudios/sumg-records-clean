@@ -129,10 +129,11 @@ export async function autoCreateJobAndProject(data: {
     .from("yt_upload_jobs")
     .insert({
       title,
+      job_type:      "quick_generate",
       producer_slug: data.producerSlug || null,
       description:   data.promptSnippet,
       status:        "pending",
-      tags:          [],
+      tags:          ["quick-generate"],
       retry_count:   0,
     })
     .select("id, title, producer_slug, status, thumbnail_mode, thumbnail_status, thumbnail_asset_id, thumbnail_project_id, scheduled_at, created_at, yt_channel_id")
@@ -160,30 +161,53 @@ export async function autoCreateJobAndProject(data: {
 }
 
 export async function createThumbnailJob(data: {
-  title: string
+  title?: string
   producerSlug?: string
   songRelease?: string
   channelId?: string
   notes?: string
+  prompt?: string
+  jobType?: 'quick_generate' | 'youtube_automation'
 }): Promise<UploadJobForStudio | { error: string }> {
   await requireAdmin()
   const supabase = adminDb
 
+  const jobType = data.jobType ?? 'youtube_automation'
+  const isQuick = jobType === 'quick_generate'
+
+  // Quick mode: prompt is the source of truth, title falls back to a snippet.
+  // Automation mode: title is required.
+  const promptTrim = data.prompt?.trim() ?? ""
+  const titleTrim  = data.title?.trim()  ?? ""
+
+  let title: string
+  if (isQuick) {
+    title = titleTrim || promptTrim.slice(0, 80) || "Quick thumbnail"
+    if (!promptTrim && !titleTrim) {
+      return { error: "Prompt is required for Quick Generate." }
+    }
+  } else {
+    if (!titleTrim) return { error: "Job name is required for YouTube Automation." }
+    title = titleTrim
+  }
+
   const description = [
-    data.songRelease ? `Song/Release: ${data.songRelease}` : null,
-    data.notes       ? data.notes                          : null,
+    isQuick && promptTrim ? `Prompt: ${promptTrim}` : null,
+    !isQuick && data.songRelease ? `Song/Release: ${data.songRelease}` : null,
+    data.notes ? data.notes : null,
   ].filter(Boolean).join("\n") || null
 
   const { data: row, error } = await supabase
     .from("yt_upload_jobs")
     .insert({
-      title:            data.title.trim(),
-      producer_slug:    data.producerSlug || null,
-      yt_channel_id:    data.channelId   || null,
+      title,
+      job_type:         jobType,
+      producer_slug:    isQuick ? null : (data.producerSlug || null),
+      yt_channel_id:    isQuick ? null : (data.channelId    || null),
       description,
       status:           "pending",
       thumbnail_status: null,
-      tags:             [],
+      tags:             isQuick ? ["quick-generate"] : [],
       retry_count:      0,
     })
     .select("id, title, producer_slug, status, thumbnail_mode, thumbnail_status, thumbnail_asset_id, thumbnail_project_id, scheduled_at, created_at, yt_channel_id")
