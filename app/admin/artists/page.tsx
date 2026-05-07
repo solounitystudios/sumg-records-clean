@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Suspense } from "react"
 import { getArtists } from "@/lib/db/artists"
 import { getReleases } from "@/lib/db/releases"
+import { getAllSongs } from "@/lib/db/songs"
 import { archiveArtist, restoreArtist, deleteArtist } from "@/app/actions/artists"
 import ArtistPhotoUpload from "./ArtistPhotoUpload"
 import ArtistActionMenu from "./ArtistActionMenu"
@@ -20,10 +21,11 @@ export default async function ArtistsAdminPage({
 }: {
   searchParams: Promise<{ status?: string }>
 }) {
-  const [{ status: filterStatus }, allArtists, allReleases] = await Promise.all([
+  const [{ status: filterStatus }, allArtists, allReleases, allSongs] = await Promise.all([
     searchParams,
     getArtists(),
     getReleases(),
+    getAllSongs(),
   ])
 
   const activeCount   = allArtists.filter((a) => !a.status || a.status === "active").length
@@ -87,6 +89,7 @@ export default async function ArtistsAdminPage({
         {artists.map((artist) => {
           const artistReleases = allReleases.filter((r) => r.artistSlug === artist.slug)
           const liveReleases   = artistReleases.filter((r) => r.status === "published")
+          const artistSongs    = allSongs.filter((s) => s.artistSlug === artist.slug)
           const isArchived     = artist.status === "archived"
 
           const archiveAction = archiveArtist.bind(null, artist.slug)
@@ -142,7 +145,7 @@ export default async function ArtistsAdminPage({
                   <p className="mt-1 text-xs text-white/40 font-mono">{artist.role} · {artist.genre}</p>
                   <p className="mt-2.5 text-sm text-white/50 leading-relaxed max-w-2xl line-clamp-2">{artist.bio}</p>
 
-                  {/* Release stats — clickable */}
+                  {/* Release + song stats — clickable */}
                   <div className="mt-4 flex items-center gap-2.5 flex-wrap">
                     <Link
                       href={`/admin/releases?artist=${artist.slug}&status=published`}
@@ -157,6 +160,13 @@ export default async function ArtistsAdminPage({
                     >
                       <div className="text-[9px] text-white/25 uppercase tracking-[0.15em] font-mono mb-0.5">All Releases</div>
                       <div className="text-sm font-semibold font-mono tabular-nums">{artistReleases.length}</div>
+                    </Link>
+                    <Link
+                      href={`/admin/songs?artist=${artist.slug}`}
+                      className="flex-1 min-w-[100px] max-w-[160px] rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2 hover:border-white/15 hover:bg-white/[0.04] transition-all duration-150"
+                    >
+                      <div className="text-[9px] text-white/25 uppercase tracking-[0.15em] font-mono mb-0.5">Songs</div>
+                      <div className="text-sm font-semibold font-mono tabular-nums">{artistSongs.length}</div>
                     </Link>
                   </div>
 

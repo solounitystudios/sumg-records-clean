@@ -1,7 +1,7 @@
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
 import { ArtistCard } from "@/components/cards/ArtistCard";
-import { getAllArtists } from "@/lib/cms";
+import { getAllArtists, getPublicSongCountsByArtist } from "@/lib/cms";
 
 export const metadata = {
   title: "Artists",
@@ -15,7 +15,10 @@ export const metadata = {
 };
 
 export default async function ArtistsPage() {
-  const artists = await getAllArtists();
+  const [artists, songCounts] = await Promise.all([
+    getAllArtists(),
+    getPublicSongCountsByArtist(),
+  ]);
   return (
     <>
       <Navbar />
@@ -41,6 +44,7 @@ export default async function ArtistsPage() {
                 key={artist.id}
                 artist={artist}
                 size={artist.tier === "primary" ? "large" : "small"}
+                songCount={songCounts[artist.slug]}
               />
             ))}
           </div>

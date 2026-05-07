@@ -44,10 +44,10 @@ export default function ArtistPhotoUpload({
         <img
           src={currentImageUrl}
           alt=""
-          className="w-16 h-16 md:w-20 md:h-20 rounded-2xl object-cover"
+          className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover"
         />
       ) : (
-        <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center text-xl md:text-2xl font-semibold text-white/60">
+        <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center text-2xl md:text-3xl font-semibold text-white/60">
           {artistInitial}
         </div>
       )}

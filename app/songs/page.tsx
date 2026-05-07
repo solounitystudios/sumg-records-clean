@@ -75,7 +75,7 @@ export default async function SongsPage() {
                       </p>
                       <p className="text-[11px] text-white/25 truncate mt-0.5">
                         {song.artistName}
-                        {song.releaseName && (
+                        {song.releaseName && song.releaseName !== song.title && (
                           <span className="text-white/15"> · {song.releaseName}</span>
                         )}
                         {song.genre && (
@@ -83,6 +83,15 @@ export default async function SongsPage() {
                         )}
                       </p>
                     </div>
+
+                    {/* Track type label */}
+                    <span className="hidden sm:block text-[9px] tracking-[0.15em] uppercase text-white/15 flex-shrink-0 font-mono">
+                      {!song.releaseName
+                        ? "Standalone"
+                        : song.releaseName === song.title
+                          ? "Single"
+                          : "Release Track"}
+                    </span>
 
                     {/* Duration */}
                     {song.duration && (

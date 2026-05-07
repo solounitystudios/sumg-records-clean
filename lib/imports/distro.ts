@@ -6,9 +6,12 @@
  * DistroKid columns (common export):
  *   Date, Title, Artists, ISRC, UPC, Team, Stores, Country of Sale, Quantity, Earnings (USD)
  *
+ * Some DistroKid detailed/analytics exports use:
+ *   Primary Artist, Song/Album, Stores, ISRC, UPC, Net Revenue
+ *
  * Generic columns also detected:
  *   song title / track title / track name
- *   artist / artist name
+ *   artist / artist name / primary artist
  *   isrc
  *   upc
  *   streams / quantity / plays
@@ -39,7 +42,7 @@ export interface DistroImportSummary {
 }
 
 const TITLE_ALIASES  = ["title", "song title", "track title", "track name", "song", "work title"]
-const ARTIST_ALIASES = ["artists", "artist", "artist name", "performer"]
+const ARTIST_ALIASES = ["artists", "artist", "primary artist", "primary artists", "artist name", "performer"]
 const ALBUM_ALIASES  = ["song/album", "album", "album title", "release title", "album name", "release name", "release", "ep title", "lp title"]
 const ISRC_ALIASES   = ["isrc"]
 const UPC_ALIASES    = ["upc", "ean"]

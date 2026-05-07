@@ -252,6 +252,29 @@ export async function getAllPublicSongSlugs(): Promise<string[]> {
   return songs.map((s) => s.slug);
 }
 
+export async function getPublicSongCountsByArtist(): Promise<Record<string, number>> {
+  const sb = getSupabaseClient();
+  if (sb) {
+    const { data } = await sb
+      .from("songs")
+      .select("artist_slug")
+      .eq("status", "published")
+      .eq("is_visible", true);
+    if (data) {
+      return (data as { artist_slug: string | null }[]).reduce<Record<string, number>>((acc, s) => {
+        if (s.artist_slug) acc[s.artist_slug] = (acc[s.artist_slug] ?? 0) + 1;
+        return acc;
+      }, {});
+    }
+  }
+  return (rawSongs as { artistSlug?: string; status?: string; isVisible?: boolean }[])
+    .filter((s) => s.status === "published" && s.isVisible)
+    .reduce<Record<string, number>>((acc, s) => {
+      if (s.artistSlug) acc[s.artistSlug] = (acc[s.artistSlug] ?? 0) + 1;
+      return acc;
+    }, {});
+}
+
 // ─── Spotify snapshots ────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

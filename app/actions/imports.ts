@@ -27,6 +27,8 @@ export interface ImportResult {
   createdSongs?: number
   updatedSongs?: number
   skippedReasons?: string[]
+  /** First 20 parsed rows — shown in the import UI for column-mapping verification */
+  parsedPreview?: { title: string; artistName: string | null; isrc: string | null; artistSlug: string | null }[]
 }
 
 // ─── BMI Import ───────────────────────────────────────────────────────────────
@@ -159,6 +161,11 @@ export async function processDistroImport(formData: FormData): Promise<ImportRes
   const skippedReasons: string[] = []
   const updatedEntities: { id: string; title: string; slug?: string }[] = []
 
+  // Build a preview of the first 20 deduplicated rows for column-mapping verification.
+  // artistSlug is filled in during processing; we pre-populate title/artistName/isrc here.
+  const parsedPreview: { title: string; artistName: string | null; isrc: string | null; artistSlug: string | null }[] = []
+  let previewIdx = 0
+
   for (const [, row] of songMap) {
     if (!row.title?.trim() && !row.isrc?.trim()) {
       skipped++
@@ -176,19 +183,33 @@ export async function processDistroImport(formData: FormData): Promise<ImportRes
         if (ar.created) createdArtists++
       }
 
-      // 2. Find or create release (only when UPC or album title available)
+      // Capture first 20 rows for the debug preview (includes resolved artistSlug)
+      if (previewIdx < 20) {
+        parsedPreview.push({ title: row.title ?? "", artistName, isrc: row.isrc ?? null, artistSlug })
+        previewIdx++
+      }
+
+      // 2. Find or create release.
+      // DistroKid's "Song/Album" column holds the RELEASE title — which equals the track
+      // title for standalone singles. We only treat albumTitle as album context when it
+      // differs from the track title (case-insensitive). Otherwise fall through to the
+      // single path so we don't create Album-type releases for standalone tracks.
       let releaseSlug: string | null = null
-      if (row.upc?.trim() || row.albumTitle?.trim()) {
-        const rel = await distroFindOrCreateRelease({
-          upc:        row.upc?.trim()        ?? null,
-          albumTitle: row.albumTitle?.trim() ?? null,
-          artistName,
-          artistSlug,
-        })
-        if (rel) {
-          releaseSlug = rel.slug
-          if (rel.created) createdReleases++
-        }
+      const albumTitleRaw = row.albumTitle?.trim() ?? null
+      const titleRaw      = row.title?.trim() ?? null
+      const albumIsDifferentFromTitle =
+        !!albumTitleRaw && albumTitleRaw.toLowerCase() !== (titleRaw ?? "").toLowerCase()
+      const hasAlbumContext = !!row.upc?.trim() || albumIsDifferentFromTitle
+      const rel = await distroFindOrCreateRelease({
+        upc:          row.upc?.trim()               ?? null,
+        albumTitle:   albumIsDifferentFromTitle ? albumTitleRaw : null,
+        fallbackTitle: hasAlbumContext ? null : (titleRaw ?? null),
+        artistName,
+        artistSlug,
+      })
+      if (rel) {
+        releaseSlug = rel.slug
+        if (rel.created) createdReleases++
       }
 
       // 3. Match by ISRC
@@ -251,7 +272,7 @@ export async function processDistroImport(formData: FormData): Promise<ImportRes
         artistName:   artistName ?? "",
         artistSlug,
         releaseSlug,
-        releaseTitle: row.albumTitle?.trim() ?? null,
+        releaseTitle: albumIsDifferentFromTitle ? albumTitleRaw : (releaseSlug ? titleRaw : null),
         isrc:         row.isrc?.trim().toUpperCase() ?? null,
         upc:          row.upc?.trim() ?? null,
       })
@@ -286,6 +307,7 @@ export async function processDistroImport(formData: FormData): Promise<ImportRes
     createdSongs,
     updatedSongs,
     skippedReasons,
+    parsedPreview,
   }
 }
 
@@ -333,10 +355,12 @@ async function distroFindOrCreateArtist(name: string): Promise<{ slug: string; c
 }
 
 interface DistroReleaseInput {
-  upc:        string | null
-  albumTitle: string | null
-  artistName: string | null
-  artistSlug: string | null
+  upc:           string | null
+  albumTitle:    string | null
+  /** Song title used as release title when there is no album context (creates a Single). */
+  fallbackTitle: string | null
+  artistName:    string | null
+  artistSlug:    string | null
 }
 
 async function distroFindOrCreateRelease(
@@ -347,26 +371,32 @@ async function distroFindOrCreateRelease(
     if (data) return { slug: (data as { slug: string }).slug, created: false }
   }
 
-  if (input.albumTitle) {
-    const { data } = await supabase.from("releases").select("slug").ilike("title", input.albumTitle).limit(1).maybeSingle()
+  const title    = input.albumTitle ?? input.fallbackTitle
+  const isSingle = !input.albumTitle && !!input.fallbackTitle
+  const type     = isSingle ? "Single" : "Album"
+
+  if (title) {
+    const { data } = await supabase.from("releases").select("slug").ilike("title", title).eq("type", type).limit(1).maybeSingle()
     if (data) return { slug: (data as { slug: string }).slug, created: false }
 
     const base = input.artistName
-      ? `${slugify(input.artistName)}-${slugify(input.albumTitle)}`
-      : slugify(input.albumTitle)
+      ? `${slugify(input.artistName)}-${slugify(title)}`
+      : slugify(title)
     const slug = await distroUniqueSlug(base, "releases")
+    const today = new Date().toISOString().slice(0, 10)
     const { data: created, error } = await supabase
       .from("releases")
       .insert({
         id: randomUUID(),
-        title: input.albumTitle, slug,
+        title, slug,
         artist_name: input.artistName ?? "", artist_slug: input.artistSlug,
-        upc: input.upc ?? null, status: "published", type: "Album",
+        upc: input.upc ?? null, status: "published", type,
         genre: "", description: "", is_visible: true,
+        release_date: today,
         created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       })
       .select("slug").single()
-    if (error) throw new Error(`Create release "${input.albumTitle}": ${error.message}`)
+    if (error) throw new Error(`Create release "${title}": ${error.message}`)
     return { slug: (created as { slug: string }).slug, created: true }
   }
 
@@ -397,6 +427,7 @@ async function distroCreateSong(input: DistroSongInput): Promise<{ id: string; t
       release_slug: input.releaseSlug, release_name: input.releaseTitle,
       isrc: input.isrc,
       status: "published", is_visible: true, genre: "",
+      data_source: "distro",
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     })
     .select("id, title, slug").single()

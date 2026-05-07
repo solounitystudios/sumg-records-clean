@@ -17,9 +17,10 @@ function placeholderGradient(name: string): string {
 interface ArtistCardProps {
   artist: CMSArtist;
   size?: "large" | "small";
+  songCount?: number;
 }
 
-export function ArtistCard({ artist, size = "large" }: ArtistCardProps) {
+export function ArtistCard({ artist, size = "large", songCount }: ArtistCardProps) {
   const isLarge = size === "large";
   const imageUrl = artist.profileImageUrl ?? artist.heroImageUrl;
 
@@ -78,6 +79,11 @@ export function ArtistCard({ artist, size = "large" }: ArtistCardProps) {
         <p className="text-xs text-white/40 leading-relaxed line-clamp-2">
           {artist.bio}
         </p>
+        {songCount !== undefined && songCount > 0 && (
+          <p className="text-[10px] tracking-[0.15em] uppercase text-white/20 mt-2">
+            {songCount} {songCount === 1 ? "song" : "songs"}
+          </p>
+        )}
       </div>
 
       {/* Hover bottom line */}
