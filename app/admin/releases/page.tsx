@@ -2,6 +2,7 @@ import Link from "next/link"
 import { getReleases } from "@/lib/db/releases"
 import { formatStreams } from "@/lib/data"
 import { archiveRelease, restoreRelease } from "@/app/actions/releases"
+import { BackfillCoverArtButton } from "./BackfillCoverArtButton"
 
 export const metadata = { title: "Release Command Center — SUMG Admin" }
 
@@ -69,12 +70,15 @@ export default async function ReleasesAdminPage({
             ) : "Manage all SUMG releases across the roster."}
           </p>
         </div>
-        <Link
-          href="/admin/releases/new"
-          className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-medium text-black hover:bg-white/90 transition-all duration-150"
-        >
-          + New Release
-        </Link>
+        <div className="flex flex-col items-end gap-3">
+          <Link
+            href="/admin/releases/new"
+            className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-medium text-black hover:bg-white/90 transition-all duration-150"
+          >
+            + New Release
+          </Link>
+          <BackfillCoverArtButton />
+        </div>
       </div>
 
       {/* Clickable workflow KPIs */}
