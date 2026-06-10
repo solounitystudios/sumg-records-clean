@@ -2,6 +2,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { getReleaseBySlug } from "@/lib/db/releases"
 import { updateRelease, archiveRelease, restoreRelease, deleteRelease } from "@/app/actions/releases"
+import CoverArtField from "./CoverArtField"
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -41,6 +42,8 @@ export default async function EditReleasePage({ params }: { params: Promise<{ sl
       </div>
 
       <form action={action} className="space-y-6">
+        <CoverArtField initialUrl={release.coverArtUrl ?? null} releaseTitle={release.title} />
+
         <div>
           <label className={labelClass}>Status</label>
           <select name="status" defaultValue={release.status} className={inputClass}>

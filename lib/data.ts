@@ -92,6 +92,7 @@ export interface Release {
   tracks: Track[]
   accentColor: string
   spotifyUrl?: string | null
+  coverArtUrl?: string | null
 }
 
 export interface PlatformRoyalty {

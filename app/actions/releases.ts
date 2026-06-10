@@ -12,6 +12,7 @@ export async function updateRelease(slug: string, formData: FormData) {
   const releaseDate = formData.get("releaseDate")?.toString() ?? ""
   const accentColor = formData.get("accentColor")?.toString() ?? ""
   const spotifyUrl = formData.get("spotifyUrl")?.toString().trim() ?? ""
+  const coverArtUrl = formData.get("coverArtUrl")?.toString().trim() ?? ""
 
   // Fetch existing dsp_links to merge Spotify URL without clobbering other platforms
   const { data: existing } = await supabase
@@ -29,7 +30,14 @@ export async function updateRelease(slug: string, formData: FormData) {
 
   const { error } = await supabase
     .from("releases")
-    .update({ status, release_date: releaseDate, accent_color: accentColor, dsp_links: dspLinks, updated_at: new Date().toISOString() })
+    .update({
+      status,
+      release_date: releaseDate,
+      accent_color: accentColor,
+      dsp_links: dspLinks,
+      cover_art_url: coverArtUrl || null,
+      updated_at: new Date().toISOString(),
+    })
     .eq("slug", slug)
 
   if (error) throw new Error(error.message)

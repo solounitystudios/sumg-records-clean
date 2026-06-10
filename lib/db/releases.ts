@@ -34,6 +34,7 @@ function toRelease(row: ReleaseRow): Release {
     accentColor: row.accent_color,
     tracks: (row.tracklist ?? []).map(toTrack),
     spotifyUrl: (row.dsp_links as { spotify?: string } | null)?.spotify ?? null,
+    coverArtUrl: row.cover_art_url ?? null,
   }
 }
 
