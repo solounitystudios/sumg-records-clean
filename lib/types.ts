@@ -341,6 +341,8 @@ export interface CMSSong {
   producerSlugs?: string[];
   genre?: string;
   duration?: string;
+  /** Optional song-level cover art. Falls back to the parent release's cover art when unset. */
+  coverArtUrl?: string;
   audioUrl?: string;
   lyrics?: string;
   isExplicit?: boolean;

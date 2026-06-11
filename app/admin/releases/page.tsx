@@ -3,6 +3,7 @@ import { getReleases } from "@/lib/db/releases"
 import { formatStreams } from "@/lib/data"
 import { archiveRelease, restoreRelease } from "@/app/actions/releases"
 import { BackfillCoverArtButton } from "./BackfillCoverArtButton"
+import { BulkSpotifyManager } from "./BulkSpotifyManager"
 
 export const metadata = { title: "Release Command Center — SUMG Admin" }
 
@@ -38,6 +39,15 @@ export default async function ReleasesAdminPage({
   }
 
   const totalPublishedStreams = byStatus.published.reduce((s, r) => s + r.streams, 0)
+
+  // Catalog-wide coverage summary for the bulk-management panel.
+  const bulkSummary = allReleases.map((r) => ({
+    slug: r.slug,
+    title: r.title,
+    artistName: r.artistName,
+    hasSpotify: !!r.spotifyUrl,
+    hasCover: !!r.coverArtUrl,
+  }))
 
   let releases = [...allReleases]
   if (filterStatus) releases = releases.filter((r) => r.status === filterStatus)
@@ -118,6 +128,9 @@ export default async function ReleasesAdminPage({
         </div>
       </div>
 
+      {/* Bulk Spotify / cover-art management */}
+      <BulkSpotifyManager releases={bulkSummary} />
+
       {/* Release cards */}
       <div className="space-y-3">
         {sorted.map((release) => {
@@ -135,13 +148,20 @@ export default async function ReleasesAdminPage({
               }`}
             >
               <div className="flex items-start gap-5 p-5">
-                <div
-                  className="shrink-0 w-14 h-14 rounded-xl transition-transform duration-150 group-hover:scale-105"
-                  style={{
-                    background: `radial-gradient(circle at top, ${release.accentColor}44, ${release.accentColor}11)`,
-                    border: `1px solid ${release.accentColor}44`,
-                  }}
-                />
+                {release.coverArtUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={release.coverArtUrl}
+                    alt={`${release.title} cover art`}
+                    className="shrink-0 w-14 h-14 rounded-xl object-cover border border-white/10 transition-transform duration-150 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="shrink-0 w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br from-white/[0.06] to-black/40 border border-white/10 transition-transform duration-150 group-hover:scale-105">
+                    <span className="text-lg font-black text-white/25 select-none">
+                      {release.title.charAt(0)}
+                    </span>
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div>

@@ -44,7 +44,9 @@ export async function updateRelease(slug: string, formData: FormData) {
   if (error) throw new Error(error.message)
 
   revalidatePath("/admin/releases")
+  revalidatePath("/releases")
   revalidatePath(`/releases/${slug}`)
+  revalidatePath("/songs")
   redirect("/admin/releases")
 }
 
@@ -146,8 +148,13 @@ export interface BackfillCoverArtResult {
  * TODO: Once Supabase Storage re-upload is implemented, download the Spotify
  * image and re-host it in our own bucket instead of storing the remote
  * Spotify CDN URL directly (CDN URLs can rotate/expire).
+ *
+ * Pass `slugs` to restrict the backfill to a specific set of releases (used by
+ * the bulk-management panel). Omit it to scan the entire catalog.
  */
-export async function backfillCoverArtFromSpotify(): Promise<BackfillCoverArtResult> {
+export async function backfillCoverArtFromSpotify(
+  slugs?: string[]
+): Promise<BackfillCoverArtResult> {
   await requireAdmin()
 
   const result: BackfillCoverArtResult = {
@@ -158,9 +165,13 @@ export async function backfillCoverArtFromSpotify(): Promise<BackfillCoverArtRes
     errors: [],
   }
 
-  const { data, error } = await supabase
-    .from("releases")
-    .select("id, slug, dsp_links, cover_art_url")
+  const scopedSlugs = slugs?.map((s) => s.trim()).filter(Boolean)
+  if (scopedSlugs && scopedSlugs.length === 0) return result
+
+  let query = supabase.from("releases").select("id, slug, dsp_links, cover_art_url")
+  if (scopedSlugs) query = query.in("slug", scopedSlugs)
+
+  const { data, error } = await query
 
   if (error) throw new Error(error.message)
 
@@ -226,6 +237,9 @@ export async function backfillCoverArtFromSpotify(): Promise<BackfillCoverArtRes
 
   if (result.updated > 0) {
     revalidatePath("/admin/releases")
+    revalidatePath("/releases")
+    revalidatePath("/releases/[slug]", "page")
+    revalidatePath("/songs")
   }
 
   return result

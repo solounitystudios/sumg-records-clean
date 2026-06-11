@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getAuthUser, isExecutiveRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -60,6 +61,11 @@ export async function POST(request: NextRequest) {
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
+
+  // Refresh public catalogue, the release detail page, and the admin command center.
+  revalidatePath("/releases");
+  revalidatePath(`/releases/${releaseSlug.trim()}`);
+  revalidatePath("/admin/releases");
 
   return NextResponse.json({ ok: true, spotifyAlbumId: spotifyAlbumId.trim() });
 }

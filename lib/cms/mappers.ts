@@ -121,6 +121,7 @@ export function rowToSong(r: any): CMSSong {
     producerSlugs: r.producer_slugs ?? undefined,
     genre: r.genre ?? undefined,
     duration: r.duration ?? undefined,
+    coverArtUrl: r.cover_art_url ?? undefined,
     audioUrl: r.audio_url ?? undefined,
     lyrics: r.lyrics ?? undefined,
     isExplicit: r.is_explicit ?? false,

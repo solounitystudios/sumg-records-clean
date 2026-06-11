@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/site/Navbar";
 import { Footer } from "@/components/site/Footer";
-import { getPublicSongs } from "@/lib/cms";
+import { getPublicSongs, getPublishedReleases } from "@/lib/cms";
 import Link from "next/link";
 
 export const metadata = {
@@ -15,7 +15,19 @@ export const metadata = {
 };
 
 export default async function SongsPage() {
-  const songs = (await getPublicSongs()).sort((a, b) => {
+  const [rawSongs, releases] = await Promise.all([
+    getPublicSongs(),
+    getPublishedReleases(),
+  ]);
+
+  // Map each release slug to its cover art so songs can fall back to their
+  // parent release's artwork when they have none of their own.
+  const releaseCoverBySlug = new Map<string, string>();
+  for (const r of releases) {
+    if (r.coverArtUrl) releaseCoverBySlug.set(r.slug, r.coverArtUrl);
+  }
+
+  const songs = rawSongs.sort((a, b) => {
     // Sort by publish date (newest first), then title A–Z as tiebreak
     const dateA = a.publishAt ?? a.createdAt;
     const dateB = b.publishAt ?? b.createdAt;
@@ -52,16 +64,38 @@ export default async function SongsPage() {
               <p className="text-white/20 text-sm italic">No songs available yet.</p>
             ) : (
               <div className="max-w-3xl">
-                {songs.map((song, i) => (
+                {songs.map((song, i) => {
+                  const artwork =
+                    song.coverArtUrl ??
+                    (song.releaseSlug
+                      ? releaseCoverBySlug.get(song.releaseSlug)
+                      : undefined);
+                  return (
                   <Link
                     key={song.id}
                     href={`/songs/${song.slug}`}
-                    className="flex items-center gap-5 py-4 px-3 border-b border-white/[0.04] group hover:bg-white/[0.025] hover:border-white/[0.08] transition-all duration-200"
+                    className="flex items-center gap-4 py-4 px-3 border-b border-white/[0.04] group hover:bg-white/[0.025] hover:border-white/[0.08] transition-all duration-200"
                   >
                     {/* Index */}
-                    <span className="text-[11px] font-mono text-white/15 min-w-[2.5rem]">
+                    <span className="text-[11px] font-mono text-white/15 min-w-[1.75rem]">
                       {String(i + 1).padStart(2, "0")}
                     </span>
+
+                    {/* Artwork */}
+                    {artwork ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={artwork}
+                        alt={`${song.title} cover art`}
+                        className="w-11 h-11 rounded object-cover flex-shrink-0 border border-white/5 group-hover:border-white/15 transition-colors duration-200"
+                      />
+                    ) : (
+                      <div className="w-11 h-11 rounded flex-shrink-0 bg-gradient-to-br from-white/[0.06] to-black/40 flex items-center justify-center border border-white/5">
+                        <span className="text-sm font-black text-white/15 select-none leading-none">
+                          {song.title.charAt(0)}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
@@ -105,7 +139,8 @@ export default async function SongsPage() {
                       →
                     </span>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
