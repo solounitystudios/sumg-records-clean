@@ -1,0 +1,2 @@
+ALTER TABLE releases ADD COLUMN IF NOT EXISTS cover_art_url  TEXT;
+ALTER TABLE releases ADD COLUMN IF NOT EXISTS dsp_links      JSONB;
