@@ -89,7 +89,6 @@ async function fetchReadyJobs(): Promise<RawJob[]> {
     .limit(10)
 
   if (error) throw new Error(`fetchReadyJobs: ${error.message}`)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data ?? []) as any
 }
 

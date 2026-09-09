@@ -69,7 +69,6 @@ export interface EngineLog {
 
 // ─── Mappers ──────────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toChannel(r: any): YtChannel {
   return {
     id:                  r.id,
@@ -93,7 +92,6 @@ function toChannel(r: any): YtChannel {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toJob(r: any): YtUploadJob {
   return {
     id:           r.id,
@@ -137,7 +135,6 @@ async function attachThumbnailUrls(jobs: YtUploadJob[]): Promise<YtUploadJob[]> 
   }))
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toLog(r: any): EngineLog {
   return {
     id:        r.id,

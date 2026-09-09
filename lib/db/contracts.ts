@@ -22,7 +22,6 @@ export type ContractTemplate = {
   createdAt: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toContract(row: Record<string, any>): Contract {
   return {
     id: row.id,
@@ -39,7 +38,6 @@ function toContract(row: Record<string, any>): Contract {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toTemplate(row: Record<string, any>): ContractTemplate {
   return {
     id: row.id,

@@ -51,9 +51,7 @@ export interface Cart {
   currencyCode: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeCart(raw: any): Cart {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lines: CartLine[] = raw.lines.edges.map(({ node }: any) => ({
     id:            node.id,
     quantity:      node.quantity,
@@ -95,7 +93,6 @@ async function gql<T>(query: string, variables: Record<string, unknown>): Promis
 }
 
 export async function createCart(variantId: string, quantity: number): Promise<Cart> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = await gql<any>(`
     mutation CartCreate($lines: [CartLineInput!]!) {
       cartCreate(input: { lines: $lines }) {
@@ -108,7 +105,6 @@ export async function createCart(variantId: string, quantity: number): Promise<C
 }
 
 export async function addCartLines(cartId: string, variantId: string, quantity: number): Promise<Cart> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = await gql<any>(`
     mutation CartLinesAdd($cartId: ID!, $lines: [CartLineInput!]!) {
       cartLinesAdd(cartId: $cartId, lines: $lines) {
@@ -121,7 +117,6 @@ export async function addCartLines(cartId: string, variantId: string, quantity: 
 }
 
 export async function updateCartLine(cartId: string, lineId: string, quantity: number): Promise<Cart> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = await gql<any>(`
     mutation CartLinesUpdate($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
       cartLinesUpdate(cartId: $cartId, lines: $lines) {
@@ -134,7 +129,6 @@ export async function updateCartLine(cartId: string, lineId: string, quantity: n
 }
 
 export async function removeCartLines(cartId: string, lineIds: string[]): Promise<Cart> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = await gql<any>(`
     mutation CartLinesRemove($cartId: ID!, $lineIds: [ID!]!) {
       cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
@@ -148,7 +142,6 @@ export async function removeCartLines(cartId: string, lineIds: string[]): Promis
 
 export async function getCart(cartId: string): Promise<Cart | null> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await gql<any>(`
       query GetCart($cartId: ID!) {
         cart(id: $cartId) { ...CartFields }

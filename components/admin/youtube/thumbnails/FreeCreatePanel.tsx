@@ -222,7 +222,6 @@ export function FreeCreatePanel({ producers, generationEnabled, initialPrompt, o
       } catch { /* ignore poll errors */ }
     }, 5000)
     return () => clearInterval(timer)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mjPendingId])
 
   function handleProviderChange(p: GenProvider) {

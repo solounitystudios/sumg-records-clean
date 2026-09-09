@@ -16,7 +16,6 @@ import type { ArtistSpotifySnapshot } from "@/lib/types";
  * module into client-bundled code.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToArtistSpotifySnapshot(r: any): ArtistSpotifySnapshot {
   return {
     id: r.id,

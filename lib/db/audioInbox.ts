@@ -79,7 +79,6 @@ interface AssetSnippet {
   mime_type: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toRow(r: any): AudioInboxRow {
   return {
     id:                   r.id,
@@ -127,7 +126,6 @@ function toRow(r: any): AudioInboxRow {
 
 // Fetches asset metadata for a batch of inbox rows without relying on a FK embed.
 // Works regardless of whether the audio_inbox → assets FK constraint exists.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function attachAssets(rows: any[]): Promise<any[]> {
   if (rows.length === 0) return rows
   const ids = [...new Set<string>(rows.map((r) => r.asset_id).filter(Boolean))]
@@ -146,7 +144,6 @@ async function attachAssets(rows: any[]): Promise<any[]> {
 
 // Resolves approved thumbnail image URLs for rows that have a yt_job_id.
 // Two extra SELECT queries regardless of row count; safe to call on every page load.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function attachThumbnailUrls(rows: any[]): Promise<any[]> {
   const jobIds = [...new Set<string>(rows.map((r) => r.yt_job_id).filter(Boolean))]
   if (jobIds.length === 0) return rows.map((r) => ({ ...r, _thumbnailAssetUrl: null }))

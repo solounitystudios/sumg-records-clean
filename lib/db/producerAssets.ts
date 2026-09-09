@@ -16,7 +16,6 @@ export interface ProducerAsset {
   assetSizeBytes?: number | null
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toProducerAsset(r: any): ProducerAsset {
   return {
     id: r.id,

@@ -6,7 +6,6 @@ const SELECT =
   "yt_channel_url, yt_handle, yt_channel_id, yt_upload_cadence, " +
   "yt_title_template, yt_description_template, yt_default_tags, dna_slug"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ProducerRow = Record<string, any>
 
 function toProducer(row: ProducerRow): Producer {

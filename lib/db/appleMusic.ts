@@ -13,7 +13,6 @@ export interface AppleMetricsRow {
   createdAt: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toMetrics(r: any): AppleMetricsRow {
   return {
     id: r.id,

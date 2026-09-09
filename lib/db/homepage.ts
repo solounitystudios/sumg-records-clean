@@ -22,7 +22,6 @@ const FALLBACK: CMSHomepageConfig = {
   updatedAt: new Date().toISOString(),
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toConfig(r: any): CMSHomepageConfig {
   return {
     id: r.id,

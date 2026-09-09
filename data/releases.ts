@@ -1,6 +1,5 @@
 import { CMSRelease, CMSSong } from "@/lib/types";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function t(obj: any): CMSSong {
   return {
     slug: obj.id,

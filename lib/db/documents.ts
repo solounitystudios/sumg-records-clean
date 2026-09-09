@@ -17,7 +17,6 @@ export type Document = {
   updatedAt: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toDocument(row: Record<string, any>): Document {
   return {
     id: row.id,
