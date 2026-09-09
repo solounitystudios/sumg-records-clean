@@ -13,6 +13,22 @@
 
 No catalog persistence migration (A1/A2/A5) was applied — confirmed via a live migration-ledger check and a `catalog_%` table-existence query (0 tables) immediately after A0.1. No bucket created, no row mutated, no credential rotated, no PersonaWorks/Suno access.
 
+## A0's deferred half, now closed: `artist_spotify_snapshots` public SELECT
+
+A0 (above) deliberately left this table's public SELECT policy untouched, because closing it required an application-code precondition A0 alone couldn't satisfy — see A0's own file comment, §5 above. That precondition is now met, in a dedicated follow-up pass (2026-09-09, same day):
+
+**Why the public SELECT policy existed:** nobody set out to make Spotify follower/popularity data public. `lib/cms/index.ts::getArtistSpotifySnapshots()`/`insertArtistSpotifySnapshot()` were originally written in the same file as 13 genuinely-public content functions (releases, artists, producers, brands, songs) and reused that file's shared `getSupabaseClient()` — a fresh anon/publishable client with no session attached. That client only worked for the two Spotify-snapshot functions because the SELECT policy happened to be `USING(true)`. The three admin pages that call these functions (`app/admin/spotify`, `app/admin/analytics`, `app/admin/intelligence` via `SpotifyArtistRow`) are all `requireAdmin()`-gated at the `app/admin/layout.tsx` level — but that page-level gate has no bearing on what Supabase RLS sees, since the DB client itself carried no session.
+
+**Exact application dependency, traced from scratch this pass:** exactly one reader (`getArtistSpotifySnapshots`) and one writer (`insertArtistSpotifySnapshot`, confirmed dead code — zero callers anywhere in the repo) touched `artist_spotify_snapshots` in `lib/cms/index.ts`. Zero public routes reference the table at all. The real, live write path (`app/actions/spotify.ts::refreshArtistSpotifySnapshot()`) was already using the service-role client and was never affected by any of this.
+
+**Client correction:** both functions moved to a new file, `lib/cms/admin-spotify.ts`, guarded by `import "server-only"`, using `lib/supabase/server.ts::createClient()` — the same session-aware, cookie-based `@supabase/ssr` server client `lib/auth.ts::getAuthUser()` already uses for the exact same reason. This is Option A from the checkpoint (authenticated server client, `is_cms_role()` continues to authorize normally) — not service-role, which would have granted more privilege than the read actually needs. `lib/cms/index.ts`'s 13 genuinely-public functions were not touched. All 3 call sites' imports updated from `@/lib/cms` to `@/lib/cms/admin-spotify`.
+
+**Migration:** `supabase/migrations/20260909041713_artist_spotify_snapshots_select_hardening.sql` — `DROP POLICY "public read artist snapshots"` → `CREATE POLICY "cms read artist snapshots" ... USING (is_cms_role())`. **APPLIED + VERIFIED.**
+
+**Effective-privilege proof (not just policy text):** since the table has 0 real rows, "returns 0 rows" can't distinguish "RLS blocked it" from "table's empty" — so verification went one level deeper, evaluating `is_cms_role()` directly as each role. As `anon`: `auth.jwt()` is `null`, `is_cms_role()` → `false`. As `authenticated` with no claims: `is_cms_role()` → `false`. `is_cms_role()`'s own definition (`coalesce((auth.jwt()->'app_metadata'->>'role') IN (...cms roles...), false)`) makes the "would return true for an actual CMS-role JWT" half of the proof definitional, not assumed — and this exact function already correctly authorizes every other CMS-gated table in the schema in production use today. No runtime login was fabricated to "prove" the true-case directly, per the explicit instruction not to.
+
+**Verified:** anon SELECT denied, authenticated-non-CMS SELECT denied, write policy unchanged, `service_role.rolbypassrls = true` (bypasses RLS entirely, reconfirmed), row count unchanged (0 → 0), `dna_records`/`import_logs`/`apple_metrics_daily`/`audio_inbox` policies all unchanged from A0/A0.1's verified state, migration ledger shows exactly 4 new migrations total this whole staged effort and zero `catalog_%` tables.
+
 ---
 
 **Below this line: the original pre-application document, preserved as written.**

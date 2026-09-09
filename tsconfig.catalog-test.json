@@ -7,9 +7,10 @@
     "lib": ["ES2020"],
     "noEmit": false,
     "declaration": false,
-    "rootDir": "lib/catalog",
+    "incremental": false,
+    "rootDir": "lib",
     "outDir": ".test-build",
     "jsx": "react-jsx"
   },
-  "include": ["lib/catalog/**/*.ts"]
+  "include": ["lib/catalog/**/*.ts", "lib/cms/*.security.test.ts"]
 }

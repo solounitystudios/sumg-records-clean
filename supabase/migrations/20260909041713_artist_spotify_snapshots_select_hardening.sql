@@ -1,0 +1,31 @@
+-- artist_spotify_snapshots SELECT hardening. Additive follow-up to A0
+-- (which deliberately left this table's public SELECT untouched pending an
+-- application-code precondition — see A0's own comments). That precondition
+-- is now met: lib/cms/admin-spotify.ts moved the two admin-only readers off
+-- the anon/publishable client onto the session-aware server client
+-- (lib/supabase/server.ts::createClient()), so is_cms_role() now evaluates
+-- against the real logged-in admin's JWT instead of an empty anon session.
+--
+-- CURRENT LIVE STATE (reconfirmed immediately before writing this file):
+--   "public read artist snapshots", FOR SELECT, roles={public}, USING(true).
+-- WHY CHANGE: no public route in the repo reads this table (confirmed via a
+--   full-repo dependency trace); the only three readers are admin surfaces
+--   under app/admin/**, all gated by requireAdmin() in app/admin/layout.tsx,
+--   and all now use the session-aware client — nothing depends on public
+--   SELECT any more.
+-- EXPECTED AFTER STATE: SELECT gated by is_cms_role(), matching the write
+--   policy (already is_cms_role() since A0) and every other CMS-role-gated
+--   table in this schema.
+-- ROLLBACK: DROP POLICY "cms read artist snapshots" ON artist_spotify_snapshots;
+--           CREATE POLICY "public read artist snapshots" ON artist_spotify_snapshots
+--             FOR SELECT USING (true);
+-- DEPENDENCY / BLAST RADIUS: three admin surfaces (app/admin/spotify,
+--   app/admin/analytics, app/admin/intelligence via SpotifyArtistRow), all
+--   already updated in this same pass to use the session-aware client
+--   (lib/cms/admin-spotify.ts). The dead-code writer
+--   (insertArtistSpotifySnapshot) and the real live writer
+--   (app/actions/spotify.ts, service-role) are both unaffected — this
+--   migration only touches the SELECT policy.
+
+DROP POLICY IF EXISTS "public read artist snapshots" ON artist_spotify_snapshots;
+CREATE POLICY "cms read artist snapshots" ON artist_spotify_snapshots FOR SELECT USING (is_cms_role());

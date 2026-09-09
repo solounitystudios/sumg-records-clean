@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts,.tsx",
     "pretest": "tsc -p tsconfig.catalog-test.json",
-    "test": "node --test .test-build/*.test.js"
+    "test": "node --test '.test-build/**/*.test.js'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",

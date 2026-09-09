@@ -1,5 +1,5 @@
 import { getSpotifyArtist, getSpotifyArtistTopTracks } from "@/lib/spotify"
-import { getArtistSpotifySnapshots } from "@/lib/cms"
+import { getArtistSpotifySnapshots } from "@/lib/cms/admin-spotify"
 import { formatFollowers, formatMs } from "@/lib/spotifyFormat"
 import type { Artist } from "@/lib/data"
 

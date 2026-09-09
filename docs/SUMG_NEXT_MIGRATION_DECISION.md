@@ -54,6 +54,11 @@ A0.1   — APPLIED + VERIFIED IN PRODUCTION, 2026-09-09 (two migrations — the 
          the original proposal didn't account for; a corrective follow-up closed it)
          supabase/migrations/20260909035736_append_inbox_log_hardening.sql
          supabase/migrations/20260909040002_append_inbox_log_revoke_public.sql
+Spotify SELECT follow-up — APPLIED + VERIFIED IN PRODUCTION, 2026-09-09 (same day,
+         separate pass). Closes the public SELECT A0 deliberately deferred on
+         artist_spotify_snapshots, after a client-code fix (lib/cms/admin-spotify.ts)
+         removed the application dependency that made deferring it necessary.
+         supabase/migrations/20260909041713_artist_spotify_snapshots_select_hardening.sql
 A1 (revised again) — ready for human review, NOT applied; created_by/uploaded_by now
                      UUID->auth.users, upload_status added per the vault preflight's
                      SHA-256 design
@@ -66,7 +71,7 @@ A5 (revised)      — ready for human review, NOT applied; actor now UUID->auth.
 A3, A4            — still deferred, unchanged this pass — no code depends on them yet
 ```
 
-A0 and A0.1 are applied and verified. A1/A2/A3/A4/A5 remain proposals only — not applied, awaiting separate founder authorization for the next production stage.
+A0, A0.1, and the Spotify SELECT follow-up are all applied and verified — the entire security-hardening scope of this staged effort is now closed in production. A1/A2/A3/A4/A5 remain proposals only — not applied, awaiting separate founder authorization for the next production stage.
 
 ## 3. Lint CI baseline policy (Part 17)
 
