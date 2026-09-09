@@ -5,9 +5,7 @@ import { rowToRelease as rowToCMSRelease } from "@/lib/cms/mappers"
 
 const SELECT = "*"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TrackRow = Record<string, any>
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ReleaseRow = Record<string, any>
 
 function toTrack(row: TrackRow): Track {

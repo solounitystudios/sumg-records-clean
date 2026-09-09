@@ -2,6 +2,7 @@ import Link from "next/link"
 import { getArtists } from "@/lib/db/artists"
 import { createRelease } from "@/app/actions/releases"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "New Release — SUMG Admin" }
 
 const inputClass =

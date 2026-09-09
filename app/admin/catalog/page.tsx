@@ -155,6 +155,36 @@ export default async function CatalogPage() {
         </div>
       </div>
 
+      {/* Command Center Foundation — see docs/SUMG_CATALOG_COMMAND_CENTER_ARCHITECTURE.md */}
+      <div className="rounded-xl border border-white/[0.07] bg-[#0d1016] p-5 mb-8">
+        <SectionHead title="Command Center Foundation" />
+        <p className="text-xs text-white/35 mb-4 max-w-2xl">
+          Foundation routes for the canonical Work / Recording / Version model, rights &amp; policy layer,
+          and editorial routing desk described in the architecture doc. These are read-only scaffolding —
+          no new tables are live yet, so there is nothing to count here.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/catalog/intake"
+            className="rounded-full border border-white/15 px-4 py-2 text-xs text-white/60 hover:border-white/30 hover:text-white transition-colors duration-150"
+          >
+            Intake →
+          </Link>
+          <Link
+            href="/admin/catalog/review"
+            className="rounded-full border border-white/15 px-4 py-2 text-xs text-white/60 hover:border-white/30 hover:text-white transition-colors duration-150"
+          >
+            Review →
+          </Link>
+          <Link
+            href="/admin/catalog/routing"
+            className="rounded-full border border-white/15 px-4 py-2 text-xs text-white/60 hover:border-white/30 hover:text-white transition-colors duration-150"
+          >
+            Routing →
+          </Link>
+        </div>
+      </div>
+
       {/* Artist roster */}
       <div className="mb-8">
         <SectionHead title="Artist Roster" />

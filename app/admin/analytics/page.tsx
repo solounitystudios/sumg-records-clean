@@ -4,8 +4,9 @@ import { getReleases } from "@/lib/db/releases"
 import { getRoyalties } from "@/lib/db/royalties"
 import { getNews } from "@/lib/db/news"
 import { formatStreams, formatRevenue } from "@/lib/data"
-import { getArtistSpotifySnapshots } from "@/lib/cms"
+import { getArtistSpotifySnapshots } from "@/lib/cms/admin-spotify"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "Analytics — SUMG Admin" }
 
 // ─── Source badge ─────────────────────────────────────────────────────────────

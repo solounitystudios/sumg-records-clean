@@ -15,7 +15,6 @@ export type AdminTask = {
   updatedAt: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toTask(row: Record<string, any>): AdminTask {
   return {
     id: row.id,

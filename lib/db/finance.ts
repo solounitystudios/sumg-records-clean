@@ -14,7 +14,6 @@ export type FinanceTransaction = {
   createdAt: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toTransaction(row: Record<string, any>): FinanceTransaction {
   return {
     id: row.id,

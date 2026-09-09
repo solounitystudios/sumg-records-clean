@@ -103,7 +103,6 @@ async function run(): Promise<void> {
   await log(null, null, "info", "[render-worker] started")
   console.log("[worker] polling…")
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
       await tick()

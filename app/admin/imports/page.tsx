@@ -54,7 +54,6 @@ export default async function ImportsPage() {
               ))}
             </div>
             <div className="divide-y divide-white/[0.04]">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {logs.map((log: any) => (
                 <div key={log.id} className="grid grid-cols-6 px-5 py-3 items-center">
                   <span className="text-[10px] text-white/40">{formatDate(log.imported_at)}</span>

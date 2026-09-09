@@ -3,7 +3,6 @@ import type { Artist } from "@/lib/data"
 
 const SELECT = "*"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ArtistRow = Record<string, any>
 
 function toArtist(row: ArtistRow): Artist {

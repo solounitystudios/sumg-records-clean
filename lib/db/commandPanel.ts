@@ -173,7 +173,6 @@ export async function get30DayCalendar(): Promise<CalendarDay[]> {
       id:            r.id,
       title:         r.title ?? null,
       producerSlug:  r.producer_slug,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       channelHandle: (r.yt_channels as any)?.channel_handle ?? null,
       scheduledAt:   r.scheduled_at,
       status:        r.status,
@@ -306,7 +305,6 @@ export async function getFailedJobsPanel(limit = 20): Promise<FailedJob[]> {
     id:            r.id,
     producerSlug:  r.producer_slug,
     title:         r.title ?? null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     channelHandle: (r.yt_channels as any)?.channel_handle ?? null,
     errorMessage:  r.error_message ?? null,
     retryCount:    r.retry_count ?? 0,
@@ -329,7 +327,6 @@ export async function getQueueBottleneck(): Promise<BottleneckJob[]> {
     producerSlug:  r.producer_slug,
     title:         r.title ?? null,
     status:        r.status,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     channelHandle: (r.yt_channels as any)?.channel_handle ?? null,
     createdAt:     r.created_at,
   }))

@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { ArtistSpotifySnapshot, CMSArtist, CMSBrand, CMSProducer, CMSRelease, CMSSong } from "@/lib/types";
+import { CMSArtist, CMSBrand, CMSProducer, CMSRelease, CMSSong } from "@/lib/types";
 import { rowToArtist, rowToProducer, rowToBrand, rowToRelease, rowToSong } from "./mappers";
 import { artists as rawArtists } from "@/data/artists";
 import { brands as rawBrands } from "@/data/brands";
@@ -275,66 +275,8 @@ export async function getPublicSongCountsByArtist(): Promise<Record<string, numb
     }, {});
 }
 
-// ─── Spotify snapshots ────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToArtistSpotifySnapshot(r: any): ArtistSpotifySnapshot {
-  return {
-    id: r.id,
-    artistSlug: r.artist_slug,
-    spotifyId: r.spotify_id,
-    followers: r.followers,
-    popularity: r.popularity ?? 0,
-    snapshotAt: r.snapshot_at,
-  };
-}
-
-/**
- * Return all follower snapshots for a given artist, newest first.
- * Falls back to an empty array when Supabase is not configured.
- */
-export async function getArtistSpotifySnapshots(
-  artistSlug: string
-): Promise<ArtistSpotifySnapshot[]> {
-  const sb = getSupabaseClient();
-  if (!sb) return [];
-  const { data, error } = await sb
-    .from("artist_spotify_snapshots")
-    .select("*")
-    .eq("artist_slug", artistSlug)
-    .order("snapshot_at", { ascending: false });
-  if (error) {
-    console.error("[cms] artist spotify snapshots:", error.message);
-    return [];
-  }
-  return (data ?? []).map(rowToArtistSpotifySnapshot);
-}
-
-/**
- * Insert a new follower snapshot row.
- * Returns the inserted row or null on failure.
- */
-export async function insertArtistSpotifySnapshot(
-  snap: Omit<ArtistSpotifySnapshot, "id">
-): Promise<ArtistSpotifySnapshot | null> {
-  const sb = getSupabaseClient();
-  if (!sb) return null;
-  const id = crypto.randomUUID();
-  const { data, error } = await sb
-    .from("artist_spotify_snapshots")
-    .insert({
-      id,
-      artist_slug: snap.artistSlug,
-      spotify_id: snap.spotifyId,
-      followers: snap.followers,
-      popularity: snap.popularity,
-      snapshot_at: snap.snapshotAt,
-    })
-    .select()
-    .maybeSingle();
-  if (error) {
-    console.error("[cms] insert artist spotify snapshot:", error.message);
-    return null;
-  }
-  return data ? rowToArtistSpotifySnapshot(data) : null;
-}
+// Spotify snapshot reads/writes moved to lib/cms/admin-spotify.ts — that
+// table is CMS-role-gated in RLS (no public-read policy), unlike everything
+// else in this file, so it needs the session-aware server client, not the
+// anon/publishable client every other function here correctly uses for
+// genuinely public content. See that file for the full rationale.

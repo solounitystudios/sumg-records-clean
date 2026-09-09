@@ -7,6 +7,7 @@ import { AppleMusicSearchPanel } from "@/components/admin/AppleMusicSearchPanel"
 import type { Artist } from "@/lib/data";
 import type { CMSRelease, CMSSong } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Apple Music — SUMG Admin" };
 
 // ─── Apple Music icon ─────────────────────────────────────────────────────────

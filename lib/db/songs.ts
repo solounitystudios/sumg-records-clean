@@ -2,7 +2,6 @@ import { supabase } from "./supabase"
 import type { CMSSong } from "@/lib/types"
 import { rowToSong } from "@/lib/cms/mappers"
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const toSong = (r: any): CMSSong => rowToSong(r)
 
 export async function getAllSongs(): Promise<CMSSong[]> {

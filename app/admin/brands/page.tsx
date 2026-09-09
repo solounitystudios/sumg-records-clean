@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { getBrands } from "@/lib/db/brands"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "Brand System — SUMG Admin" }
 
 const categoryStyle: Record<string, string> = {

@@ -17,7 +17,6 @@ export type PublishingWork = {
   updatedAt: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toWork(row: Record<string, any>): PublishingWork {
   return {
     id: row.id,

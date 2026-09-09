@@ -4,6 +4,7 @@ import { getArtists } from "@/lib/db/artists"
 import { getReleases } from "@/lib/db/releases"
 import { getRoyalties } from "@/lib/db/royalties"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "Command Center — SUMG Records" }
 
 const STATUS_CLS: Record<string, string> = {

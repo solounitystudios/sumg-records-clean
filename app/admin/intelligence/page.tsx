@@ -11,6 +11,7 @@ import { SpotifyArtistRow } from "@/components/admin/intelligence/SpotifyArtistR
 import type { Artist } from "@/lib/data"
 import type { CMSSong } from "@/lib/types"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "Intelligence — SUMG Admin" }
 
 // ─── UI helpers ───────────────────────────────────────────────────────────────

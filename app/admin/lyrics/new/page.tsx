@@ -3,6 +3,7 @@ import { getArtists } from "@/lib/db/artists"
 import { getReleases } from "@/lib/db/releases"
 import { createLyricProject } from "@/app/actions/lyrics"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "New Lyric Project — SUMG Admin" }
 
 const inputClass =

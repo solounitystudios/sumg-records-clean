@@ -1,5 +1,6 @@
 import { getContributors } from "@/lib/db/contributors"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "Contributors — SUMG Admin" }
 
 const typeBadge: Record<string, string> = {

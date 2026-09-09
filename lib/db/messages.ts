@@ -20,7 +20,6 @@ export type Message = {
   createdAt: string
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toThread(row: Record<string, any>): MessageThread {
   return {
     id: row.id,
@@ -35,7 +34,6 @@ function toThread(row: Record<string, any>): MessageThread {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toMessage(row: Record<string, any>): Message {
   return {
     id: row.id,
@@ -54,7 +52,6 @@ export async function getThreads(): Promise<MessageThread[]> {
   if (error) throw new Error(`getThreads: ${error.message}`)
   return (data ?? []).map((row) => ({
     ...toThread(row),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     messageCount: (row as any).message_messages?.[0]?.count ?? 0,
   }))
 }

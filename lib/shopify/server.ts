@@ -51,13 +51,11 @@ export interface ShopifyProductDetail extends ShopifyProduct {
   usingFallback: boolean
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeProduct(node: any): ShopifyProductDetail {
   const price = parseFloat(node.priceRange?.minVariantPrice?.amount ?? "0")
   const compareRaw = node.compareAtPriceRange?.minVariantPrice?.amount
   const compareAtPrice = compareRaw ? parseFloat(compareRaw) : undefined
   const currency: string = node.priceRange?.minVariantPrice?.currencyCode ?? "USD"
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const images: string[] = (node.images?.edges ?? []).map((e: any) => e.node.url as string)
   const imageUrl = images[0]
   const rawStatus: string = (node.status as string).toLowerCase()
@@ -65,7 +63,6 @@ function normalizeProduct(node: any): ShopifyProductDetail {
     ? rawStatus
     : "draft") as ShopifyProductStatus
   const brandSlug = (node.vendor as string).toLowerCase().replace(/\s+/g, "-")
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const variants: ShopifyVariant[] = (node.variants?.edges ?? []).map((e: any) => ({
     id: e.node.id as string,
     title: e.node.title as string,
@@ -146,7 +143,6 @@ async function fetchStorefrontProducts(): Promise<{ products: ShopifyProductDeta
       return { products: fallbackProducts.map(toDetail), usingFallback: true }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const edges: any[] = json.data?.products?.edges ?? []
     return { products: edges.map((e: { node: unknown }) => normalizeProduct(e.node)), usingFallback: false }
   } catch (err) {
