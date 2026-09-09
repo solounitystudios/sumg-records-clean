@@ -1,3 +1,14 @@
+-- APPLIED + VERIFIED IN PRODUCTION 2026-09-09, IN TWO STEPS. See
+-- supabase/migrations/20260909035736_append_inbox_log_hardening.sql (this
+-- file's promoted copy — pinned search_path correctly, but its
+-- REVOKE EXECUTE FROM anon, authenticated did NOT close the gap because
+-- PUBLIC also held EXECUTE, which this proposal never accounted for) and
+-- supabase/migrations/20260909040002_append_inbox_log_revoke_public.sql (the
+-- corrective follow-up that actually closed it). See
+-- docs/SUMG_SECURITY_MIGRATION_HARDENING.md for the full verification
+-- record. This file is kept as the historical proposal record — do not
+-- re-apply it as originally written; it is known incomplete.
+--
 -- PROPOSAL — NOT APPLIED. See supabase/migrations_proposed/README.md.
 --
 -- A0.1 — append_inbox_log hardening. New this pass (2026-09-09), split out

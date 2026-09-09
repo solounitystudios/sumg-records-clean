@@ -1,11 +1,3 @@
--- APPLIED + VERIFIED IN PRODUCTION 2026-09-09. See
--- supabase/migrations/20260909035504_rls_hardening_dna_import_spotify_apple.sql
--- for the promoted, applied copy, and docs/SUMG_SECURITY_MIGRATION_HARDENING.md
--- for the verification record. This file is kept as the historical proposal
--- record — do not re-apply it.
---
--- PROPOSAL — NOT APPLIED. See supabase/migrations_proposed/README.md.
---
 -- A0 — RLS hardening, REWRITTEN 2026-09-09 against a live pg_policies query
 -- against yisxnwbsnzxjnmzpstzj (see docs/SUMG_SECURITY_MIGRATION_HARDENING.md
 -- for the full trace). The version reviewed in PR #21 used guessed policy
@@ -18,8 +10,12 @@
 -- deliberately NOT touched in this file (see §3 below).
 --
 -- Independent of A1/A2/A5. append_inbox_log is deliberately NOT covered here
--- — see A0_1_append_inbox_log_hardening.sql (different remediation shape:
--- function GRANT/REVOKE, not CREATE POLICY).
+-- — see 20260909000001_append_inbox_log_hardening.sql (different remediation
+-- shape: function GRANT/REVOKE, not CREATE POLICY).
+--
+-- Promoted from supabase/migrations_proposed/A0_rls_hardening.sql, copied
+-- verbatim after a fresh live pre-flight query on 2026-09-09 confirmed zero
+-- drift since it was written.
 
 -- ============================================================================
 -- 1. dna_records — fully open (read AND write) to anon and authenticated

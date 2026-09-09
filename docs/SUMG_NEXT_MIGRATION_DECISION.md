@@ -42,27 +42,31 @@ If A0 were applied exactly as written today, three of its four fixes would silen
 
 </details>
 
-## 2. Overall migration sequencing recommendation — updated
+## 2. Overall migration sequencing recommendation — updated, A0/A0.1 now applied
 
-See `supabase/migrations_proposed/README.md` for the proven-from-SQL dependency graph (none of the seven proposal files has a hard FK dependency on another) and `SUMG_SECURITY_MIGRATION_HARDENING.md` §13 for the reasoning. Current recommended order:
+See `supabase/migrations_proposed/README.md` for the proven-from-SQL dependency graph (none of the seven proposal files has a hard FK dependency on another) and `SUMG_SECURITY_MIGRATION_HARDENING.md` §13 for the reasoning, and its status block for the full applied/verified account.
 
 ```
-A0 (rewritten)    — ready to promote as written; the artist_spotify_snapshots write-policy
-                     fix and the dna_records/import_logs/apple_metrics_daily closures have
-                     zero traced dependency. Its SELECT policy on artist_spotify_snapshots
-                     is deliberately left untouched — see SUMG_SECURITY_MIGRATION_HARDENING.md §5
-A0.1 (new)        — ready to promote; zero app-code change required, the one legitimate
-                     caller already uses service-role and is unaffected
-A1 (revised again) — ready for human review; created_by/uploaded_by now UUID->auth.users,
-                     upload_status added per the vault preflight's SHA-256 design
-A2 (revised)      — ready for human review; set_by now UUID->auth.users, AI-cannot-clear
-                     backstop now keys off set_by_source (provenance vocabulary) not a
-                     fragile string match, UNIQUE(subject_type, subject_id) added
-A5 (revised)      — ready for human review; actor now UUID->auth.users (nullable)
+A0     — APPLIED + VERIFIED IN PRODUCTION, 2026-09-09
+         supabase/migrations/20260909035504_rls_hardening_dna_import_spotify_apple.sql
+A0.1   — APPLIED + VERIFIED IN PRODUCTION, 2026-09-09 (two migrations — the first
+         only partially closed the gap due to a PostgreSQL PUBLIC-grant default
+         the original proposal didn't account for; a corrective follow-up closed it)
+         supabase/migrations/20260909035736_append_inbox_log_hardening.sql
+         supabase/migrations/20260909040002_append_inbox_log_revoke_public.sql
+A1 (revised again) — ready for human review, NOT applied; created_by/uploaded_by now
+                     UUID->auth.users, upload_status added per the vault preflight's
+                     SHA-256 design
+A2 (revised)      — ready for human review, NOT applied; set_by now UUID->auth.users,
+                     AI-cannot-clear backstop now keys off set_by_source (provenance
+                     vocabulary) not a fragile string match, UNIQUE(subject_type,
+                     subject_id) added
+A5 (revised)      — ready for human review, NOT applied; actor now UUID->auth.users
+                     (nullable)
 A3, A4            — still deferred, unchanged this pass — no code depends on them yet
 ```
 
-None of A0/A0.1/A1/A2/A3/A4/A5 were applied in this pass.
+A0 and A0.1 are applied and verified. A1/A2/A3/A4/A5 remain proposals only — not applied, awaiting separate founder authorization for the next production stage.
 
 ## 3. Lint CI baseline policy (Part 17)
 

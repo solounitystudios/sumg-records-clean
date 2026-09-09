@@ -1,0 +1,39 @@
+-- A0.1 corrective follow-up. The first A0.1 migration
+-- (20260909000001_append_inbox_log_hardening.sql) revoked EXECUTE on
+-- public.append_inbox_log from anon and authenticated individually, and
+-- pinned search_path. The search_path fix took effect correctly. The
+-- EXECUTE revocation did NOT: live verification immediately after that
+-- migration showed has_function_privilege('anon', ..., 'EXECUTE') and
+-- has_function_privilege('authenticated', ..., 'EXECUTE') were still both
+-- true.
+--
+-- ROOT CAUSE (confirmed via aclexplode(pg_proc.proacl) before writing this
+-- file): PostgreSQL grants EXECUTE on every newly created function to the
+-- PUBLIC pseudo-role by default, unless explicitly revoked at creation time.
+-- append_inbox_log's ACL showed three grantees: PUBLIC (EXECUTE), postgres
+-- (EXECUTE), service_role (EXECUTE) — no individual anon/authenticated
+-- entries remained (those REVOKEs did work), but PUBLIC's grant makes
+-- has_function_privilege() return true for every role regardless of any
+-- REVOKE targeted at that role specifically, since PUBLIC privileges apply
+-- unconditionally to all roles. REVOKE FROM PUBLIC is the missing statement.
+--
+-- CURRENT LIVE STATE (re-verified immediately before this migration):
+--   PUBLIC: EXECUTE = true
+--   anon effective EXECUTE: true (via PUBLIC)
+--   authenticated effective EXECUTE: true (via PUBLIC)
+--   service_role: EXECUTE = true, via its OWN explicit ACL entry, independent
+--     of the PUBLIC grant — confirmed by aclexplode showing service_role as
+--     a distinct grantee row, not merely inheriting from PUBLIC.
+--   postgres (owner): EXECUTE = true, own explicit ACL entry.
+--
+-- EXPECTED AFTER STATE: PUBLIC EXECUTE = false; anon/authenticated effective
+--   EXECUTE = false (no path to it anymore — no individual grant, no PUBLIC
+--   grant); service_role and postgres unaffected (their grants are
+--   independent of PUBLIC and this statement does not touch them).
+-- ROLLBACK: GRANT EXECUTE ON FUNCTION public.append_inbox_log(text, jsonb)
+--   TO PUBLIC; (re-opens the bypass — emergency only, re-file immediately.)
+-- DEPENDENCY / BLAST RADIUS: identical to the first A0.1 migration — the one
+--   legitimate caller (app/actions/audioInbox.ts:173) uses service_role,
+--   which is unaffected by this statement.
+
+REVOKE EXECUTE ON FUNCTION public.append_inbox_log(text, jsonb) FROM PUBLIC;

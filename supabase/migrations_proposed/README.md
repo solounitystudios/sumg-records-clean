@@ -5,6 +5,14 @@ Foundation pass (`docs/SUMG_CATALOG_PERSISTENCE_AUDIT.md`). They are deliberatel
 kept out of `supabase/migrations/` so `supabase db push` and CI cannot apply them
 by accident.
 
+**A0 and A0.1 have since been promoted and applied** (2026-09-09, staged security
+migration promotion pass) — see `supabase/migrations/20260909035504_*.sql`,
+`20260909035736_*.sql`, and `20260909040002_*.sql`, and
+`docs/SUMG_SECURITY_MIGRATION_HARDENING.md` for the verification record. Their
+copies in this directory are kept as historical proposal records (each now
+carries a note saying so) — do not re-apply them. A1/A2/A3/A4/A5 remain
+proposals only.
+
 To promote a slice:
 
 1. Review the SQL and the corresponding section of `SUMG_CATALOG_PERSISTENCE_AUDIT.md`.
