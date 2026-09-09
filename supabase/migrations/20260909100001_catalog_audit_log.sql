@@ -1,51 +1,40 @@
--- PROMOTED, NOT YET APPLIED (2026-09-09, SUMG-CAT-P0-001). See
--- supabase/migrations/20260909100001_catalog_audit_log.sql for the promoted,
--- ready-to-apply copy. This file is kept as the historical proposal record —
--- do not re-apply it. Applying the promoted copy to production requires an
--- explicit `supabase db push` (or manual application) by a human with
--- production access — this was NOT done as part of SUMG-CAT-P0-001.
---
--- PROPOSAL — NOT APPLIED. See supabase/migrations_proposed/README.md.
---
 -- A5 — Audit Log. Additive only. Deliberately append-only (no UPDATE
 -- policy, no DELETE policy) so the log cannot be edited after the fact by
 -- any role, including admin, through the normal client.
 --
--- REVISED AGAIN 2026-09-09 (pre-production hardening pass) — see
--- docs/SUMG_REVIEW_AUDIT_AND_DELETION.md for the full reasoning.
+-- Promoted from supabase/migrations_proposed/A5_audit_log.sql (design history
+-- and full reasoning there). Applied ahead of A2 deliberately — A2's rights
+-- audit trigger requires this table to exist at write time.
 --
--- NEW action taxonomy (CHECK-constrained, not free text): 21 event types,
--- every one traceable to a real code path or design decision in this pass
--- (no speculative events with no planned writer). See the doc for the exact
--- mapping from each event to the function/trigger/state-transition that
--- emits it.
+-- Action taxonomy (CHECK-constrained, not free text): 21 event types, every
+-- one traceable to a real code path or design decision (no speculative
+-- events with no planned writer). See docs/SUMG_REVIEW_AUDIT_AND_DELETION.md
+-- for the exact mapping from each event to the function/trigger/state-
+-- transition that emits it.
 --
--- NEW actor model, replacing the single nullable `actor` FK: actor_type
--- (human/service/worker/ai/system) + actor_label (always required — for
--- humans, an identity snapshot captured at insert time; for everything
--- else, the service/worker/system identifier). This resolves a real
--- tension discovered while designing it: a naive "human actor_type
--- requires a non-null actor FK, permanently" CHECK constraint would be
--- violated the moment a human user's auth.users row is deleted (actor gets
--- SET NULL via the FK action, which re-validates the row's CHECK
--- constraints and would then fail) — breaking exactly the "audit survives
--- user deletion" requirement it was meant to serve. Fixed by only
--- constraining the SPOOFING direction permanently (a non-human event may
--- never carry a real human UUID) and requiring actor_label unconditionally
--- so the audit trail stays meaningful even after the FK goes null — "who
--- did this" survives as a label; "click through to their live account" does
--- not, which is the correct, achievable guarantee.
+-- Actor model: actor_type (human/service/worker/ai/system) + actor_label
+-- (always required — for humans, an identity snapshot captured at insert
+-- time; for everything else, the service/worker/system identifier). A naive
+-- "human actor_type requires a non-null actor FK, permanently" CHECK
+-- constraint would be violated the moment a human user's auth.users row is
+-- deleted (actor gets SET NULL via the FK action, which re-validates the
+-- row's CHECK constraints and would then fail) — breaking exactly the
+-- "audit survives user deletion" requirement it was meant to serve. Fixed by
+-- only constraining the SPOOFING direction permanently (a non-human event
+-- may never carry a real human UUID) and requiring actor_label
+-- unconditionally so the audit trail stays meaningful even after the FK goes
+-- null — "who did this" survives as a label; "click through to their live
+-- account" does not, which is the correct, achievable guarantee.
 --
--- NEW: occurred_at is now bounded by a CHECK (within a small window of the
--- INSERT's actual wall-clock time), not just DEFAULT now() — a DEFAULT can
--- still be overridden by an explicit value in the INSERT statement, so
--- without this bound a caller could backdate or postdate an event. This
--- closes that gap.
+-- occurred_at is bounded by a CHECK (within a small window of the INSERT's
+-- actual wall-clock time), not just DEFAULT now() — a DEFAULT can still be
+-- overridden by an explicit value in the INSERT statement, so without this
+-- bound a caller could backdate or postdate an event.
 --
--- NEW: correlation_id, distinct from the existing job_id — job_id ties an
--- event to one worker job; correlation_id ties a whole causally-related
--- sequence of events (e.g. one intake attempt's create -> upload ->
--- verify -> review chain) together for tracing, per Part 17's explicit ask.
+-- correlation_id, distinct from job_id — job_id ties an event to one worker
+-- job; correlation_id ties a whole causally-related sequence of events
+-- (e.g. one intake attempt's create -> upload -> verify -> review chain)
+-- together for tracing.
 
 CREATE TABLE IF NOT EXISTS catalog_audit_log (
   id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

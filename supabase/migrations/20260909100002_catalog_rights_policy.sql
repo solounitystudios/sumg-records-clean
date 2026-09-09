@@ -1,82 +1,47 @@
--- PROMOTED, NOT YET APPLIED (2026-09-09, SUMG-CAT-P0-001). See
--- supabase/migrations/20260909100002_catalog_rights_policy.sql for the
--- promoted, ready-to-apply copy. This file is kept as the historical
--- proposal record — do not re-apply it. Applying the promoted copy to
--- production requires an explicit `supabase db push` (or manual
--- application) by a human with production access — this was NOT done as
--- part of SUMG-CAT-P0-001.
---
--- PROPOSAL — NOT APPLIED. See supabase/migrations_proposed/README.md.
---
 -- A2 — Rights / Policy. Additive only.
 --
--- REVISED AGAIN 2026-09-09 (pre-production hardening pass) — see
--- docs/SUMG_RIGHTS_AND_ROUTING_MODEL.md for the full reasoning. Two
--- substantive changes from the prior revision:
+-- Promoted from supabase/migrations_proposed/A2_rights_policy.sql (design
+-- history and full reasoning there, including docs/SUMG_RIGHTS_AND_ROUTING_MODEL.md).
 --
--- 1. RIGHTS HISTORY MODEL, FINALIZED: Option A (current-state table +
---    generic A5 audit log), REJECTED as written last time because it relied
---    on application code remembering to write both in the same transaction
---    — a hope, not a guarantee. HARDENED this revision with a trigger:
---    every INSERT/UPDATE on catalog_rights_records now unconditionally
---    writes a 'rights_changed' event to catalog_audit_log (A5) with the
---    full before/after row state. This is DB-enforced, not
---    convention-enforced — no code path (including a future direct-SQL
---    fix, a service-role bug, or a forgotten audit call) can change rights
---    state without leaving a trail.
+-- Depends on: 20260909100001_catalog_audit_log.sql (A5) — this table's DDL
+-- (CREATE TABLE/FUNCTION/TRIGGER) succeeds even if catalog_audit_log doesn't
+-- exist, but every write to catalog_rights_records will fail at RUNTIME with
+-- "relation catalog_audit_log does not exist" until A5 is also applied. Both
+-- are promoted together in this migration pair, A5 first by timestamp.
 --
---    THIS INTRODUCES A REAL CROSS-FILE DEPENDENCY THAT DID NOT EXIST
---    BEFORE: this table's DDL (CREATE TABLE/FUNCTION/TRIGGER) succeeds
---    even if A5's catalog_audit_log doesn't exist yet (Postgres does not
---    statically validate table references inside a function body), but
---    every write to catalog_rights_records will fail at RUNTIME with
---    "relation catalog_audit_log does not exist" until A5 is also applied.
---    Practical consequence: apply A5 before or together with A2, not
---    after. See docs/SUMG_CATALOG_PRE_PRODUCTION_HARDENING.md's migration
---    rehearsal section — the previously "proven independent, any order"
---    claim for A2 no longer holds once this trigger exists, and the
---    recommended order is revised accordingly (A5 moves ahead of A2).
+-- RIGHTS HISTORY MODEL: every INSERT/UPDATE on catalog_rights_records
+-- unconditionally writes a 'rights_changed' event to catalog_audit_log (A5)
+-- with the full before/after row state. This is DB-enforced, not
+-- convention-enforced — no code path (including a future direct-SQL fix, a
+-- service-role bug, or a forgotten audit call) can change rights state
+-- without leaving a trail.
 --
--- 2. PERMISSIONS SHAPE NOW DB-VALIDATED: previously any JSONB object was
---    accepted for `permissions` as long as the column existed. Added a
---    CHECK constraint requiring exactly the four known keys
---    (distribution/sync/personaworks/aiTraining), each a JSON boolean, no
---    extra keys. The mission brief's Part 12 offered a different candidate
---    vocabulary (play_internal/stream_personaworks/public_stream/
---    distribute_dsp/publish_video/create_derivative/sync_license/
---    download_master) — deliberately NOT adopted: this repo already has a
---    real, implemented, tested vocabulary (lib/catalog/types.ts's
---    RightsPermissions, lib/catalog/destinations.ts's CatalogDestination
---    routing) built around distribution/sync/personaworks/aiTraining.
---    Replacing it with an unused, speculative 8-flag list would be exactly
---    the overbuilt schema this whole pass is trying to avoid elsewhere —
---    four flags matching real, already-wired destinations beat eight
---    matching none. A schema-version column for the permissions shape was
---    considered and rejected for the same reason: nothing reads one yet,
---    and a future vocabulary change is a one-line CHECK-constraint
---    migration regardless.
+-- PERMISSIONS SHAPE IS DB-VALIDATED: a CHECK constraint requires exactly the
+-- four known keys (distribution/sync/personaworks/aiTraining), each a JSON
+-- boolean, no extra keys — matching lib/catalog/types.ts's
+-- RightsPermissions / lib/catalog/destinations.ts's CatalogDestination
+-- routing vocabulary already implemented and tested in this repo.
 --
--- Unchanged from the prior revision (still correct): set_by is
--- UUID REFERENCES auth.users(id); set_by_source mirrors
+-- set_by is UUID REFERENCES auth.users(id); set_by_source mirrors
 -- lib/catalog/types.ts's ProvenanceSource and backs the AI-cannot-clear
 -- CHECK; permissions defaults to an explicit all-false object;
 -- UNIQUE(subject_type, subject_id) makes catalog_rights_records a
--- mutable-current-state table, not a history table (history is now the
--- trigger-fed audit log, harder-guaranteed than before, not a new parallel
--- mechanism).
+-- mutable-current-state table, not a history table (history is the
+-- trigger-fed audit log).
 --
--- NEW: expires_at (nullable). A rights grant can carry a real expiration
--- date now. Expiration is NOT solely a background job's job to notice —
+-- expires_at (nullable): a rights grant can carry a real expiration date.
+-- Expiration is NOT solely a background job's job to notice —
 -- lib/catalog/rights.ts's permission checks (canDistribute, canSync, etc.)
--- must treat status='cleared' with a past expires_at as equivalent to
--- 'expired' AT CHECK TIME, not only after some reconciliation job has
--- gotten around to flipping the stored status column. This makes
--- expiration robust to a cron job that hasn't run yet. See
--- docs/SUMG_RIGHTS_AND_ROUTING_MODEL.md.
+-- treat status='cleared' with a past expires_at as equivalent to 'expired'
+-- AT CHECK TIME, not only after some reconciliation job has gotten around to
+-- flipping the stored status column.
 --
--- Depends on: A5 must be applied first (or together) — see note 1 above.
--- Otherwise unchanged: subject_type/subject_id is a loose polymorphic
--- reference, not an FK, matching the existing repo convention.
+-- subject_type/subject_id is a loose polymorphic reference, not an FK,
+-- matching the existing repo convention — and deliberately covers
+-- 'song'/'release' (today's real, existing catalog rows) as well as
+-- 'work'/'recording' (not yet applied — A1), so this slice attaches
+-- directly to production's existing 32 songs / 32 releases without waiting
+-- on Master Vault or Work/Recording/Version to land.
 
 CREATE TABLE IF NOT EXISTS catalog_rights_records (
   id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -112,9 +77,9 @@ ALTER TABLE catalog_rights_records
   ADD CONSTRAINT catalog_rights_records_ai_cannot_clear
   CHECK (NOT (status = 'cleared' AND set_by_source IN ('ai_inferred', 'telemetry_learned')));
 
--- Permissions shape validation (new this revision): exactly the four known
--- keys, each a JSON boolean. Rejects unknown keys and non-boolean values at
--- the DB level, not just by TypeScript's type system.
+-- Permissions shape validation: exactly the four known keys, each a JSON
+-- boolean. Rejects unknown keys and non-boolean values at the DB level, not
+-- just by TypeScript's type system.
 ALTER TABLE catalog_rights_records
   ADD CONSTRAINT catalog_rights_records_permissions_shape
   CHECK (
@@ -127,12 +92,11 @@ ALTER TABLE catalog_rights_records
   );
 
 -- Every rights-record write is unconditionally audited — DB-enforced, not
--- convention-enforced. See the header comment for the A5 dependency this
--- creates. actor_type/actor_service are not separate columns here because
--- A5's catalog_audit_log.actor is nullable and set_by is already the human
--- actor when one exists; automation-authored rows (set_by IS NULL,
--- set_by_source identifies the automated origin) audit with a NULL actor,
--- exactly matching A5's documented actor model.
+-- convention-enforced. actor_type/actor_service are not separate columns
+-- here because A5's catalog_audit_log.actor is nullable and set_by is
+-- already the human actor when one exists; automation-authored rows
+-- (set_by IS NULL, set_by_source identifies the automated origin) audit
+-- with a NULL actor, exactly matching A5's documented actor model.
 CREATE OR REPLACE FUNCTION catalog_rights_records_audit() RETURNS trigger AS $$
 BEGIN
   INSERT INTO catalog_audit_log (actor, action, object_type, object_id, previous_state, new_state, occurred_at, source)

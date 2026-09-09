@@ -10,8 +10,19 @@ migration promotion pass) — see `supabase/migrations/20260909035504_*.sql`,
 `20260909035736_*.sql`, and `20260909040002_*.sql`, and
 `docs/SUMG_SECURITY_MIGRATION_HARDENING.md` for the verification record. Their
 copies in this directory are kept as historical proposal records (each now
-carries a note saying so) — do not re-apply them. A1/A2/A3/A4/A5 remain
-proposals only.
+carries a note saying so) — do not re-apply them.
+
+**A5 and A2 have since been promoted but NOT applied** (2026-09-09,
+SUMG-CAT-P0-001) — see `supabase/migrations/20260909100001_catalog_audit_log.sql`
+and `20260909100002_catalog_rights_policy.sql` for the promoted, ready-to-apply
+copies. Their copies in this directory are kept as historical proposal
+records (each now carries a note saying so) — do not re-apply them.
+**Promoted is not the same as applied**: no `supabase db push` and no direct
+SQL execution against any project was run for this pair — a human with
+production access must explicitly apply these two files (A5 before or
+together with A2 — see the dependency note below) before
+`lib/db/catalogRights.ts` has anything real to read or write. A1/A3/A4
+remain proposals only.
 
 To promote a slice:
 
