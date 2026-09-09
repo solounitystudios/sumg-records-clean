@@ -3,6 +3,7 @@ import { getNews } from "@/lib/db/news"
 import { createNewsItem, deleteNewsItem } from "@/app/actions/news"
 import { NewsIngestPanel } from "./NewsIngestPanel"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "News — SUMG Admin" }
 
 const categoryStyle: Record<string, string> = {

@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { getLyricProjects } from "@/lib/db/lyrics"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "Lyric Engine — SUMG Admin" }
 
 const statusStyle: Record<string, string> = {

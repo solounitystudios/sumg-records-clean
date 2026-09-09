@@ -5,6 +5,7 @@ import { getReleases } from "@/lib/db/releases"
 import { getBrands } from "@/lib/db/brands"
 import { updateHomepageConfig } from "@/app/actions/homepage"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "Edit Homepage — SUMG Admin" }
 
 const inputClass =

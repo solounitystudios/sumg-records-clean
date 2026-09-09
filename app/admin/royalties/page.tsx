@@ -2,6 +2,7 @@ import { getRoyalties } from "@/lib/db/royalties"
 import { getArtists } from "@/lib/db/artists"
 import { formatStreams, formatRevenue } from "@/lib/data"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "Royalty Platform — SUMG Admin" }
 
 const periods = ["2026-Q1", "2025-Q4"]

@@ -5,6 +5,7 @@ import { archiveRelease, restoreRelease } from "@/app/actions/releases"
 import { BackfillCoverArtButton } from "./BackfillCoverArtButton"
 import { BulkSpotifyManager } from "./BulkSpotifyManager"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "Release Command Center — SUMG Admin" }
 
 const statusStyle: Record<string, string> = {

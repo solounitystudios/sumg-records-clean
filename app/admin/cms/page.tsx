@@ -7,6 +7,7 @@ import { getNews } from "@/lib/db/news"
 import { getProducers } from "@/lib/db/producers"
 import { getLyricProjects } from "@/lib/db/lyrics"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "CMS Control Center — SUMG Admin" }
 
 const SEO_PAGES = [

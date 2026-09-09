@@ -30,6 +30,9 @@ export async function getNews(): Promise<NewsItem[]> {
     .from("news")
     .select(SELECT)
     .order("sort_order")
-  if (error) throw new Error(`getNews: ${error.message}`)
+  if (error) {
+    console.error("[db] news:", error.message)
+    return []
+  }
   return (data as NewsRow[]).map(toNewsItem)
 }

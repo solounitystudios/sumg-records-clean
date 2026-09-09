@@ -8,6 +8,7 @@ import ArtistPhotoUpload from "./ArtistPhotoUpload"
 import ArtistActionMenu from "./ArtistActionMenu"
 import { SpotifyStatsWidget } from "@/components/admin/SpotifyStatsWidget"
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "Artist Management — SUMG Admin" }
 
 const STATUS_CLS: Record<string, string> = {

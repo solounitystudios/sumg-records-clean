@@ -8,6 +8,7 @@ import { SpotifyRefreshButton } from "@/components/admin/SpotifyRefreshButton";
 import { SpotifySearchPanel } from "@/components/admin/SpotifySearchPanel";
 import type { Artist } from "@/lib/data";
 
+export const dynamic = "force-dynamic"
 export const metadata = { title: "Spotify Intelligence — SUMG Admin" };
 
 function SpotifyIcon({ className }: { className: string }) {
