@@ -4,9 +4,12 @@
 
 ---
 
-## 1. A0 (RLS hardening) — validated against production, NOT ready as written
+## 1. A0 (RLS hardening) — SUPERSEDED, see `SUMG_SECURITY_MIGRATION_HARDENING.md`
 
-**A0 DECISION: NEEDS REVISION.**
+**This section described a since-corrected version of A0 and is kept only for historical record of what was found wrong.** `supabase/migrations_proposed/A0_rls_hardening.sql` has since been rewritten against a fresh live `pg_policies` query, with `dna_records`/`import_logs`/`apple_metrics_daily` fully hardened and `artist_spotify_snapshots`'s write policy tightened (its public read is deliberately deferred pending a traced code precondition, not a naming bug). A companion `A0_1_append_inbox_log_hardening.sql` now exists for the SECURITY DEFINER function bypass. Full current reasoning, the proven app-dependency traces, and the A0 decision as it stands now: **`SUMG_SECURITY_MIGRATION_HARDENING.md`**. The original naming-mismatch finding below remains true of the version reviewed at the time and is why the rewrite happened.
+
+<details>
+<summary>Original finding (2026-09-09, production-verification pass) — superseded, kept for record</summary>
 
 A0 (`supabase/migrations_proposed/A0_rls_hardening.sql`, shipped in PR #21) was written from repo SQL alone, before any live query was possible. Checked every one of its four `DROP POLICY IF EXISTS` statements against the actual live policy names (`SUMG_PRODUCTION_SCHEMA_DRIFT_AUDIT.md` §4):
 
@@ -37,26 +40,26 @@ If A0 were applied exactly as written today, three of its four fixes would silen
 4. Create a companion `A0.1_append_inbox_log_hardening.sql` for the function-level fix, kept separate since its remediation shape (function REVOKE/rewrite) differs from A0's (CREATE POLICY).
 5. Before promoting anything, re-run the exact live `pg_policies` query this pass used — policy names and behavior are a moving target and must be re-verified at promotion time, not assumed from this document.
 
-## 2. Overall migration sequencing recommendation
+</details>
+
+## 2. Overall migration sequencing recommendation — updated
+
+See `supabase/migrations_proposed/README.md` for the proven-from-SQL dependency graph (none of the seven proposal files has a hard FK dependency on another) and `SUMG_SECURITY_MIGRATION_HARDENING.md` §13 for the reasoning. Current recommended order:
 
 ```
-A0 (revised, see §1)  — highest priority, fixes a real live open-write table (dna_records);
-                         do NOT promote until the naming fix + artist_spotify_snapshots
-                         decision above are resolved
-A0.1 (new)             — append_inbox_log hardening, can ship independently of A0
-A1 (revised, see       — first real persistence slice; safe to promote once a human
- SUMG_MANUAL_INTAKE_     has reviewed the trimmed V1 shape; additive, zero backfill,
- V1_PLAN.md §2)          zero collision with any of the 53 live tables
-A2                     — reviewed against production, unchanged, no revision needed;
-                         promote alongside or immediately after A1 (rights records are
-                         created in the same transaction as a new catalog_works row
-                         per the intake plan, so A1 without A2 is incomplete)
-A5 (audit log)         — promote alongside A1/A2 per the audit-log placement decision
-                         in SUMG_MANUAL_INTAKE_V1_PLAN.md §8 — the intake flow's
-                         transaction writes to it from day one
-A3, A4                 — defer until the Review Queue / Routing Desk V1 UI (Manual
-                         Intake plan §6/§7) is actually being implemented against real
-                         data; no code in this pass depends on them yet
+A0 (rewritten)    — ready to promote as written; the artist_spotify_snapshots write-policy
+                     fix and the dna_records/import_logs/apple_metrics_daily closures have
+                     zero traced dependency. Its SELECT policy on artist_spotify_snapshots
+                     is deliberately left untouched — see SUMG_SECURITY_MIGRATION_HARDENING.md §5
+A0.1 (new)        — ready to promote; zero app-code change required, the one legitimate
+                     caller already uses service-role and is unaffected
+A1 (revised again) — ready for human review; created_by/uploaded_by now UUID->auth.users,
+                     upload_status added per the vault preflight's SHA-256 design
+A2 (revised)      — ready for human review; set_by now UUID->auth.users, AI-cannot-clear
+                     backstop now keys off set_by_source (provenance vocabulary) not a
+                     fragile string match, UNIQUE(subject_type, subject_id) added
+A5 (revised)      — ready for human review; actor now UUID->auth.users (nullable)
+A3, A4            — still deferred, unchanged this pass — no code depends on them yet
 ```
 
 None of A0/A0.1/A1/A2/A3/A4/A5 were applied in this pass.
@@ -80,3 +83,5 @@ Concretely, for a future pass (not this one — CI config changes are a repo-pol
 ```
 
 Why not the other options: (B) removing the ceiling entirely stops CI from ever catching a *new* regression, which defeats the purpose of having the check at all — not recommended. (C) fixing all 70 warnings in a dedicated cleanup PR is the actual long-term right answer, but is explicitly out of scope for a catalog-foundation pass and shouldn't block merging real, tested, zero-regression work behind an unrelated pre-existing debt. The `--max-warnings 69` adjustment is the smallest honest change that (a) unblocks PR #21 truthfully, (b) does not hide or lower the bar, and (c) still fails CI the moment anyone adds warning #70. **Not applied to `.github/workflows/ci.yml` in this pass** — flagged as a recommendation per Part 17's "propose," not "apply," instruction; the repo owner should decide whether `--max-warnings 69` or a real cleanup PR is preferred before either is merged.
+
+**Re-confirmed in the security-migration-hardening pass:** `main` clean-checkout baseline is still exactly 69 (0 errors); this branch's delta is still 0. This recommendation still stands unchanged — do not pretend 69 warnings are acceptable forever, but do not mix this cleanup into a security-migration PR either. Not applied here.

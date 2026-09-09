@@ -1,13 +1,27 @@
 -- PROPOSAL — NOT APPLIED. See supabase/migrations_proposed/README.md.
 --
--- A5 — Audit Log. Additive only.
--- Depends on: nothing at the DB level. Deliberately append-only (no UPDATE
+-- A5 — Audit Log. Additive only. Deliberately append-only (no UPDATE
 -- policy, no DELETE policy) so the log cannot be edited after the fact by
 -- any role, including admin, through the normal client.
+--
+-- REVISED 2026-09-09 (security-migration-hardening pass): actor TEXT ->
+-- UUID REFERENCES auth.users(id), same reasoning as A1/A2. Nullable (unlike
+-- catalog_asset_versions.uploaded_by) because a genuinely non-human,
+-- automation-triggered event is a real, intended future case for this
+-- table — when actor IS NULL, automation_rule_id (already present) is
+-- expected to be populated instead; a row with both null is a data-quality
+-- bug to catch in review, not a schema-level impossibility, since forcing
+-- NOT NULL here would make automation-only events unrepresentable. Every
+-- event this table needs to record for the V1 milestone
+-- (docs/SUMG_MANUAL_INTAKE_V1_PLAN.md §8: UPLOAD_INITIATED, MASTER_SECURED,
+-- HASH_VERIFIED, CATALOG_RECORD_CREATED, REVIEW_DECISION,
+-- RIGHTS_STATE_CHANGED, ROUTE_APPROVED) is human-initiated, so actor will
+-- always be populated in practice for V1 — the nullability exists for the
+-- schema's future, not V1's actual writes.
 
 CREATE TABLE IF NOT EXISTS catalog_audit_log (
   id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  actor               TEXT        NOT NULL,
+  actor               UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
   action              TEXT        NOT NULL,
   object_type         TEXT        NOT NULL,
   object_id           TEXT        NOT NULL,

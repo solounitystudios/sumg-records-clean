@@ -23,7 +23,7 @@ Audited `supabase/migrations_proposed/A1` and `A2` against the verified producti
 | Entity | V1 fields (this revision) | Dropped from the original A1 reviewed in PR #21 | Why |
 |---|---|---|---|
 | `catalog_works` | id, title, song_id (nullable), **created_by**, **status**, created_at, updated_at | — (additive only) | Need to know who started the intake and whether it's still mid-intake vs. active |
-| `catalog_recordings` | id, work_id, **artist_reference** (nullable text), created_at | `title`, `is_primary` | A work's title covers V1 (one recording per work); primacy is meaningless with exactly one recording |
+| `catalog_recordings` | id, work_id, **artist_slug** (nullable text), created_at | `title`, `is_primary` | A work's title covers V1 (one recording per work); primacy is meaningless with exactly one recording |
 | `catalog_asset_versions` | id, recording_id, version_kind, vault_object_ref, sha256, size_bytes, **mime_type**, **duration_seconds**, **technical_metadata** (jsonb), **review_status**, **source**, **uploaded_by**, is_primary, created_at, updated_at | — (additive only) | Part 12's technical facts need somewhere to live; Part 13's review queue needs a state field |
 | `catalog_asset_lineage` | unchanged | — | Already minimal |
 
@@ -31,32 +31,34 @@ No backfill of any existing `songs` row — `catalog_works.song_id` stays null f
 
 ## 3. Manual intake V1 — exact workflow (Part 10)
 
+**SHA-256 verification and the exact transaction/state model below were both revised in the security-migration-hardening pass — see `SUMG_MASTER_VAULT_IMPLEMENTATION_PREFLIGHT.md` §2–3 for the full reasoning (a synchronous server-side re-hash was found to require a full master re-download through a request-bound Vercel function, not the "cheap" step originally assumed here; verification is now an asynchronous job in the existing `worker/` service). This section now just summarizes the corrected flow — full detail lives in the preflight doc, not duplicated here.**
+
 ```
 ADMIN → /admin/catalog/intake (already exists as a stub page, PR #21)
   → "Upload Master" action
-  → client requests a signed upload URL for the private vault bucket
-  → client uploads directly to Supabase Storage using that signed URL
-  → server verifies the upload (HEAD request via service role: confirms object
-    exists, reads size/mime from storage.objects — does not re-read the bytes)
-  → server computes/receives SHA-256 (see below), inserts:
-      catalog_works (status='intake')
-      catalog_recordings
-      catalog_asset_versions (review_status='pending_review')
-      catalog_rights_records (status='unknown') — same transaction
-      catalog_audit_log row(s) — same transaction, see §6
-  → redirect to /admin/catalog/review/[assetVersionId]
+  → server creates catalog_works/recordings/asset_versions(upload_status=
+    'pending_upload')/rights_records(status='unknown')/audit_log rows in one
+    transaction FIRST, deriving the vault object key from the new
+    asset_version_id — before any bytes exist in storage, so a real object
+    can never exist with nothing pointing at it
+  → server issues a signed upload URL for that exact object key
+  → client computes SHA-256 client-side, uploads directly to Supabase Storage
+  → client calls a "confirm" action → server does a cheap metadata-only
+    check (object exists, size matches) → upload_status='uploaded_unverified'
+  → worker (existing worker/ service, same pattern as its video-render job
+    polling) picks up 'uploaded_unverified' rows, streams the object back,
+    computes the real SHA-256, sets upload_status='verified' or 'failed'
+  → redirect to /admin/catalog/review/[assetVersionId] once verified
 ```
 
 - **Route:** `/admin/catalog/intake` (existing stub, gets a real form) → posts to a new Server Action `app/actions/catalogIntake.ts::uploadMaster(formData)`.
-- **Direct-to-storage vs. server proxy:** direct signed upload, not proxied through the Next.js server action. Part 10 explicitly says "do not send huge master files through Next.js unnecessarily" — a 200MB WAV through a Vercel/Next.js server action risks request body limits and ties up server compute for the whole upload duration for no benefit. The server action's job is: (1) issue a short-lived signed **upload** URL (Supabase Storage supports `createSignedUploadUrl()`, the write-side counterpart to `getSignedReadUrl` already designed in `lib/catalog/vault.ts` — that interface would need one more method, `putOriginal`/`putDerivative` already model the write, so this is an implementation detail of a real `MasterVault`, not an interface change), (2) after the client confirms upload completion, verify via a metadata-only HEAD-style query and create the DB rows.
-- **SHA-256:** computed **client-side before upload starts** (Web Crypto `crypto.subtle.digest`, streamed) so the value the server trusts is known before the bytes leave the browser, then **re-verified server-side** after upload via `MasterVault.verifyObject()` (re-hashes the stored object using the service-role client, never trusts the client-reported hash alone) — this is exactly `vault.ts`'s existing `verifyObject(objectRef, expectedSha256)` contract, unchanged.
-- **DB transaction boundary:** the four inserts (work, recording, asset version, rights record) plus the audit log rows happen in one Postgres transaction (a single RPC/function call via the service-role client, or sequential inserts wrapped in a Supabase `rpc()` — matching the existing `append_inbox_log`-style single-purpose RPC pattern already used in this codebase, minus that function's security gap: this one must NOT be `SECURITY DEFINER` callable by `anon`). Partial failure must not leave an orphan vault object referenced by nothing, or a `catalog_works` row with no rights record — either everything commits or nothing does.
+- **Direct-to-storage vs. server proxy:** direct signed upload, not proxied through the Next.js server action — Part 10 explicitly says "do not send huge master files through Next.js unnecessarily," and the preflight doc's SHA-256 analysis independently confirms a synchronous full-file round-trip through a serverless function is expensive, not cheap.
 - **Max size:** 250MB (per the vault readiness doc).
 - **Allowed formats:** `audio/wav`, `audio/x-wav`, `audio/flac`, `audio/aiff` for masters; `audio/mpeg` accepted but flagged as non-master-quality in the UI (a compressed reference, not a master).
-- **Failure handling:** signed-upload-URL request failure → no DB row created at all (nothing to clean up). Upload-to-storage failure → same, client just retries against a fresh signed URL. Post-upload verification failure (hash mismatch, object missing) → the object is left in the vault (never silently deleted — Part 31's "never auto-delete" applies even to a bad upload; a human decides), no catalog rows are created, and a single `catalog_audit_log` entry records the failed verification attempt.
-- **Idempotency:** re-running the same upload (same file) computes the same SHA-256. Before creating new catalog rows, the flow checks `catalog_asset_versions` for an existing row with the same `sha256` — see §4.
-- **Retry:** upload retry is a plain re-attempt of the signed-upload step (new signed URL, same client-computed hash) — no partial-upload resume in V1, files are small enough (≤250MB) that a clean retry is acceptable.
-- **Review state:** every new asset version starts `review_status = 'pending_review'`.
+- **Failure handling:** a `pending_upload` row with no confirmed upload is inert and safely cleanable later (not built this pass). A `failed` (hash-mismatch) verification never auto-deletes the object or the row — a human decides, and a `catalog_audit_log` entry records the failure.
+- **Idempotency:** a retry of the same intake attempt (same client idempotency token) re-uses the same `catalog_asset_versions.id`/object key while still `pending_upload`, rather than creating a duplicate row.
+- **Retry:** plain re-attempt against the same signed-URL-issuing step; no partial-upload resume in V1.
+- **Review state:** every new asset version starts `review_status = 'pending_review'` and `upload_status = 'pending_upload'` — these are two orthogonal dimensions, see the preflight doc.
 - **Audit event:** see §6.
 
 ## 4. Duplicate handling (Part 11)
@@ -75,11 +77,11 @@ Extracted server-side (after verified upload, before the transaction commits) us
 
 `/admin/catalog/review` (existing honest stub from PR #21) becomes a real list + detail view **once this slice's tables exist** — not before, and not with any production write wired in this pass unless explicitly authorized later, per Part 13's own instruction. Planned shape:
 
-**List view** — every `catalog_asset_versions` row with `review_status = 'pending_review'`, joined to its `catalog_recordings`/`catalog_works`/`catalog_rights_records` rows, showing: title/source filename, upload time, SHA-256 (truncated for display), technical metadata summary, a duplicate warning badge (if `classifyDuplicate()` found an `exact_duplicate` at intake time — stored as a flag, not re-computed on every page load), current rights status (`unknown` for everything in V1), artist/persona assignment (from `catalog_recordings.artist_reference`, editable), project assignment (not modeled yet — deferred), catalog role (not modeled yet — deferred, see Part 22 of the original mission brief), master/version type (`version_kind`), provenance (`source`, `uploaded_by`), policy flags (none exist yet in V1 — A2 ships the table, nothing writes to it automatically), destination proposals (none — Routing Desk V1 is manual only, see §7).
+**List view** — every `catalog_asset_versions` row with `review_status = 'pending_review'`, joined to its `catalog_recordings`/`catalog_works`/`catalog_rights_records` rows, showing: title/source filename, upload time, SHA-256 (truncated for display), technical metadata summary, a duplicate warning badge (if `classifyDuplicate()` found an `exact_duplicate` at intake time — stored as a flag, not re-computed on every page load), current rights status (`unknown` for everything in V1), artist/persona assignment (from `catalog_recordings.artist_slug`, editable), project assignment (not modeled yet — deferred), catalog role (not modeled yet — deferred, see Part 22 of the original mission brief), master/version type (`version_kind`), provenance (`source`, `uploaded_by`), policy flags (none exist yet in V1 — A2 ships the table, nothing writes to it automatically), destination proposals (none — Routing Desk V1 is manual only, see §7).
 
 **Founder actions** (server actions, each one an explicit, auditable write — not batch/automatic):
 - Approve Catalog Record → `review_status = 'approved'`
-- Assign Artist → writes `catalog_recordings.artist_reference`
+- Assign Artist → writes `catalog_recordings.artist_slug`
 - Assign Persona → not modeled this slice (no persona-identity table exists anywhere in the schema yet, live or proposed — genuinely deferred, not silently dropped)
 - Assign Project → not modeled this slice (same reason)
 - Hold → `review_status = 'held'`

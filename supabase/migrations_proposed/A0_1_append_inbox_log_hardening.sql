@@ -1,0 +1,84 @@
+-- PROPOSAL — NOT APPLIED. See supabase/migrations_proposed/README.md.
+--
+-- A0.1 — append_inbox_log hardening. New this pass (2026-09-09), split out
+-- from A0 because its remediation shape (function GRANT/REVOKE) is different
+-- from A0's (CREATE POLICY on a table). Independent of A0/A1/A2/A5 — no
+-- dependency either direction.
+--
+-- CURRENT LIVE STATE (confirmed via pg_proc + has_function_privilege() on
+-- 2026-09-09):
+--   public.append_inbox_log(p_id text, p_entry jsonb) is SECURITY DEFINER,
+--   owned by `postgres`, no search_path pinned (proconfig is null — also
+--   flagged separately by the Supabase Advisor as function_search_path_mutable),
+--   body is an unconditional `UPDATE audio_inbox SET action_log = ... WHERE
+--   id = p_id` with NO internal auth/role check of any kind. EXECUTE is
+--   granted to anon, authenticated, postgres, AND service_role (confirmed via
+--   has_function_privilege() for each role individually). audio_inbox's own
+--   table-level RLS policy (admin_all_audio_inbox, is_cms_role()) is correct
+--   — this function is a complete bypass of it: anyone with the public anon
+--   key (by design present in every client bundle as
+--   NEXT_PUBLIC_SUPABASE_ANON_KEY) can call
+--   POST /rest/v1/rpc/append_inbox_log with any {p_id, p_entry} and mutate
+--   any audio_inbox row's action_log, with no authentication at all.
+--
+-- INTENDED CALLER, TRACED: app/actions/audioInbox.ts:173 is the only call
+--   site in the repo (`supabase.rpc("append_inbox_log", { p_id: id, p_entry:
+--   entry })`). That file imports `supabase` from "@/lib/db/supabase" — the
+--   SERVICE-ROLE client — confirmed by reading the import statement, not
+--   assumed from directory location. The legitimate app path therefore
+--   ALREADY calls this function as service_role, which already has EXECUTE
+--   (and would keep it after this migration — nothing here touches the
+--   service_role grant).
+--
+-- OPTIONS EVALUATED:
+--   A. REVOKE EXECUTE FROM anon/authenticated, keep service_role/postgres —
+--      smallest possible change, zero code change required, the legitimate
+--      caller already uses service_role so nothing breaks. CHOSEN.
+--   B. Add an internal is_cms_role()-style auth check inside the function —
+--      redundant given the caller already authenticates via requireAdmin()
+--      before reaching this RPC, and SQL-language SECURITY DEFINER functions
+--      can't easily call an auth.jwt()-based check the same way a policy
+--      does without extra plumbing; more moving parts than the fix needs.
+--   C. Drop SECURITY DEFINER entirely — would break the function's actual
+--      purpose (it needs elevated privilege to jsonb-append onto a row that
+--      RLS would otherwise gate correctly for the caller's own role, since
+--      service_role already bypasses RLS this isn't even necessary for the
+--      current caller — but changing to SECURITY INVOKER changes call
+--      semantics more than a REVOKE does, for no additional safety here).
+--   D. Move the update behind a purely server-only path with no RPC at all —
+--      correct long-term shape, but a larger refactor (removing the RPC,
+--      inlining the UPDATE into app/actions/audioInbox.ts directly via the
+--      service-role client) than this narrow hardening pass should bundle in.
+--   Chosen: Option A. Smallest safe fix, zero app-code change required,
+--   verified the one legitimate caller is unaffected.
+--
+-- WHY CHANGE: anon/authenticated should never have had EXECUTE on a
+--   SECURITY DEFINER function that mutates an admin-only table with no
+--   internal check. This is a direct, live, unauthenticated write path into
+--   production data.
+-- EXPECTED AFTER STATE: only service_role (and the table owner, postgres)
+--   can call append_inbox_log; anon and authenticated get a permission-denied
+--   error from PostgREST if they attempt the RPC. app/actions/audioInbox.ts's
+--   legitimate call (via service_role) is unaffected.
+-- ROLLBACK: GRANT EXECUTE ON FUNCTION public.append_inbox_log(text, jsonb)
+--             TO anon, authenticated;
+--           (Restores the exact prior state — re-opens the bypass; emergency
+--           use only, re-file the regression immediately.)
+-- DEPENDENCY / BLAST RADIUS: single call site in the entire repo
+--   (app/actions/audioInbox.ts:173), already using service_role. No admin
+--   UI, worker, or public route calls this RPC directly. Zero legitimate
+--   functionality depends on anon/authenticated EXECUTE.
+
+REVOKE EXECUTE ON FUNCTION public.append_inbox_log(text, jsonb) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.append_inbox_log(text, jsonb) FROM authenticated;
+
+-- Secondary, lower-severity fix bundled here since it's the same function and
+-- the same Advisor finding category (function_search_path_mutable): pin
+-- search_path so the function can't be tricked by a session-level search_path
+-- change into resolving `audio_inbox` to an unexpected schema. Zero behavior
+-- change for the legitimate caller — audio_inbox already lives in `public`.
+ALTER FUNCTION public.append_inbox_log(text, jsonb) SET search_path = public;
+
+-- Reversal: see ROLLBACK comment above for the EXECUTE grants;
+-- ALTER FUNCTION public.append_inbox_log(text, jsonb) RESET search_path;
+-- to undo the search_path pin specifically.
