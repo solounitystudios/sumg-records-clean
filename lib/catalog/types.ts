@@ -160,7 +160,8 @@ export interface CatalogRightsRecord extends CatalogSubjectRef {
   evidenceDocumentId: string | null;
   contractId: string | null;
   permissions: RightsPermissions;
-  setBy: string;
+  /** Null when the record was set by an automated source with no human actor (e.g. an import), never a placeholder string. */
+  setBy: string | null;
   setAt: string;
   /** When set, a 'cleared' status past this instant must be treated as expired at check time — never rely solely on a background job having flipped `status`. */
   expiresAt: string | null;
