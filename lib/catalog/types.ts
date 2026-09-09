@@ -162,6 +162,8 @@ export interface CatalogRightsRecord extends CatalogSubjectRef {
   permissions: RightsPermissions;
   setBy: string;
   setAt: string;
+  /** When set, a 'cleared' status past this instant must be treated as expired at check time — never rely solely on a background job having flipped `status`. */
+  expiresAt: string | null;
 }
 
 export type PolicyFlag =
@@ -222,16 +224,29 @@ export interface CatalogDeliveryReceipt {
  * NOT a live integration — PersonaWorks independently ingests and verifies
  * this shape. No network code lives in lib/catalog/.
  */
+export type CatalogAvailabilityState = "available" | "not_available";
+
 export interface CatalogPersonaWorksDeliveryContract {
-  contractVersion: "1.0";
+  contractVersion: "1.1";
   sumgCatalogId: string;
   workId: string;
   recordingId: string;
   assetVersionId: string;
+  /** version_kind + is_primary snapshot — "which cut is this" (Part 15's "version"). */
+  versionKind: string;
   title: string;
   artistOrPersona: string;
   project: string | null;
-  assetReference: { vaultObjectRef: string; sha256: string };
+  /**
+   * Opaque, never independently resolvable by PersonaWorks — this is a
+   * pointer, not a downloadable URL. Turning it into an actual signed read
+   * requires PersonaWorks calling back to SUMG, which is explicitly a
+   * future integration, not part of this contract. Embedding a real signed
+   * URL here would require refresh mechanics that don't exist yet and
+   * would let the reference outlive its intended access window.
+   */
+  assetReference: { vaultObjectRef: string; verifiedSha256: string };
+  mimeType: string | null;
   durationSeconds: number | null;
   bpm: number | null;
   key: string | null;
@@ -239,7 +254,17 @@ export interface CatalogPersonaWorksDeliveryContract {
   genre: string | null;
   mood: string | null;
   rightsStatus: RightsStatus;
+  /** Full permission snapshot, not just the personaworks flag — PersonaWorks needs to know the other flags too (e.g. whether it may also treat this as distribution/sync-cleared) even though only `personaworksPermission` gates whether this contract exists at all. */
+  rightsPermissions: RightsPermissions;
   personaworksPermission: boolean;
+  /**
+   * Whether SUMG considers this specific asset version ready for handoff —
+   * derived from upload_status='verified' AND review_status='approved',
+   * never from rights alone. A cleared-rights asset that hasn't passed
+   * technical verification or editorial review is 'not_available'
+   * regardless of what buildPersonaWorksContract's rights check says.
+   */
+  availabilityState: CatalogAvailabilityState;
   programmingRoles: string[];
   visualTraits: Record<string, unknown>;
   provenanceId: string;

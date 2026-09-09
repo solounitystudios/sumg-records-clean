@@ -3,6 +3,7 @@ export * from "./provenance";
 export * from "./rights";
 export * from "./policy";
 export * from "./routing";
+export * from "./routing-guard";
 export * from "./destinations";
 export * from "./lineage";
 export * from "./intake";

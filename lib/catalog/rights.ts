@@ -35,26 +35,38 @@ export function assertAiCannotClear(nextStatus: RightsStatus, setBySource: Prove
 
 export type RightsAction = keyof RightsPermissions;
 
+type PermissionCheckable = Pick<CatalogRightsRecord, "status" | "permissions" | "expiresAt">;
+
 /**
- * A record only grants an action when status is exactly `cleared` AND the
- * specific permission flag is set. unknown/under_review/restricted/denied/
- * expired are all treated as "no permission" without collapsing their
- * distinct meanings elsewhere in the system.
+ * A record only grants an action when status is exactly `cleared`, the
+ * specific permission flag is set, AND (if set) expiresAt has not passed as
+ * of `now`. unknown/under_review/restricted/denied/expired are all treated
+ * as "no permission" without collapsing their distinct meanings elsewhere in
+ * the system.
+ *
+ * Expiration is checked HERE, at read time, against the caller-supplied
+ * `now` — never via a hidden `new Date()`/`Date.now()` (same discipline as
+ * lib/catalog/vault.ts), and never solely by trusting that some background
+ * job has already flipped `status` to 'expired'. A 'cleared' record whose
+ * expiresAt has passed is treated as having no permission regardless of
+ * what the stored status column still says, so a reconciliation job that
+ * hasn't run yet can never grant a permission that should no longer exist.
  */
-export function hasPermission(record: Pick<CatalogRightsRecord, "status" | "permissions">, action: RightsAction): boolean {
+export function hasPermission(record: PermissionCheckable, action: RightsAction, now: string): boolean {
   if (!isCleared(record.status)) return false;
+  if (record.expiresAt !== null && record.expiresAt <= now) return false;
   return record.permissions[action] === true;
 }
 
-export function canDistribute(record: Pick<CatalogRightsRecord, "status" | "permissions">): boolean {
-  return hasPermission(record, "distribution");
+export function canDistribute(record: PermissionCheckable, now: string): boolean {
+  return hasPermission(record, "distribution", now);
 }
-export function canSync(record: Pick<CatalogRightsRecord, "status" | "permissions">): boolean {
-  return hasPermission(record, "sync");
+export function canSync(record: PermissionCheckable, now: string): boolean {
+  return hasPermission(record, "sync", now);
 }
-export function canDeliverToPersonaWorks(record: Pick<CatalogRightsRecord, "status" | "permissions">): boolean {
-  return hasPermission(record, "personaworks");
+export function canDeliverToPersonaWorks(record: PermissionCheckable, now: string): boolean {
+  return hasPermission(record, "personaworks", now);
 }
-export function canTrainAi(record: Pick<CatalogRightsRecord, "status" | "permissions">): boolean {
-  return hasPermission(record, "aiTraining");
+export function canTrainAi(record: PermissionCheckable, now: string): boolean {
+  return hasPermission(record, "aiTraining", now);
 }

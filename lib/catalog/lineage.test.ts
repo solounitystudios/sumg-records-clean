@@ -3,21 +3,28 @@ import assert from "node:assert/strict";
 import { addLineageEdge, classifyDuplicate, getAncestors, getDescendants, isSafeToAutoDelete, LineageCycleError } from "./lineage";
 import type { CatalogAssetLineageEdge } from "./types";
 
+const NOW = "2026-01-01T00:00:00.000Z";
+
 test("lineage does not permit direct self-parenting", () => {
-  assert.throws(() => addLineageEdge([], "v1", "v1", "normalize"), LineageCycleError);
+  assert.throws(() => addLineageEdge([], "v1", "v1", "normalize", NOW), LineageCycleError);
 });
 
 test("lineage does not permit a cycle (A -> B -> A)", () => {
-  const edges = addLineageEdge([], "v2", "v1", "normalize");
-  assert.throws(() => addLineageEdge(edges, "v1", "v2", "normalize"), LineageCycleError);
+  const edges = addLineageEdge([], "v2", "v1", "normalize", NOW);
+  assert.throws(() => addLineageEdge(edges, "v1", "v2", "normalize", NOW), LineageCycleError);
 });
 
 test("a valid derivation chain is accepted and ancestry is traceable", () => {
   let edges: CatalogAssetLineageEdge[] = [];
-  edges = addLineageEdge(edges, "v2", "v1", "normalize");
-  edges = addLineageEdge(edges, "v3", "v2", "transcode_aac");
+  edges = addLineageEdge(edges, "v2", "v1", "normalize", NOW);
+  edges = addLineageEdge(edges, "v3", "v2", "transcode_aac", NOW);
   assert.deepEqual(getAncestors(edges, "v3"), ["v2", "v1"]);
   assert.deepEqual(getDescendants(edges, "v1"), ["v2", "v3"]);
+});
+
+test("addLineageEdge is deterministic — createdAt comes from the injected clock, not a hidden one", () => {
+  const edges = addLineageEdge([], "v2", "v1", "normalize", NOW);
+  assert.equal(edges[0].createdAt, NOW);
 });
 
 test("exact hashes identify exact duplicates", () => {

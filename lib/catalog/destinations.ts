@@ -21,9 +21,9 @@ const DESTINATION_GATED_ACTION: Record<CatalogDestination, PolicyGatedAction> = 
   archive: "publish",
 };
 
-export function requestDestination(subject: CatalogSubjectRef, destination: CatalogDestination): CatalogDestinationAssignment {
+export function requestDestination(subject: CatalogSubjectRef, destination: CatalogDestination, now: string): CatalogDestinationAssignment {
   return {
-    id: `${subject.subjectId}:${destination}:${Date.now()}`,
+    id: `${subject.subjectId}:${destination}:${now}`,
     subjectType: subject.subjectType,
     subjectId: subject.subjectId,
     destination,
@@ -84,20 +84,28 @@ export function markDelivered(
 
 /**
  * Pure assembly of a PersonaWorks delivery contract. No network call. The
- * contract is only buildable when rights explicitly grant PersonaWorks
- * delivery — this function throws otherwise rather than emitting a
- * contract with a false permission claim.
+ * contract is only buildable when BOTH rights explicitly grant PersonaWorks
+ * delivery AND the asset version is actually verified + approved
+ * (availabilityState would otherwise be 'not_available') — this function
+ * throws in either failure case rather than emitting a contract with a
+ * false permission or readiness claim. Rights being cleared early (before
+ * technical verification or editorial review complete) must never let an
+ * unverified or unreviewed asset out the door.
  */
 export function buildPersonaWorksContract(input: {
   sumgCatalogId: string;
   workId: string;
   recordingId: string;
   assetVersionId: string;
+  versionKind: string;
   title: string;
   artistOrPersona: string;
   project: string | null;
   vaultObjectRef: string;
-  sha256: string;
+  verifiedSha256: string | null;
+  mimeType: string | null;
+  uploadStatus: string;
+  reviewStatus: string;
   durationSeconds: number | null;
   bpm: number | null;
   key: string | null;
@@ -108,21 +116,30 @@ export function buildPersonaWorksContract(input: {
   programmingRoles: string[];
   visualTraits: Record<string, unknown>;
   provenanceId: string;
+  now: string;
 }): CatalogPersonaWorksDeliveryContract {
-  if (!canDeliverToPersonaWorks(input.rights)) {
+  if (!canDeliverToPersonaWorks(input.rights, input.now)) {
     throw new Error("Rights record does not grant PersonaWorks delivery permission");
+  }
+  const availabilityState = input.uploadStatus === "verified" && input.reviewStatus === "approved" ? "available" : "not_available";
+  if (availabilityState !== "available" || input.verifiedSha256 === null) {
+    throw new Error(
+      `Asset version is not available for handoff (uploadStatus="${input.uploadStatus}", reviewStatus="${input.reviewStatus}") — rights being cleared does not override verification/review state`
+    );
   }
 
   return {
-    contractVersion: "1.0",
+    contractVersion: "1.1",
     sumgCatalogId: input.sumgCatalogId,
     workId: input.workId,
     recordingId: input.recordingId,
     assetVersionId: input.assetVersionId,
+    versionKind: input.versionKind,
     title: input.title,
     artistOrPersona: input.artistOrPersona,
     project: input.project,
-    assetReference: { vaultObjectRef: input.vaultObjectRef, sha256: input.sha256 },
+    assetReference: { vaultObjectRef: input.vaultObjectRef, verifiedSha256: input.verifiedSha256 },
+    mimeType: input.mimeType,
     durationSeconds: input.durationSeconds,
     bpm: input.bpm,
     key: input.key,
@@ -130,7 +147,9 @@ export function buildPersonaWorksContract(input: {
     genre: input.genre,
     mood: input.mood,
     rightsStatus: input.rights.status,
+    rightsPermissions: input.rights.permissions,
     personaworksPermission: true,
+    availabilityState,
     programmingRoles: input.programmingRoles,
     visualTraits: input.visualTraits,
     provenanceId: input.provenanceId,

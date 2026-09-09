@@ -20,27 +20,43 @@ To promote a slice:
    `YYYYMMDDHHMMSS_` timestamp prefix per the existing convention.
 3. Apply it the normal way (`supabase db push` or the project's deploy pipeline).
 
-**Proven DB-level independence (verified 2026-09-09 by grepping every
-`REFERENCES` clause in every file — see `docs/SUMG_SECURITY_MIGRATION_HARDENING.md`
-§14):** none of A0, A0.1, A1, A2, A3, A4, A5 has a foreign-key dependency on
-another proposal file. A2's `subject_type`/`subject_id` is a loose
-polymorphic reference, not an FK to A1's `catalog_works` — so A2 could
-technically be applied without A1 ever existing. Every `REFERENCES` clause
-across all seven files points either at an already-live table
-(`songs`, `documents`, `contracts`, `auth.users`) or at a table defined
-within the *same* file. All seven are independently applicable, in any order,
-at the database level.
+**UPDATE 2026-09-09 (pre-production hardening pass) — the independence claim
+below no longer holds for A2.** A2 was revised to add a trigger
+(`catalog_rights_records_audit_trg`) that unconditionally writes to A5's
+`catalog_audit_log` on every rights-record insert/update, replacing a weaker
+"application code should remember to audit this" convention with a real
+DB-enforced guarantee. Postgres does not statically validate table
+references inside a function body, so A2's DDL (`CREATE TABLE`/`FUNCTION`/
+`TRIGGER`) will still succeed even if A5 hasn't been applied yet — but every
+write to `catalog_rights_records` will fail at runtime
+(`relation "catalog_audit_log" does not exist`) until A5 also exists.
+**Practical order requirement: apply A5 before or together with A2, not
+after.** This is exactly the kind of schema-revision-introduces-a-dependency
+case this pass's own instructions warned not to assume away — see
+`docs/SUMG_CATALOG_PRE_PRODUCTION_HARDENING.md`'s migration rehearsal section
+for the full account.
 
-**Recommended order anyway** — not for FK reasons, but because the intake
-workflow this schema supports (`docs/SUMG_MANUAL_INTAKE_V1_PLAN.md`) needs
-several of them to exist together to do anything useful:
+**Originally proven DB-level independence (2026-09-09, security-migration-
+hardening pass, before the above trigger existed):** grepping every
+`REFERENCES` clause in every file showed none of A0, A0.1, A1, A2, A3, A4, A5
+had a foreign-key dependency on another proposal file — that FK-level claim
+is still true today (A2's trigger is a function-body reference, not an FK);
+only the *practical, runtime* independence claim for A2 has changed.
+
+**Two new tables since that audit, both inside A1's file:**
+`catalog_verification_jobs` (worker claim/lease bookkeeping) and
+`catalog_review_flags` (multi-reason human review flags) — both reference
+only tables defined earlier in A1's own file plus `auth.users`, so they don't
+change A1's own independence.
+
+**Recommended order:**
 
 `A0_rls_hardening.sql` → `A0_1_append_inbox_log_hardening.sql` →
-`A1_work_recording_version_lineage.sql` → `A2_rights_policy.sql` →
-`A5_audit_log.sql` → (`A3_editorial_routing.sql`, `A4_destinations_receipts.sql`
-deferred until the Review Queue / Routing Desk UI is actually being built
-against real data — see the manual intake plan §2)
+`A1_work_recording_version_lineage.sql` → `A5_audit_log.sql` →
+`A2_rights_policy.sql` (moved after A5 — see the dependency note above) →
+(`A3_editorial_routing.sql`, `A4_destinations_receipts.sql` deferred until
+the Review Queue / Routing Desk UI is actually being built against real
+data — see `docs/SUMG_MANUAL_INTAKE_V1_PLAN.md` §2)
 
-A0 and A0.1 are the highest-priority, lowest-risk slices (pure policy/grant
-changes on tables that already exist, zero new tables) and should ship first
-regardless of when the catalog persistence slices land.
+A0 and A0.1 are already applied and verified in production — see
+`docs/SUMG_SECURITY_MIGRATION_HARDENING.md`.

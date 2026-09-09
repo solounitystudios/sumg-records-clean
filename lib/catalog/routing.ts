@@ -23,10 +23,11 @@ export class RoutingAuthorizationError extends Error {
 export function applyRecipe(
   recipe: CatalogRoutingRecipe,
   subject: CatalogSubjectRef,
-  proposedAssignment: Record<string, unknown>
+  proposedAssignment: Record<string, unknown>,
+  now: string
 ): CatalogRoutingDecision {
   return {
-    id: `${recipe.id}:${subject.subjectId}:${Date.now()}`,
+    id: `${recipe.id}:${subject.subjectId}:${now}`,
     subjectType: subject.subjectType,
     subjectId: subject.subjectId,
     recipeId: recipe.id,
@@ -40,10 +41,11 @@ export function applyRecipe(
 /** Manual routing (no recipe) — still born `proposed`. */
 export function proposeManualRouting(
   subject: CatalogSubjectRef,
-  proposedAssignment: Record<string, unknown>
+  proposedAssignment: Record<string, unknown>,
+  now: string
 ): CatalogRoutingDecision {
   return {
-    id: `manual:${subject.subjectId}:${Date.now()}`,
+    id: `manual:${subject.subjectId}:${now}`,
     subjectType: subject.subjectType,
     subjectId: subject.subjectId,
     recipeId: null,
