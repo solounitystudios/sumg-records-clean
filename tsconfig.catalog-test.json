@@ -15,6 +15,8 @@
   "include": [
     "lib/catalog/**/*.ts",
     "lib/cms/*.security.test.ts",
-    "lib/youtube/thumbnails/*.security.test.ts"
+    "lib/youtube/thumbnails/*.security.test.ts",
+    "lib/youtube/oauth-state.ts",
+    "lib/youtube/*.security.test.ts"
   ]
 }
