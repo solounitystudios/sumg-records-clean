@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { requireAdmin } from "@/lib/auth"
 import { supabase } from "@/lib/db/supabase"
 import { buildAuthUrl, isOAuthConfigured } from "@/lib/youtube/oauth"
+import { createOAuthState } from "@/lib/youtube/oauth-state-store"
 import { runProcessor } from "@/lib/youtube/processor"
 import type { ProcessSummary } from "@/lib/youtube/types"
 
@@ -35,13 +36,26 @@ export async function retryFailedJob(formData: FormData) {
 }
 
 export async function initiateOAuth(formData: FormData) {
-  await requireAdmin()
+  const user = await requireAdmin()
   if (!isOAuthConfigured()) {
     throw new Error("YouTube OAuth is not configured — add YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, and YOUTUBE_REDIRECT_URI to your environment")
   }
   const channelId = formData.get("channel_id")?.toString() ?? ""
   if (!channelId) throw new Error("channel_id required")
-  redirect(buildAuthUrl(channelId))
+
+  // Bind the OAuth state to the channel and to this authenticated admin.
+  // Confirm the channel exists first so we never mint state for a bad id.
+  const { data: channel, error } = await supabase
+    .from("yt_channels")
+    .select("id")
+    .eq("id", channelId)
+    .single()
+  if (error || !channel) throw new Error("Unknown channel")
+
+  // SUMG-SEC-P0-005: the OAuth `state` is a single-use 256-bit random token,
+  // never the channel id. redirect() must run AFTER the state row is written.
+  const state = await createOAuthState({ channelId, initiatedBy: user.id })
+  redirect(buildAuthUrl(state))
 }
 
 export async function disconnectOAuth(formData: FormData) {

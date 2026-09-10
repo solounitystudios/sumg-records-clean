@@ -17,7 +17,15 @@ export function getMissingOAuthConfig(): string[] {
   return missing
 }
 
-export function buildAuthUrl(channelDbId: string): string {
+/**
+ * Build the Google authorization URL.
+ *
+ * SUMG-SEC-P0-005: `state` is an opaque, single-use, cryptographically random
+ * token minted by `createOAuthState()` — NOT the channel id and NOT any other
+ * predictable database identifier. The callback resolves the channel from the
+ * consumed state row, never from `state` itself.
+ */
+export function buildAuthUrl(state: string): string {
   const params = new URLSearchParams({
     client_id:     CLIENT_ID,
     redirect_uri:  REDIRECT_URI,
@@ -25,7 +33,7 @@ export function buildAuthUrl(channelDbId: string): string {
     scope:         "https://www.googleapis.com/auth/youtube.upload",
     access_type:   "offline",
     prompt:        "consent",
-    state:         channelDbId,
+    state,
   })
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
 }
