@@ -32,6 +32,13 @@ jobs:
       - name: Lint
         run: npm run lint -- --max-warnings 50
 
+      - name: Test
+        # Compiles the node:test suites (tsconfig.catalog-test.json) and runs them.
+        # Covers the SUMG-SEC-P0-004 privileged Server Action authorization invariant
+        # (lib/youtube/thumbnails/actions.security.test.ts) plus the existing
+        # lib/catalog and lib/cms security suites.
+        run: npm run pretest && npm test
+
       - name: Build
         run: npm run build
         env:
