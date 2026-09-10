@@ -9,3 +9,5 @@ export * from "./lineage";
 export * from "./intake";
 export * from "./source-adapter";
 export * from "./vault";
+export * from "./master-vault-key";
+export * from "./asset-store";

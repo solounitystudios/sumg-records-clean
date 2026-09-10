@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createInMemoryMasterVault, sha256Hex, VaultObjectTooLargeError } from "./vault";
+import { createInMemoryMasterVault, sha256Hex, VaultObjectExistsError, VaultObjectTooLargeError } from "./vault";
 
 const FIXED_CLOCK = () => new Date("2026-01-01T00:00:00.000Z");
 
@@ -24,6 +24,16 @@ test("putOriginal rejects an object over the configured size limit", async () =>
   const vault = createInMemoryMasterVault({ clock: FIXED_CLOCK });
   const bytes = new Uint8Array(100);
   await assert.rejects(() => vault.putOriginal("obj-2", { bytes, mimeType: "audio/wav", maxSizeBytes: 10 }), VaultObjectTooLargeError);
+});
+
+test("putOriginal never silently overwrites an existing object — replacement is a new version", async () => {
+  const vault = createInMemoryMasterVault({ clock: FIXED_CLOCK });
+  const bytes = new TextEncoder().encode("hello master");
+  await vault.putOriginal("obj-1", { bytes, mimeType: "audio/wav" });
+  await assert.rejects(
+    () => vault.putOriginal("obj-1", { bytes: new TextEncoder().encode("different"), mimeType: "audio/wav" }),
+    VaultObjectExistsError,
+  );
 });
 
 test("putDerivative requires the parent object to already exist", async () => {
