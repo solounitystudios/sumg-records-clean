@@ -1,7 +1,7 @@
 /**
  * SUMG-SEC-P0-005 — schema/security contract for the OAuth-state migration.
  *
- * Structural checks on supabase/migrations/20260910013000_yt_oauth_state_integrity.sql.
+ * Structural checks on supabase/migrations/20260910212711_yt_oauth_state_integrity.sql.
  * Not a substitute for a live DB run, but locks the security-relevant shape and
  * keeps the migration inside P0-005 scope (additive only, no unrelated table).
  */
@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 const SQL = readFileSync(
-  join(__dirname, "..", "..", "supabase", "migrations", "20260910013000_yt_oauth_state_integrity.sql"),
+  join(__dirname, "..", "..", "supabase", "migrations", "20260910212711_yt_oauth_state_integrity.sql"),
   "utf8",
 )
 /** DDL only — `-- ...` line comments stripped so "must not contain" tests real SQL. */

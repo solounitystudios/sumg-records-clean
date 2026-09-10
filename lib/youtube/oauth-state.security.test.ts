@@ -31,7 +31,7 @@ const CALLBACK_SRC = read("app/api/youtube/oauth/callback/route.ts")
 const OAUTH_SRC = read("lib/youtube/oauth.ts")
 const YT_ENGINE_SRC = read("app/actions/ytEngine.ts")
 const HELPER_SRC = read("lib/youtube/oauth-state.ts")
-const MIGRATION_SRC = read("supabase/migrations/20260910013000_yt_oauth_state_integrity.sql")
+const MIGRATION_SRC = read("supabase/migrations/20260910212711_yt_oauth_state_integrity.sql")
 
 // ── 1. Pure helper behavior ────────────────────────────────────────────────
 
