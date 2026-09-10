@@ -68,7 +68,7 @@ BEGIN
     RAISE EXCEPTION 'CASE 2b FAILED: recording.work_id was mutable';
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM LIKE '%CASE 2b FAILED%' THEN RAISE; END IF;
-    RAISE NOTICE 'CASE 2b PASSED: recording.work_id immutable (%）', SQLERRM;
+    RAISE NOTICE 'CASE 2b PASSED: recording.work_id immutable (%)', SQLERRM;
   END;
 
   -- ── 3. ASSET VERSION (primary master) ────────────────────────────────
