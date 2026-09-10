@@ -1,6 +1,13 @@
 # SUMG Next Migration Decision
 
-**Status:** Decision record, grounded in live production verification (`SUMG_PRODUCTION_SCHEMA_DRIFT_AUDIT.md`). No migration was applied in this pass.
+**Status:** Decision record, grounded in live production verification (`SUMG_PRODUCTION_SCHEMA_DRIFT_AUDIT.md`). No migration was applied *in the pass that authored this document*.
+
+> **UPDATE 2026-09-10 — production migration state recorded (docs-only pass).** §2's sequencing block below is updated to current reality:
+> - **A0 / A0.1 / Spotify SELECT follow-up** — APPLIED + VERIFIED IN PRODUCTION (unchanged).
+> - **A5 / A2** — promoted and applied (SUMG-CAT-P0-001) and corrected (SUMG-CAT-P0-002); **PRODUCTION-PROVEN**.
+> - **A1 + a new MasterVault storage migration** — promoted with fixes and applied (SUMG-CAT-P0-003); **MIGRATION-APPLIED + STRUCTURALLY VERIFIED**, but **NOT YET PRODUCTION-PROVEN** — the founder-authorized end-to-end proof with one real master file is still required.
+> - **A3 / A4** — still proposals only, deferred by design.
+> These four states are not interchangeable: CODE-COMPLETE < MIGRATION-APPLIED < STRUCTURALLY VERIFIED < PRODUCTION-PROVEN.
 
 ---
 
@@ -42,7 +49,7 @@ If A0 were applied exactly as written today, three of its four fixes would silen
 
 </details>
 
-## 2. Overall migration sequencing recommendation — updated, A0/A0.1 now applied
+## 2. Overall migration sequencing recommendation — updated 2026-09-10 (A0/A0.1 + A5/A2 applied; A1 + MasterVault storage MIGRATION-APPLIED, not yet production-proven)
 
 See `supabase/migrations_proposed/README.md` for the proven-from-SQL dependency graph (none of the seven proposal files has a hard FK dependency on another) and `SUMG_SECURITY_MIGRATION_HARDENING.md` §13 for the reasoning, and its status block for the full applied/verified account.
 
@@ -59,19 +66,40 @@ Spotify SELECT follow-up — APPLIED + VERIFIED IN PRODUCTION, 2026-09-09 (same 
          artist_spotify_snapshots, after a client-code fix (lib/cms/admin-spotify.ts)
          removed the application dependency that made deferring it necessary.
          supabase/migrations/20260909041713_artist_spotify_snapshots_select_hardening.sql
-A1 (revised again) — ready for human review, NOT applied; created_by/uploaded_by now
-                     UUID->auth.users, upload_status added per the vault preflight's
-                     SHA-256 design
-A2 (revised)      — ready for human review, NOT applied; set_by now UUID->auth.users,
-                     AI-cannot-clear backstop now keys off set_by_source (provenance
-                     vocabulary) not a fragile string match, UNIQUE(subject_type,
-                     subject_id) added
-A5 (revised)      — ready for human review, NOT applied; actor now UUID->auth.users
-                     (nullable)
-A3, A4            — still deferred, unchanged this pass — no code depends on them yet
+A5     — MIGRATION-APPLIED + PRODUCTION-PROVEN, 2026-09-09 (promoted as SUMG-CAT-P0-001;
+         ledger 20260909153314 `catalog_audit_log`; audit rows exist in production).
+         actor is UUID->auth.users (nullable).
+A2     — MIGRATION-APPLIED + PRODUCTION-PROVEN, 2026-09-09 (promoted as SUMG-CAT-P0-001;
+         ledger 20260909153452 `catalog_rights_policy`; audit-trigger actor semantics
+         then corrected by SUMG-CAT-P0-002, ledger 20260909233528
+         `catalog_rights_audit_actor_fix`). set_by is UUID->auth.users; AI-cannot-clear
+         backstop keys off set_by_source (provenance vocabulary), not a fragile string
+         match; UNIQUE(subject_type, subject_id) present.
+A1     — MIGRATION-APPLIED + STRUCTURALLY VERIFIED, NOT YET PRODUCTION-PROVEN, 2026-09-10
+         (promoted with 6 fixes as SUMG-CAT-P0-003; ledger 20260910012021
+         `catalog_a1_work_recording_version_lineage`; file
+         supabase/migrations/20260909180000_*.sql). All six A1 tables exist with RLS
+         enabled; required triggers + CHECK constraints structurally verified read-only;
+         ZERO data rows. created_by/uploaded_by are UUID->auth.users; upload_status
+         present per the vault preflight's SHA-256 design. The founder-authorized
+         end-to-end proof with one real master file
+         (SUMG_CAT_P0_003_MASTERVAULT_A1.md §8) is still outstanding.
+MasterVault storage — MIGRATION-APPLIED + STRUCTURALLY VERIFIED, NOT YET PRODUCTION-PROVEN,
+         2026-09-10 (SUMG-CAT-P0-003; ledger 20260910012109
+         `catalog_master_vault_storage`; file
+         supabase/migrations/20260909180100_*.sql). `sumg-master-vault` exists, private,
+         250 MB limit, 8-entry audio MIME allowlist, exactly two CMS storage.objects
+         policies (read + write), no update/delete policy. ZERO objects stored.
+A3, A4 — still deferred — proposals only, no code depends on them yet
 ```
 
-A0, A0.1, and the Spotify SELECT follow-up are all applied and verified — the entire security-hardening scope of this staged effort is now closed in production. A1/A2/A3/A4/A5 remain proposals only — not applied, awaiting separate founder authorization for the next production stage.
+A0, A0.1, and the Spotify SELECT follow-up are all applied and verified — the entire
+security-hardening scope of this staged effort is closed in production. A5 and A2 were
+subsequently promoted, applied (SUMG-CAT-P0-001), and corrected (SUMG-CAT-P0-002), and are
+**PRODUCTION-PROVEN**. A1 and the MasterVault storage migration were promoted with fixes
+and applied (SUMG-CAT-P0-003) and are **MIGRATION-APPLIED + STRUCTURALLY VERIFIED but NOT
+YET PRODUCTION-PROVEN** — the founder-authorized end-to-end proof with one real master
+file is still required. A3 and A4 remain proposals only — not applied, deferred by design.
 
 ## 3. Lint CI baseline policy (Part 17)
 

@@ -109,4 +109,6 @@ No fake routing metrics anywhere — the stub page today shows zero numbers beca
 
 ## 9. What this plan explicitly does not do
 
-No public publish. No distribution. No PersonaWorks. No source deletion. No AI requirement anywhere in the flow. No production migration applied — `A1`(revised)/`A2`/`A5` remain proposals in `supabase/migrations_proposed/`, not promoted into `supabase/migrations/`. No route, server action, or UI code was written in this pass — this document is the plan a future, explicitly authorized pass would implement against.
+No public publish. No distribution. No PersonaWorks. No source deletion. No AI requirement anywhere in the flow. No route, server action, or UI code was written in this pass — this document is the plan a future, explicitly authorized pass would implement against.
+
+> **UPDATE 2026-09-10:** the schema this plan targets has since been promoted and applied. `A5`/`A2` are **MIGRATION-APPLIED + PRODUCTION-PROVEN** (SUMG-CAT-P0-001 / P0-002). `A1` (with 6 fixes) and a new MasterVault storage migration are **MIGRATION-APPLIED + STRUCTURALLY VERIFIED but NOT YET PRODUCTION-PROVEN** (SUMG-CAT-P0-003; ledger `20260910012021` / `20260910012109`). The route / server action / worker / UI in this plan are still unbuilt — that is the next code slice (SUMG-CAT-P0-004), and it requires no new migration. See `SUMG_CAT_P0_003_MASTERVAULT_A1.md` and `supabase/migrations_proposed/README.md`.

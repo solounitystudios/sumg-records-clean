@@ -2,6 +2,8 @@
 
 **Status:** Read-only production verification, 2026-09-09, against `yisxnwbsnzxjnmzpstzj`. No bucket was created, modified, or deleted. No object was uploaded, downloaded, or deleted. Object *metadata* (name, size, MIME type, timestamps) was queried via `storage.objects`; no object content and no signed/public URL was ever fetched or printed.
 
+> **UPDATE 2026-09-10:** the V1 recommendation in §5 was subsequently implemented. The `sumg-master-vault` private bucket and its two CMS `storage.objects` policies are now **MIGRATION-APPLIED to production and STRUCTURALLY VERIFIED** (migration `20260909180100_catalog_master_vault_storage.sql`, ledger `20260910012109`) — private, 250 MB limit, 8-entry audio MIME allowlist, `master vault cms read` + `master vault cms write` only, no update/delete policy. It holds **zero objects**; the end-to-end proof with a real master is **NOT YET PRODUCTION-PROVEN** (see `SUMG_CAT_P0_003_MASTERVAULT_A1.md`). §6's "**NO**" below reflects the 2026-09-09 pass only.
+
 ---
 
 ## 1. Current storage — production reality
