@@ -12,5 +12,9 @@
     "outDir": ".test-build",
     "jsx": "react-jsx"
   },
-  "include": ["lib/catalog/**/*.ts", "lib/cms/*.security.test.ts"]
+  "include": [
+    "lib/catalog/**/*.ts",
+    "lib/cms/*.security.test.ts",
+    "lib/youtube/thumbnails/*.security.test.ts"
+  ]
 }

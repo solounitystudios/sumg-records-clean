@@ -18,6 +18,7 @@ import type {
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getJobsForStudio(): Promise<UploadJobForStudio[]> {
+  await requireAdmin()
   const supabase = adminDb
 
   const projectRef = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "")
@@ -50,6 +51,7 @@ export async function getJobsForStudio(): Promise<UploadJobForStudio[]> {
 }
 
 export async function getOrCreateProject(jobId: string): Promise<ThumbnailProject | { error: string }> {
+  await requireAdmin()
   const supabase = adminDb
 
   const { data: existing } = await supabase
@@ -83,6 +85,7 @@ export async function getOrCreateProject(jobId: string): Promise<ThumbnailProjec
 }
 
 export async function getProjectVersions(projectId: string): Promise<ThumbnailVersion[]> {
+  await requireAdmin()
   const supabase = adminDb
   const { data } = await supabase
     .from("thumbnail_versions")
@@ -93,6 +96,7 @@ export async function getProjectVersions(projectId: string): Promise<ThumbnailVe
 }
 
 export async function getPresetsFromDb(producerSlug: string): Promise<ThumbnailPreset[]> {
+  await requireAdmin()
   const supabase = adminDb
   const { data } = await supabase
     .from("thumbnail_presets")
@@ -104,6 +108,7 @@ export async function getPresetsFromDb(producerSlug: string): Promise<ThumbnailP
 }
 
 export async function getPromptsFromLibrary(producerSlug: string): Promise<ThumbnailPromptRow[]> {
+  await requireAdmin()
   const supabase = adminDb
   const { data } = await supabase
     .from("thumbnail_prompts")
@@ -226,6 +231,7 @@ export async function saveProjectDraft(
   presetSlug?: string,
   notes?: string,
 ): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const { error } = await supabase
     .from("thumbnail_projects")
@@ -248,6 +254,7 @@ export async function addVersionByUrl(
   prompt?: string,
   styleBucket?: string,
 ): Promise<{ id: string } | { error: string }> {
+  await requireAdmin()
   const supabase = adminDb
 
   const { data: existing } = await supabase
@@ -281,6 +288,7 @@ export async function selectVersion(
   projectId: string,
   versionId: string,
 ): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
 
   await supabase
@@ -304,6 +312,7 @@ export async function selectVersion(
 }
 
 export async function rejectVersion(versionId: string): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const { error } = await supabase
     .from("thumbnail_versions")
@@ -325,6 +334,7 @@ export async function approveProject(
   mode: 'generated' | 'edited' | 'custom' = 'generated',
   promptUsed?: string,
 ): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
 
   // 1. Insert into assets so renderer can fetch it by ID
@@ -398,6 +408,7 @@ export async function approveProject(
 }
 
 export async function skipThumbnail(jobId: string): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const { error } = await supabase
     .from("yt_upload_jobs")
@@ -417,6 +428,7 @@ export async function getJobMediaAssets(jobId: string): Promise<{
   audioUrl: string | null
   renderUrl: string | null
 }> {
+  await requireAdmin()
   const supabase = adminDb
 
   // Audio URL via audio_inbox → assets
@@ -468,6 +480,7 @@ export async function savePromptToProject(
   projectId: string,
   prompt: string,
 ): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const { error } = await supabase
     .from("thumbnail_projects")
@@ -479,6 +492,7 @@ export async function savePromptToProject(
 }
 
 export async function getImageAssetsForPicker(): Promise<Array<{ id: string; url: string; filename: string }>> {
+  await requireAdmin()
   const supabase = adminDb
   const { data } = await supabase
     .from("assets")
@@ -496,6 +510,7 @@ export async function savePromptToLibrary(
   category?: string,
   styleBucket?: string,
 ): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const { error } = await supabase
     .from("thumbnail_prompts")
@@ -515,6 +530,7 @@ export async function savePromptToLibrary(
 export async function getPromptLibrary(
   filters: PromptLibraryFilters = {}
 ): Promise<ThumbnailPromptRow[]> {
+  await requireAdmin()
   const supabase = adminDb
 
   let q = supabase
@@ -548,6 +564,7 @@ export async function createPrompt(data: {
   styleBucket?: string
   ctrScore?: number
 }): Promise<{ id: string } | { error: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const { data: row, error } = await supabase
     .from("thumbnail_prompts")
@@ -578,6 +595,7 @@ export async function updatePrompt(
     ctrScore?: number | null
   }
 ): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (data.prompt      !== undefined) updates.prompt       = data.prompt
@@ -594,6 +612,7 @@ export async function updatePrompt(
 }
 
 export async function archivePrompt(id: string): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const { error } = await supabase
     .from("thumbnail_prompts")
@@ -605,6 +624,7 @@ export async function archivePrompt(id: string): Promise<{ error?: string }> {
 }
 
 export async function restorePrompt(id: string): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const { error } = await supabase
     .from("thumbnail_prompts")
@@ -616,6 +636,7 @@ export async function restorePrompt(id: string): Promise<{ error?: string }> {
 }
 
 export async function deletePromptPermanently(id: string): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const { error } = await supabase.from("thumbnail_prompts").delete().eq("id", id)
   revalidatePath("/admin/youtube/thumbnail-studio")
@@ -624,6 +645,7 @@ export async function deletePromptPermanently(id: string): Promise<{ error?: str
 }
 
 export async function duplicatePrompt(id: string): Promise<{ id: string } | { error: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const { data: src } = await supabase.from("thumbnail_prompts").select("*").eq("id", id).single()
   if (!src) return { error: "Prompt not found" }
@@ -649,6 +671,7 @@ export async function duplicatePrompt(id: string): Promise<{ id: string } | { er
 }
 
 export async function markPromptFavorite(id: string, value: boolean): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const { error } = await supabase
     .from("thumbnail_prompts")
@@ -659,6 +682,7 @@ export async function markPromptFavorite(id: string, value: boolean): Promise<{ 
 }
 
 export async function markPromptWinner(id: string, value: boolean): Promise<{ error?: string }> {
+  await requireAdmin()
   const supabase = adminDb
   const { error } = await supabase
     .from("thumbnail_prompts")
@@ -669,6 +693,7 @@ export async function markPromptWinner(id: string, value: boolean): Promise<{ er
 }
 
 export async function incrementPromptUseCount(id: string): Promise<void> {
+  await requireAdmin()
   const supabase = adminDb
   const { data } = await supabase
     .from("thumbnail_prompts")
@@ -697,6 +722,7 @@ export async function saveFreeCreateAsset({
   styleBucket?: string
   name?: string
 }): Promise<{ assetId: string; thumbnailAssetId: string } | { error: string }> {
+  await requireAdmin()
   const supabase = adminDb
 
   // Determine a filename from the URL
@@ -1006,6 +1032,7 @@ export async function getMidjourneyJobStatus(jobId: string, projectId?: string):
   versionId: string | null
   assetId: string | null
 }> {
+  await requireAdmin()
   const supabase = adminDb
 
   const { data: job } = await supabase
