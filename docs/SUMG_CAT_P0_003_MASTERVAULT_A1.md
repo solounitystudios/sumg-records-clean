@@ -142,7 +142,11 @@ Encoded as `supabase/tests/sumg-cat-p0-003-vertical-slice.sql` (transactional `B
 ### Audit coverage (Phase 12)
 
 - **DB triggers** (can't happen silently): `intake_created` (asset version INSERT), `lineage_created` (lineage INSERT). Same enforcement model as A2's `rights_changed`.
-- **Adapter-emitted** (real actor only the caller knows): `upload_completed`, `hash_verified` / `hash_mismatch`, `verification_passed`, `verification_failed` (all `actor_type='worker'`, `actor=null`, worker label), `review_approved` / `review_rejected` / `review_requested` (`actor_type='human'`, the reviewer UUID).
+- **Adapter-emitted** (real actor only the caller knows), all `actor_type='worker'`, `actor=null`, worker label:
+  - upload: `upload_completed`
+  - verification **success** (client hash absent, or matches the authoritative re-hash): `hash_verified` + `verification_passed`; `upload_status='verified'`, job `completed`.
+  - verification **hash mismatch** (a *present* `client_sha256` contradicted by the authoritative `verified_sha256`): `hash_mismatch` + `verification_failed` (**never** `verification_passed`); `upload_status='verification_failed'`, job `failed` (`last_error_code='hash_mismatch'`), and an open `blocked` `hash_mismatch` `catalog_review_flags` row is created (idempotent). `verified_sha256` still records the true authoritative hash; `client_sha256` is never overwritten. Identical in `lib/catalog/asset-store.ts` and `lib/db/catalogAssets.ts`.
+- **Adapter-emitted** review transitions: `review_approved` / `review_rejected` / `review_requested` (`actor_type='human'`, the reviewer UUID).
 - `assertAuditActorShape` enforces A5's `no_human_spoof` invariant in the adapter before every write; the DB CHECK is the backstop.
 - Reused A5 actor vocabulary exactly (`human`/`service`/`worker`/`ai`/`system`). No fake UUIDs — `actor` is always a real `auth.users` id or `null`.
 
@@ -230,8 +234,10 @@ Preferred V1 path — **server-proxied**, service-role, no browser key:
    - `createSupabaseMasterVault().putOriginal(objectRef, { bytes, mimeType })`  → returns `{ sha256, sizeBytes }`
    - `store.attachVaultObject({ assetVersionId, vaultObjectRef: objectRef, clientSha256: sha256, sizeBytes, mimeType, actor: <founder uuid> })`
    - `store.createVerificationJob(assetVersionId)`
-   - `verifiedSha256 = ` re-hash via `vault.verifyObject(objectRef, sha256)` (returns bool) then `store.recordVerification({ assetVersionId, verifiedSha256: sha256, workerLabel: 'p0003-manual-verify' })`
-   - `store.setReviewStatus({ assetVersionId, status: 'approved', reviewedBy: <founder uuid> })`
+   - re-hash the **stored** object: `authoritativeSha256 = ` (download + SHA-256, or `vault.getObjectMetadata(objectRef).sha256`); then `store.recordVerification({ assetVersionId, verifiedSha256: authoritativeSha256, workerLabel: 'p0003-manual-verify' })`.
+     - **On the happy path** (server-proxied upload → the server hashed the exact bytes it stored) `authoritativeSha256 === clientSha256`, so `recordVerification` sets `upload_status='verified'`, completes the job, and emits `hash_verified` + `verification_passed`.
+     - **If `authoritativeSha256 !== clientSha256`** (should never happen on the server-proxied path — would indicate storage corruption): `recordVerification` sets `upload_status='verification_failed'`, marks the job `failed` with `last_error_code='hash_mismatch'`, opens a `blocked` `hash_mismatch` `catalog_review_flags` row, and emits `hash_mismatch` + `verification_failed` (never `verification_passed`). `verified_sha256` still records the true authoritative hash; `client_sha256` is left untouched. Stop the proof and investigate — do **not** approve.
+   - `store.setReviewStatus({ assetVersionId, status: 'approved', reviewedBy: <founder uuid> })`  *(happy path only)*
 
 ### Prove lineage (one extra tiny synthetic derivative — no media processing)
 
@@ -277,10 +283,37 @@ Prior 3 P0-002 rows remain → total 11.
 
 ### Cleanup / non-cleanup rules
 
-- **Delete** the temp `catalog_rights_records` row, `catalog_asset_lineage` row, `catalog_verification_jobs` row, both `catalog_asset_versions` rows, the `catalog_recordings` row, the `catalog_works` row (in FK order — CASCADE from `catalog_works` handles most).
-- **Delete** the `storage.objects` entry(ies) in `sumg-master-vault` — via the **service-role client** only (there is deliberately no client delete path). Confirm the bucket is empty afterward.
-- **Do NOT delete** `catalog_audit_log` rows — append-only by design. The `__SUMG P0-003 PRODUCTION PROOF__`-labeled `intake_created` / `lineage_created` / etc. rows stay, exactly like the P0-002 retained rows.
-- Re-verify: `catalog_works=0`, `catalog_recordings=0`, `catalog_asset_versions=0`, `catalog_asset_lineage=0`, `catalog_verification_jobs=0`, `catalog_review_flags=0`, `catalog_rights_records=0`, `sumg-master-vault` objects = 0; `songs=32`, `releases=32`, others unchanged.
+Delete **only** the exact P0-003 temporary rows, by their own captured ids — never a broad or unqualified `DELETE`. Order matters: `catalog_review_flags` and `catalog_rights_records` use a **polymorphic `subject_id` with no FK**, so they do **not** cascade when the subject row is deleted — they must be removed explicitly and **first**.
+
+Let `WORK_ID`, `RECORDING_ID`, `MASTER_VERSION_ID`, `DERIV_VERSION_ID`, `VAULT_KEY` be the ids captured during the proof.
+
+1. **Review flags first** (no cascade — scoped to the exact subjects):
+   ```sql
+   DELETE FROM catalog_review_flags
+    WHERE subject_type = 'asset_version'
+      AND subject_id IN (MASTER_VERSION_ID, DERIV_VERSION_ID);
+   -- if a work/recording-subject flag was created during the proof, also:
+   DELETE FROM catalog_review_flags WHERE subject_type = 'work'      AND subject_id = WORK_ID;
+   DELETE FROM catalog_review_flags WHERE subject_type = 'recording' AND subject_id = RECORDING_ID;
+   ```
+2. **Rights record** (no cascade — scoped to the exact subject):
+   ```sql
+   DELETE FROM catalog_rights_records WHERE subject_type = 'recording' AND subject_id = RECORDING_ID::text;
+   ```
+3. **The A1 graph** — deleting the one `catalog_works` row CASCADEs to `catalog_recordings` → `catalog_asset_versions` → `catalog_asset_lineage` + `catalog_verification_jobs`:
+   ```sql
+   DELETE FROM catalog_works WHERE id = WORK_ID;
+   ```
+   (No separate deletes needed for recordings/versions/lineage/jobs — the CASCADE covers them. Do not run an unqualified delete on any of those tables.)
+4. **Storage object(s)** in `sumg-master-vault` — via the **service-role client only** (there is deliberately no client delete path), by exact key:
+   ```
+   supabase.storage.from('sumg-master-vault').remove([VAULT_KEY /*, sidecar key if created */])
+   ```
+   Confirm the bucket is empty afterward.
+- **Do NOT delete** `catalog_audit_log` rows — append-only by design. The `__SUMG P0-003 PRODUCTION PROOF__`-labeled `intake_created` / `upload_completed` / `hash_verified` / `verification_passed` / `review_approved` / `lineage_created` / `rights_changed` rows stay, exactly like the P0-002 retained rows. Append-only cleanup semantics are unchanged by this runbook.
+- **Re-verify** (each scoped or a plain count, no deletes): `catalog_works=0`, `catalog_recordings=0`, `catalog_asset_versions=0`, `catalog_asset_lineage=0`, `catalog_verification_jobs=0`, `catalog_review_flags=0`, `catalog_rights_records=0`, `sumg-master-vault` objects = 0; `songs=32`, `releases=32`, `contributors=1`, `publishing_works=0`, `contracts=0`, `documents=0` unchanged.
+
+> If the proof exercises the **hash-mismatch** path (optional — see below), it also produces one `catalog_asset_versions` row in `verification_failed`, its failed `catalog_verification_jobs` row, and one open `catalog_review_flags` row with `reason_code='hash_mismatch'`. Clean those the same way: the `hash_mismatch` review flag by its exact `subject_id` in step 1, then the version row (CASCADEs its job) in step 3 via the `catalog_works` cascade or by its own id. Its `intake_created` / `hash_mismatch` / `verification_failed` audit rows stay (append-only).
 
 ### Rollback boundaries
 

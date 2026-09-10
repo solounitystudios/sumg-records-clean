@@ -145,15 +145,77 @@ test("recordVerification sets verified_sha256, completes the job, and emits hash
   assert.equal(passed.actorLabel, "verify-worker-1");
 });
 
-test("recordVerification emits hash_mismatch when the verified hash differs from the client claim", async () => {
-  const { audit, store, version } = await buildSlice();
+test("a hash mismatch can NEVER be represented as verified (SUMG-CAT-P0-003 FIX 1)", async () => {
+  // 1. client SHA = A, 2. authoritative verified SHA = B, 3. A != B
+  const { audit, store, version } = await buildSlice(); // buildSlice sets clientSha256 = "clienthash"
+  assert.equal(version.clientSha256, "clienthash");
   const ref = `masters/${version.recordingId}/${version.id}/original.wav`;
   await store.attachVaultObject({ assetVersionId: version.id, vaultObjectRef: ref, actor: HUMAN }, LATER);
-  await store.recordVerification(
-    { assetVersionId: version.id, verifiedSha256: "DIFFERENT", workerLabel: "verify-worker-1" },
+  await store.createVerificationJob(version.id, LATER);
+
+  const result = await store.recordVerification(
+    { assetVersionId: version.id, verifiedSha256: "authoritative-B", workerLabel: "verify-worker-1" },
     LATER,
   );
-  assert.ok(audit.events.some((e) => e.action === "hash_mismatch"));
+
+  const actions = audit.events.map((e) => e.action);
+  // 4. hash_mismatch event exists
+  assert.ok(actions.includes("hash_mismatch"), "hash_mismatch must be emitted");
+  // 5. upload_status != verified
+  assert.equal(result.uploadStatus, "verification_failed");
+  assert.notEqual(result.uploadStatus, "verified");
+  // 6. verification_passed is NOT emitted
+  assert.equal(actions.includes("verification_passed"), false, "verification_passed must NOT be emitted on a mismatch");
+  assert.equal(actions.includes("hash_verified"), false, "hash_verified must NOT be emitted on a mismatch");
+  assert.ok(actions.includes("verification_failed"), "verification_failed must be emitted on a mismatch");
+  // 7. verification job does not report successful completion
+  const job = await store.getVerificationJob(version.id);
+  assert.equal(job!.status, "failed");
+  assert.equal(job!.completedAt, null);
+  assert.equal(job!.lastErrorCode, "hash_mismatch");
+  // 8. review state surfaces hash_mismatch
+  const flags = await store.listReviewFlags("asset_version", version.id);
+  const mm = flags.find((f) => f.reasonCode === "hash_mismatch");
+  assert.ok(mm, "an open hash_mismatch review flag must exist");
+  assert.equal(mm!.status, "open");
+  assert.equal(mm!.severity, "blocked");
+  // 9. verified_sha256 preserves the actual authoritative hash
+  assert.equal(result.verifiedSha256, "authoritative-B");
+  // 10. client_sha256 remains unchanged
+  assert.equal(result.clientSha256, "clienthash");
+});
+
+test("recording a mismatch twice does not throw and does not open a second flag (idempotent)", async () => {
+  const { store, version } = await buildSlice();
+  const ref = `masters/${version.recordingId}/${version.id}/original.wav`;
+  await store.attachVaultObject({ assetVersionId: version.id, vaultObjectRef: ref, actor: HUMAN }, LATER);
+  await store.recordVerification({ assetVersionId: version.id, verifiedSha256: "B", workerLabel: "w1" }, LATER);
+  await assert.doesNotReject(() =>
+    store.recordVerification({ assetVersionId: version.id, verifiedSha256: "B", workerLabel: "w1" }, LATER),
+  );
+  const flags = await store.listReviewFlags("asset_version", version.id);
+  assert.equal(flags.filter((f) => f.reasonCode === "hash_mismatch" && f.status === "open").length, 1);
+});
+
+test("an absent client_sha256 is a success, not a mismatch — nothing to contradict", async () => {
+  const { audit, store, recording } = await buildSlice();
+  const noClaim = await store.createAssetVersion(
+    { recordingId: recording.id, versionKind: "other", source: "worker_derivative", uploadedBy: null }, // no clientSha256
+    LATER,
+  );
+  assert.equal(noClaim.clientSha256, null);
+  const result = await store.recordVerification(
+    { assetVersionId: noClaim.id, verifiedSha256: "authoritative-only", workerLabel: "w1" },
+    LATER,
+  );
+  assert.equal(result.uploadStatus, "verified");
+  assert.equal(result.verifiedSha256, "authoritative-only");
+  const actions = audit.events.filter((e) => e.objectId === noClaim.id).map((e) => e.action);
+  assert.ok(actions.includes("hash_verified"));
+  assert.ok(actions.includes("verification_passed"));
+  assert.equal(actions.includes("hash_mismatch"), false);
+  const flags = await store.listReviewFlags("asset_version", noClaim.id);
+  assert.equal(flags.length, 0);
 });
 
 test("setReviewStatus records review_approved with the human reviewer as actor", async () => {

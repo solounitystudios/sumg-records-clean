@@ -35,6 +35,8 @@ DECLARE
   rec              catalog_recordings%ROWTYPE;
   ver              catalog_asset_versions%ROWTYPE;
   deriv            catalog_asset_versions%ROWTYPE;
+  mm_ver           catalog_asset_versions%ROWTYPE;
+  mm_job           catalog_verification_jobs%ROWTYPE;
   lin              catalog_asset_lineage%ROWTYPE;
   vjob             catalog_verification_jobs%ROWTYPE;
   flag             catalog_review_flags%ROWTYPE;
@@ -130,6 +132,57 @@ BEGIN
     IF SQLERRM LIKE '%CASE 6b FAILED%' THEN RAISE; END IF;
     RAISE NOTICE 'CASE 6b PASSED: asset_version.recording_id immutable';
   END;
+
+  -- ── 6c. HASH MISMATCH failure state is representable (SUMG-CAT-P0-003 FIX 1)
+  -- The mismatch -> verification_failed routing is application logic
+  -- (lib/db/catalogAssets.ts::recordVerification, unit-tested in
+  -- asset-store.test.ts). Here we prove the SCHEMA can hold the failure
+  -- shape end to end: a present client claim, a DIFFERENT authoritative
+  -- verified_sha256, upload_status='verification_failed', the job failed
+  -- with last_error_code='hash_mismatch', and an OPEN hash_mismatch review
+  -- flag — all on one row, with client_sha256 untouched.
+  INSERT INTO catalog_asset_versions (recording_id, version_kind, source, uploaded_by, client_sha256)
+  VALUES (rec.id, 'other', 'worker_derivative', NULL, 'client-claim-AAA')
+  RETURNING * INTO mm_ver;
+  INSERT INTO catalog_verification_jobs (asset_version_id) VALUES (mm_ver.id) RETURNING * INTO mm_job;
+
+  UPDATE catalog_asset_versions
+     SET verified_sha256 = 'authoritative-BBB', upload_status = 'verification_failed'
+   WHERE id = mm_ver.id;
+  UPDATE catalog_verification_jobs
+     SET status = 'failed', last_attempt_at = now(),
+         last_error_code = 'hash_mismatch',
+         last_error_detail = 'client_sha256=client-claim-AAA verified_sha256=authoritative-BBB'
+   WHERE id = mm_job.id;
+  INSERT INTO catalog_review_flags (subject_type, subject_id, reason_code, severity, detail)
+  VALUES ('asset_version', mm_ver.id, 'hash_mismatch', 'blocked',
+          'authoritative stored-object hash does not match the client-submitted advisory hash');
+
+  SELECT * INTO mm_ver FROM catalog_asset_versions WHERE id = mm_ver.id;
+  SELECT * INTO mm_job FROM catalog_verification_jobs WHERE id = mm_job.id;
+  IF mm_ver.upload_status <> 'verification_failed' THEN
+    RAISE EXCEPTION 'CASE 6c FAILED: mismatch upload_status is %, not verification_failed', mm_ver.upload_status;
+  END IF;
+  IF mm_ver.verified_sha256 <> 'authoritative-BBB' THEN
+    RAISE EXCEPTION 'CASE 6c FAILED: authoritative verified_sha256 not preserved (%)', mm_ver.verified_sha256;
+  END IF;
+  IF mm_ver.client_sha256 <> 'client-claim-AAA' THEN
+    RAISE EXCEPTION 'CASE 6c FAILED: client_sha256 was mutated to %', mm_ver.client_sha256;
+  END IF;
+  IF mm_job.status <> 'failed' OR mm_job.last_error_code <> 'hash_mismatch' OR mm_job.completed_at IS NOT NULL THEN
+    RAISE EXCEPTION 'CASE 6c FAILED: verification job does not reflect a hash_mismatch failure';
+  END IF;
+  SELECT count(*) INTO n FROM catalog_review_flags
+   WHERE subject_type = 'asset_version' AND subject_id = mm_ver.id
+     AND reason_code = 'hash_mismatch' AND status = 'open';
+  IF n <> 1 THEN RAISE EXCEPTION 'CASE 6c FAILED: expected exactly 1 open hash_mismatch flag, got %', n; END IF;
+  RAISE NOTICE 'CASE 6c PASSED: hash mismatch -> verification_failed + preserved authoritative hash + failed job + open hash_mismatch flag';
+
+  -- Clean up the mismatch fixture rows (scoped to their exact ids) so the
+  -- later chain-count and business-data assertions are unaffected. The audit
+  -- rows they produced via the intake trigger are append-only and stay.
+  DELETE FROM catalog_review_flags WHERE subject_type = 'asset_version' AND subject_id = mm_ver.id;
+  DELETE FROM catalog_asset_versions WHERE id = mm_ver.id;  -- CASCADEs mm_job
 
   -- ── 7. REVIEW state ──────────────────────────────────────────────────
   INSERT INTO catalog_review_flags (subject_type, subject_id, reason_code, severity, detail)

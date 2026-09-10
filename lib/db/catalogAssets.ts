@@ -368,9 +368,16 @@ export function createSupabaseAssetCatalogStore(deps: { auditSink?: CatalogAudit
 
     async recordVerification(input: RecordVerificationInput, now: string) {
       const before = await getVersion(input.assetVersionId)
+      // A hash mismatch is ONLY a present client claim contradicted by the
+      // authoritative re-hash. An absent client_sha256 is not suspicious
+      // (schema: "never trusted alone") — nothing to contradict, so success.
+      const mismatch = before.clientSha256 !== null && before.clientSha256 !== input.verifiedSha256
+
       const patch: Record<string, unknown> = {
+        // authoritative hash of what is actually stored — recorded on BOTH
+        // paths; client_sha256 is never overwritten.
         verified_sha256: input.verifiedSha256,
-        upload_status: "verified",
+        upload_status: mismatch ? "verification_failed" : "verified",
         updated_at: now,
       }
       if (input.technicalMetadata !== undefined) patch.technical_metadata = input.technicalMetadata
@@ -385,14 +392,65 @@ export function createSupabaseAssetCatalogStore(deps: { auditSink?: CatalogAudit
       if (error) throw new Error(`recordVerification: ${error.message}`)
       const after = toAssetVersion(data as AssetVersionRow)
 
-      await supabase
+      const jobPatch = mismatch
+        ? {
+            status: "failed",
+            last_attempt_at: now,
+            last_error_code: "hash_mismatch",
+            last_error_detail: `client_sha256=${before.clientSha256} verified_sha256=${input.verifiedSha256}`,
+            updated_at: now,
+          }
+        : { status: "completed", completed_at: now, last_attempt_at: now, updated_at: now }
+      const { error: jobErr } = await supabase
         .from("catalog_verification_jobs")
-        .update({ status: "completed", completed_at: now, last_attempt_at: now, updated_at: now })
+        .update(jobPatch)
         .eq("asset_version_id", input.assetVersionId)
+      if (jobErr) throw new Error(`recordVerification/job: ${jobErr.message}`)
 
-      const hashMatches = before.clientSha256 === null || before.clientSha256 === input.verifiedSha256
+      if (mismatch) {
+        await audit.record({
+          action: "hash_mismatch",
+          actorType: "worker",
+          actor: null,
+          actorLabel: input.workerLabel,
+          objectType: "catalog_asset_versions",
+          objectId: after.id,
+          previousState: before,
+          newState: after,
+          source: "verification_worker",
+          occurredAt: now,
+        })
+        await audit.record({
+          action: "verification_failed",
+          actorType: "worker",
+          actor: null,
+          actorLabel: input.workerLabel,
+          objectType: "catalog_asset_versions",
+          objectId: after.id,
+          previousState: before,
+          newState: after,
+          source: "verification_worker",
+          occurredAt: now,
+        })
+        // Surface it to a human via the existing review-flag model. Idempotent:
+        // 23505 = an open hash_mismatch flag already exists
+        // (catalog_review_flags_one_open_per_reason) — tolerated.
+        const { error: flagErr } = await supabase.from("catalog_review_flags").insert({
+          subject_type: "asset_version",
+          subject_id: after.id,
+          reason_code: "hash_mismatch",
+          severity: "blocked",
+          detail: "authoritative stored-object hash does not match the client-submitted advisory hash",
+          created_at: now,
+        })
+        if (flagErr && flagErr.code !== "23505") {
+          throw new Error(`recordVerification/flag: ${flagErr.message}`)
+        }
+        return after
+      }
+
       await audit.record({
-        action: hashMatches ? "hash_verified" : "hash_mismatch",
+        action: "hash_verified",
         actorType: "worker",
         actor: null,
         actorLabel: input.workerLabel,

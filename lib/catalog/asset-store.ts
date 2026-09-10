@@ -239,6 +239,38 @@ export function createInMemoryAssetCatalogStore(deps: InMemoryDeps = {}): AssetC
     return v;
   }
 
+  function findOpenFlag(
+    subjectType: ReviewFlagSubjectType,
+    subjectId: string,
+    reasonCode: ReviewFlagReasonCode,
+  ): CatalogReviewFlag | undefined {
+    return [...flags.values()].find(
+      (f) =>
+        f.subjectType === subjectType &&
+        f.subjectId === subjectId &&
+        f.reasonCode === reasonCode &&
+        f.status === "open",
+    );
+  }
+
+  function openFlag(input: AddReviewFlagInput, now: string): CatalogReviewFlag {
+    const flag: CatalogReviewFlag = {
+      id: idFactory("flag"),
+      subjectType: input.subjectType,
+      subjectId: input.subjectId,
+      reasonCode: input.reasonCode,
+      severity: input.severity,
+      status: "open",
+      detail: input.detail,
+      createdAt: now,
+      resolvedAt: null,
+      resolvedBy: null,
+      resolution: null,
+    };
+    flags.set(flag.id, flag);
+    return flag;
+  }
+
   return {
     async createWork(input, now) {
       const work: CatalogWork = {
@@ -372,29 +404,94 @@ export function createInMemoryAssetCatalogStore(deps: InMemoryDeps = {}): AssetC
 
     async recordVerification(input, now) {
       const v = requireVersion(input.assetVersionId);
+      // A hash mismatch is ONLY when the client actually submitted an advisory
+      // hash AND the authoritative re-hash of the stored object contradicts it.
+      // An absent client_sha256 is not suspicious (schema: "never trusted
+      // alone") — there is simply no claim to contradict, so it is a success.
+      const mismatch = v.clientSha256 !== null && v.clientSha256 !== input.verifiedSha256;
       const next: CatalogAssetVersion = {
         ...v,
+        // verified_sha256 is the authoritative hash of what is actually
+        // stored — recorded on BOTH paths, never invented, client_sha256
+        // never overwritten.
         verifiedSha256: input.verifiedSha256,
         durationSeconds: input.durationSeconds ?? v.durationSeconds,
         technicalMetadata: input.technicalMetadata ?? v.technicalMetadata,
-        uploadStatus: "verified",
+        uploadStatus: mismatch ? "verification_failed" : "verified",
         updatedAt: now,
       };
       versions.set(v.id, next);
+
       const job = jobs.get(v.id);
       if (job) {
-        jobs.set(v.id, {
-          ...job,
-          status: "completed",
-          completedAt: now,
-          attemptCount: job.attemptCount + 1,
-          lastAttemptAt: now,
-          updatedAt: now,
-        });
+        jobs.set(
+          v.id,
+          mismatch
+            ? {
+                ...job,
+                status: "failed",
+                attemptCount: job.attemptCount + 1,
+                lastAttemptAt: now,
+                lastErrorCode: "hash_mismatch",
+                lastErrorDetail: `client_sha256=${v.clientSha256} verified_sha256=${input.verifiedSha256}`,
+                updatedAt: now,
+              }
+            : {
+                ...job,
+                status: "completed",
+                completedAt: now,
+                attemptCount: job.attemptCount + 1,
+                lastAttemptAt: now,
+                updatedAt: now,
+              },
+        );
       }
-      const hashMatches = v.clientSha256 === null || v.clientSha256 === input.verifiedSha256;
+
+      if (mismatch) {
+        await audit.record({
+          action: "hash_mismatch",
+          actorType: "worker",
+          actor: null,
+          actorLabel: input.workerLabel,
+          objectType: "catalog_asset_versions",
+          objectId: v.id,
+          previousState: v,
+          newState: next,
+          source: "verification_worker",
+          occurredAt: now,
+        });
+        await audit.record({
+          action: "verification_failed",
+          actorType: "worker",
+          actor: null,
+          actorLabel: input.workerLabel,
+          objectType: "catalog_asset_versions",
+          objectId: v.id,
+          previousState: v,
+          newState: next,
+          source: "verification_worker",
+          occurredAt: now,
+        });
+        // Surface it to a human via the existing review-flag model — idempotent
+        // (one open hash_mismatch flag per subject, DB-enforced by
+        // catalog_review_flags_one_open_per_reason).
+        if (!findOpenFlag("asset_version", v.id, "hash_mismatch")) {
+          openFlag(
+            {
+              subjectType: "asset_version",
+              subjectId: v.id,
+              reasonCode: "hash_mismatch",
+              severity: "blocked",
+              detail: "authoritative stored-object hash does not match the client-submitted advisory hash",
+            },
+            now,
+          );
+        }
+        return next;
+      }
+
       await audit.record({
-        action: hashMatches ? "hash_verified" : "hash_mismatch",
+        action: "hash_verified",
         actorType: "worker",
         actor: null,
         actorLabel: input.workerLabel,
@@ -509,31 +606,10 @@ export function createInMemoryAssetCatalogStore(deps: InMemoryDeps = {}): AssetC
     },
 
     async addReviewFlag(input, now) {
-      for (const f of flags.values()) {
-        if (
-          f.subjectType === input.subjectType &&
-          f.subjectId === input.subjectId &&
-          f.reasonCode === input.reasonCode &&
-          f.status === "open"
-        ) {
-          throw new ReviewFlagAlreadyOpenError(input.subjectId, input.reasonCode);
-        }
+      if (findOpenFlag(input.subjectType, input.subjectId, input.reasonCode)) {
+        throw new ReviewFlagAlreadyOpenError(input.subjectId, input.reasonCode);
       }
-      const flag: CatalogReviewFlag = {
-        id: idFactory("flag"),
-        subjectType: input.subjectType,
-        subjectId: input.subjectId,
-        reasonCode: input.reasonCode,
-        severity: input.severity,
-        status: "open",
-        detail: input.detail,
-        createdAt: now,
-        resolvedAt: null,
-        resolvedBy: null,
-        resolution: null,
-      };
-      flags.set(flag.id, flag);
-      return flag;
+      return openFlag(input, now);
     },
 
     async resolveReviewFlag(input, now) {
