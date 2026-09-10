@@ -35,7 +35,8 @@ export function addLineageEdge(
   childAssetVersionId: string,
   parentAssetVersionId: string,
   derivationType: string,
-  now: string
+  now: string,
+  createdBy: string | null = null
 ): CatalogAssetLineageEdge[] {
   if (childAssetVersionId === parentAssetVersionId) {
     throw new LineageCycleError(childAssetVersionId);
@@ -49,6 +50,7 @@ export function addLineageEdge(
     assetVersionId: childAssetVersionId,
     parentAssetVersionId,
     derivationType,
+    createdBy,
     createdAt: now,
   };
   return [...edges, newEdge];

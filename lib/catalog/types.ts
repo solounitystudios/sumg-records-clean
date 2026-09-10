@@ -38,13 +38,26 @@ export interface ProvenanceValue<T> {
   observedAt: string;
 }
 
-// ─── Work / Recording / Version / Lineage (catalog_works, A1) ──────────────
+// ─── Work / Recording / Version / Lineage (A1) ────────────────────────────
+//
+// Reconciled with supabase/migrations/20260909180000_catalog_a1_*.sql during
+// SUMG-CAT-P0-003. The pre-production hardening pass revised the A1 schema
+// (sha256 -> client_sha256 + verified_sha256; six upload states; per-recording
+// artist_slug instead of a recording title; work status/created_by) but these
+// interfaces were not updated with it. This is the narrowest reconciliation:
+// the shapes here now mirror the applied migration exactly. See
+// docs/SUMG_CAT_P0_003_MASTERVAULT_A1.md §"Domain / schema reconciliation".
+
+export type CatalogWorkStatus = "intake" | "active" | "archived";
 
 export interface CatalogWork {
   id: string;
   title: string;
-  /** Nullable pointer back to the existing songs table — songs.id is TEXT. */
+  /** Nullable pointer back to the existing songs table — songs.id is TEXT. Never forces a backfill. */
   songId: string | null;
+  /** Provenance — who created this work. Null after that user is deleted. Not an access boundary. */
+  createdBy: string | null;
+  status: CatalogWorkStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -52,10 +65,9 @@ export interface CatalogWork {
 export interface CatalogRecording {
   id: string;
   workId: string;
-  title: string;
-  isPrimary: boolean;
+  /** Loose text reference, matching the repo-wide artist_slug convention. No hard FK. */
+  artistSlug: string | null;
   createdAt: string;
-  updatedAt: string;
 }
 
 export type AssetVersionKind =
@@ -68,15 +80,47 @@ export type AssetVersionKind =
   | "stem_set"
   | "other";
 
+/** Upload / verification pipeline state — orthogonal to reviewStatus. */
+export type AssetUploadStatus =
+  | "pending_upload"
+  | "uploaded_unverified"
+  | "verifying"
+  | "verified"
+  | "verification_failed"
+  | "cancelled";
+
+/** Review Queue state — "has a human looked at this catalog record yet." Separate from rights and routing. */
+export type AssetReviewStatus = "pending_review" | "approved" | "held" | "archived" | "rejected";
+
+export type AssetVersionSource = "manual_upload" | "worker_derivative" | "system_import" | "api_upload";
+
 export interface CatalogAssetVersion {
   id: string;
   recordingId: string;
   versionKind: AssetVersionKind;
-  /** Opaque pointer into the Private Master Vault. Never a public URL. */
+  /**
+   * Opaque pointer into the Private Master Vault (bucket sumg-master-vault).
+   * Canonical shape `masters/<recordingId>/<id>/original.<ext>`. NEVER a
+   * public URL. Null until the upload is prepared.
+   */
   vaultObjectRef: string | null;
-  sha256: string | null;
+  /** Advisory hash submitted by the client before verification. Never trusted alone. */
+  clientSha256: string | null;
+  /** Authoritative hash — set only after the stored object is re-hashed server-side. */
+  verifiedSha256: string | null;
   sizeBytes: number | null;
+  mimeType: string | null;
+  durationSeconds: number | null;
+  /** Deterministic technical facts only (sample_rate, channels, bitrate_kbps, ...). No AI-inferred field. */
+  technicalMetadata: Record<string, unknown>;
+  uploadStatus: AssetUploadStatus;
+  reviewStatus: AssetReviewStatus;
+  source: AssetVersionSource;
+  /** Provenance — who uploaded this. Null after that user is deleted. */
+  uploadedBy: string | null;
   isPrimary: boolean;
+  /** Client-generated, persisted through retries. Null for non-client paths. */
+  idempotencyKey: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -86,7 +130,75 @@ export interface CatalogAssetLineageEdge {
   assetVersionId: string;
   parentAssetVersionId: string | null;
   derivationType: string;
+  /** Provenance — who created this derivation edge. Null for a system/worker path or after user deletion. */
+  createdBy?: string | null;
   createdAt: string;
+}
+
+// ─── Verification job / Review flag (A1) ──────────────────────────────────
+
+export type VerificationJobStatus = "pending" | "claimed" | "completed" | "failed";
+
+export interface CatalogVerificationJob {
+  id: string;
+  assetVersionId: string;
+  status: VerificationJobStatus;
+  /** Worker instance identity (hostname:pid or a worker UUID) — never an auth.users FK. */
+  claimedBy: string | null;
+  claimedAt: string | null;
+  leaseExpiresAt: string | null;
+  attemptCount: number;
+  lastAttemptAt: string | null;
+  lastErrorCode: string | null;
+  lastErrorDetail: string | null;
+  nextAttemptAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ReviewFlagSubjectType = "work" | "recording" | "asset_version";
+
+export type ReviewFlagReasonCode =
+  | "rights_unknown"
+  | "duplicate_hash"
+  | "metadata_missing"
+  | "verification_failed"
+  | "unsupported_format"
+  | "duration_invalid"
+  | "hash_mismatch"
+  | "lineage_conflict"
+  | "quarantine_required";
+
+export type ReviewFlagSeverity = "info" | "review" | "blocked" | "critical";
+
+export type ReviewFlagStatus = "open" | "resolved";
+
+export interface CatalogReviewFlag {
+  id: string;
+  subjectType: ReviewFlagSubjectType;
+  subjectId: string;
+  reasonCode: ReviewFlagReasonCode;
+  severity: ReviewFlagSeverity;
+  status: ReviewFlagStatus;
+  detail: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  resolution: string | null;
+}
+
+/**
+ * The assembled catalog-asset state a founder reviews — one master's full
+ * governed chain, read back through lib/db/catalogAssets.ts.
+ */
+export interface CatalogAssetState {
+  work: CatalogWork;
+  recording: CatalogRecording;
+  assetVersion: CatalogAssetVersion;
+  lineage: CatalogAssetLineageEdge[];
+  verificationJob: CatalogVerificationJob | null;
+  reviewFlags: CatalogReviewFlag[];
 }
 
 /** Public media row — corresponds to the existing `assets` table, unchanged. */

@@ -50,6 +50,43 @@ export class VaultObjectTooLargeError extends Error {
   }
 }
 
+/** Thrown when a put would overwrite an existing object. Replacement is a new asset version, never an in-place overwrite. */
+export class VaultObjectExistsError extends Error {
+  constructor(objectRef: string) {
+    super(`Object "${objectRef}" already exists — the Master Vault never overwrites; create a new asset version instead`);
+    this.name = "VaultObjectExistsError";
+  }
+}
+
+export interface SignedUploadUrl {
+  /** Short-lived, single-object upload target. Bytes go client -> storage, never through the app server. */
+  url: string;
+  /** Provider upload token, if the provider issues one separately from the URL. */
+  token: string | null;
+  objectRef: string;
+  expiresAt: string;
+}
+
+/** What the storage layer itself reports about an object — no content hash (that needs a re-download; use verifyObject). */
+export interface VaultObjectProbe {
+  objectRef: string;
+  sizeBytes: number;
+  mimeType: string | null;
+  createdAt: string | null;
+}
+
+/**
+ * Optional capability: providers that support a pre-authorized direct upload
+ * (Supabase Storage does) implement this. The in-memory fixture does not —
+ * the server-proxied putOriginal path is enough for tests and for the V1
+ * production proof.
+ */
+export interface MasterVaultDirectUpload extends MasterVault {
+  createSignedUploadUrl(objectRef: string, ttlSeconds: number): Promise<SignedUploadUrl>;
+  /** Confirm an object landed after a direct upload and read back its storage-observed size/mime. */
+  probeObject(objectRef: string): Promise<VaultObjectProbe | null>;
+}
+
 /**
  * Deterministic in-memory implementation used only for tests. It is never
  * wired to real Supabase Storage or any other provider, has no credentials,
@@ -69,6 +106,9 @@ export function createInMemoryMasterVault(opts?: { clock?: () => Date }): Master
   const parents = new Map<string, string>();
 
   function put(objectRef: string, input: PutObjectInput): VaultObjectMetadata {
+    if (store.has(objectRef)) {
+      throw new VaultObjectExistsError(objectRef);
+    }
     if (input.maxSizeBytes !== undefined && input.bytes.byteLength > input.maxSizeBytes) {
       throw new VaultObjectTooLargeError(objectRef, input.bytes.byteLength, input.maxSizeBytes);
     }
