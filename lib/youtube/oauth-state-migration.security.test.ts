@@ -1,7 +1,7 @@
 /**
  * SUMG-SEC-P0-005 — schema/security contract for the OAuth-state migration.
  *
- * Structural checks on supabase/migrations/20260910000000_yt_oauth_state_integrity.sql.
+ * Structural checks on supabase/migrations/20260910013000_yt_oauth_state_integrity.sql.
  * Not a substitute for a live DB run, but locks the security-relevant shape and
  * keeps the migration inside P0-005 scope (additive only, no unrelated table).
  */
