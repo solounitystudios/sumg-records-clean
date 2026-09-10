@@ -2,6 +2,8 @@
 
 **Status:** Design + read-only verification, 2026-09-09. No bucket created, no object uploaded, no policy changed. Supersedes the SHA-256/transaction sections of `SUMG_MANUAL_INTAKE_V1_PLAN.md` (§3–4 there now point here rather than repeating this reasoning — see that doc's note).
 
+> **UPDATE 2026-09-10:** the vault bucket is now **MIGRATION-APPLIED + STRUCTURALLY VERIFIED** in production (`sumg-master-vault`, migration `20260909180100_*.sql`, ledger `20260910012109`) — but **NOT YET PRODUCTION-PROVEN** (zero objects). The async verification worker described in §"worker" is still **not implemented** (only the `catalog_verification_jobs` table + claim primitive exist). "**Bucket created this pass: NO**" in §3 refers to the 2026-09-09 pass only. See `SUMG_CAT_P0_003_MASTERVAULT_A1.md`.
+
 ---
 
 ## 1. Vault technical readiness (Part 18)

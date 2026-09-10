@@ -1,6 +1,8 @@
 # SUMG Catalog Persistence Audit
 
-**Status:** Documentation + migration *proposals* only, from repo state on branch `feat/catalog-command-center-foundation` (base `main` @ `2affc03`). Nothing in this document has been applied to any database — no migration in `supabase/migrations_proposed/` has been run against any Supabase project, local or hosted, in this pass. Proposed SQL lives under `supabase/migrations_proposed/` — a directory deliberately outside `supabase/migrations/` so `supabase db push` / CI cannot pick it up by accident. Promoting a slice requires a human to review it, move it into `supabase/migrations/` with a proper timestamp prefix, and apply it explicitly.
+**Status:** Documentation + migration *proposals* only, from repo state on branch `feat/catalog-command-center-foundation` (base `main` @ `2affc03`). Nothing in this document had been applied to any database at the time it was written. Proposed SQL lives under `supabase/migrations_proposed/` — a directory deliberately outside `supabase/migrations/` so `supabase db push` / CI cannot pick it up by accident. Promoting a slice requires a human to review it, move it into `supabase/migrations/` with a proper timestamp prefix, and apply it explicitly.
+
+> **UPDATE 2026-09-10:** slices A0, A0.1, A5, A2, and A1 have since been promoted and applied to production; a new MasterVault storage migration was also applied. A5/A2 are PRODUCTION-PROVEN; A1 + MasterVault storage are MIGRATION-APPLIED + STRUCTURALLY VERIFIED but NOT YET PRODUCTION-PROVEN. Only A3/A4 remain proposals. The "proposed / not applied" language throughout this document reflects its authoring date — see `supabase/migrations_proposed/README.md` and `SUMG_NEXT_MIGRATION_DECISION.md` §2 for current state.
 
 See `SUMG_CATALOG_REUSE_AUDIT.md` for the reasoning behind each "new table" decision — this document is the schema-level detail.
 

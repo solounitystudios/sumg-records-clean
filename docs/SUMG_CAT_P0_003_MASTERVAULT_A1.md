@@ -1,23 +1,37 @@
 # SUMG-CAT-P0-003 — MasterVault + A1 real master asset vertical slice
 
-**Status:** implementation complete on `feat/sumg-cat-p0-003-mastervault-a1`. **No production mutation.** A1 is NOT applied; the `sumg-master-vault` bucket is NOT created. Founder approval required before any production step (see the runbook at the end).
+**Status:** CODE-COMPLETE and merged (PR #24). The two P0-003 schema migrations are now **MIGRATION-APPLIED to production and STRUCTURALLY VERIFIED**, but the slice is **NOT YET PRODUCTION-PROVEN** end-to-end. A founder-authorized proof with one real master file (runbook §8) is still required.
 
-Base main SHA: `0dbeab6f00bb008562ae577bf95b910f4babb91c` (PR #23 merged — P0-002 production-proven).
+> **UPDATE 2026-09-10 — production migration state recorded (docs-only pass, no code/migration/Supabase change).**
+> During recovery/preflight the two P0-003 migrations were found already applied to production and were structurally verified read-only (no rows written, no objects uploaded):
+>
+> | State | A1 catalog schema | MasterVault storage |
+> |---|---|---|
+> | CODE-COMPLETE | ✅ (PR #24) | ✅ (PR #24) |
+> | MIGRATION-APPLIED | ✅ ledger `20260910012021` `catalog_a1_work_recording_version_lineage` | ✅ ledger `20260910012109` `catalog_master_vault_storage` |
+> | STRUCTURALLY VERIFIED | ✅ all six A1 tables exist, RLS enabled; required P0-003 triggers + CHECK constraints present | ✅ `sumg-master-vault` exists, `public=false`, `file_size_limit=262144000` (250 MB), 8-entry audio MIME allowlist, exactly two `storage.objects` policies (`master vault cms read`, `master vault cms write`), no update/delete policy |
+> | PRODUCTION-PROVEN | ❌ zero `catalog_works`/`catalog_recordings`/`catalog_asset_versions`/lineage/verification-job/review-flag rows | ❌ zero `sumg-master-vault` objects |
+>
+> The end-to-end `REAL MASTER → PRIVATE VAULT → WORK → RECORDING → ASSET VERSION → LINEAGE → VERIFICATION/REVIEW → RIGHTS → AUDIT → READ-BACK` chain in runbook §8 has **not** been executed. The existing 32 songs / 32 releases are untouched. `catalog_audit_log` still holds only the 3 retained P0-002 rows.
+>
+> Any earlier wording in this document that says "A1 is NOT applied", "the `sumg-master-vault` bucket is NOT created", or "not applied" describes the pre-merge state and is superseded by this note.
+
+Base main SHA at branch cut: `0dbeab6f00bb008562ae577bf95b910f4babb91c` (PR #23 merged — P0-002 production-proven).
 
 ---
 
-## 1. Phase 1 — inventory (recorded)
+## 1. Phase 1 — inventory (recorded at branch cut — see the status note above for current production state)
 
-| Item | Value |
+| Item | Value (at branch cut) |
 |---|---|
 | main SHA | `0dbeab6f00bb008562ae577bf95b910f4babb91c` |
 | Working tree at branch cut | clean |
-| Latest merged Catalog PRs | #23 (P0-002 audit fix), #22 (P0-001 A5+A2), #21 (Command Center foundation) |
-| Production migration ledger head | `20260909233528` (`catalog_rights_audit_actor_fix`, P0-002) |
-| Production catalog tables | `catalog_audit_log`, `catalog_rights_records`, `catalog_policy_flags` only |
-| Production Storage buckets | `music` (private, unused), `sumg-assets` (public) |
-| A1 / A3 / A4 | UNAPPLIED |
-| MasterVault | not implemented in production |
+| Latest merged Catalog PRs | #23 (P0-002 audit fix), #22 (P0-001 A5+A2), #21 (Command Center foundation) — this slice has since merged as #24 |
+| Production migration ledger head | `20260909233528` (`catalog_rights_audit_actor_fix`, P0-002) — current head `20260910012109` (`catalog_master_vault_storage`) |
+| Production catalog tables | `catalog_audit_log`, `catalog_rights_records`, `catalog_policy_flags` only — the six A1 tables have since been MIGRATION-APPLIED |
+| Production Storage buckets | `music` (private, unused), `sumg-assets` (public) — `sumg-master-vault` (private) has since been MIGRATION-APPLIED |
+| A1 / A3 / A4 | UNAPPLIED — A1 has since been MIGRATION-APPLIED + STRUCTURALLY VERIFIED (ledger `20260910012021`), NOT YET PRODUCTION-PROVEN; A3 / A4 still UNAPPLIED |
+| MasterVault | not implemented in production — the `sumg-master-vault` bucket + storage migration (ledger `20260910012109`) have since been MIGRATION-APPLIED + STRUCTURALLY VERIFIED, NOT YET PRODUCTION-PROVEN |
 
 Files read and audited: all of `lib/catalog/*`, `lib/db/catalogRights.ts`, `lib/db/supabase.ts`, `supabase/migrations/20260909100001_catalog_audit_log.sql`, `supabase/migrations/20260909100002_catalog_rights_policy.sql`, `supabase/migrations_proposed/A1_work_recording_version_lineage.sql`, `supabase/migrations_proposed/README.md`, `docs/SUMG_MASTER_VAULT_SECURITY_CONTRACT.md`, `lib/catalog/proposed-schema-rls.security.test.ts`.
 
@@ -170,7 +184,7 @@ Encoded as `supabase/tests/sumg-cat-p0-003-vertical-slice.sql` (transactional `B
 
 **`npm test`: 182 pass / 0 fail** (was 129, +53). `npm run pretest` clean. `npx tsc --noEmit` clean. `npm run lint -- --max-warnings 50`: 27 warnings / 0 errors — **identical to the pre-P0-003 baseline** (all 27 pre-existing, in unrelated `components/` and `worker/dist/`). Production build: _[recorded in the PR / final report]_.
 
-**Real DB integration test:** `supabase/tests/sumg-cat-p0-003-vertical-slice.sql` — not run in CI (no Postgres in CI, same constraint as P0-002). Runbook §"Production proof" is the plan to execute it.
+**Real DB integration test:** `supabase/tests/sumg-cat-p0-003-vertical-slice.sql` — not run in CI (no Postgres in CI, same constraint as P0-002). Runbook §8 is the plan to execute it. **As of 2026-09-10 it has still not been executed** — the schema is MIGRATION-APPLIED + STRUCTURALLY VERIFIED but the vertical slice is NOT YET PRODUCTION-PROVEN (see the status note at the top).
 
 ### Diff scope (Phase 15)
 
@@ -184,29 +198,31 @@ To be run against production only if/when the founder applies the migrations (no
 
 ---
 
-## 8. PRODUCTION PROOF PLAN (runbook — execute only after PR approval + merge)
+## 8. PRODUCTION PROOF PLAN (runbook)
+
+> **UPDATE 2026-09-10 — the migration-apply portion of this runbook is DONE.** The two migrations below were applied to production (ledger `20260910012021`, `20260910012109`) and the "Immediately verify" checklist was run read-only and passed (all six A1 tables + RLS + triggers present; `sumg-master-vault` private, 250 MB, 8-entry MIME allowlist, exactly two CMS policies, no update/delete policy; `songs=32`, `releases=32`, `catalog_audit_log=3` unchanged). **What remains is only the data-writing proof below** (upload one real master → chain → read-back). That step is **awaiting founder authorization + one real master file** and has not been run.
 
 **Goal:** prove `REAL MASTER FILE → PRIVATE MASTERVAULT → WORK → RECORDING → ASSET VERSION → LINEAGE → VERIFICATION/REVIEW → RIGHTS → AUDIT → READ-BACK` with **one** controlled real master. Do **not** touch any of the existing 32 songs / 32 releases. Create a clearly-labeled P0-003 test asset.
 
-### Preflight (read-only)
+### Preflight (read-only) — expected state as of 2026-09-10, before the data proof
 
 ```
 -- via Supabase MCP execute_sql, project yisxnwbsnzxjnmzpstzj
-1. ledger head is still 20260909233528; no catalog_works/etc table exists yet
+1. ledger head is 20260910012109; the six A1 tables exist but hold ZERO rows
 2. songs=32, releases=32, contributors=1, publishing_works=0, contracts=0, documents=0
 3. catalog_rights_records=0, catalog_policy_flags=0, catalog_audit_log=3 (P0-002 retained)
-4. storage.buckets = {music, sumg-assets} only
-5. A1/A3/A4 objects absent; is_cms_role() unchanged
+4. storage.buckets = {music, sumg-assets, sumg-master-vault}; sumg-master-vault holds ZERO objects
+5. A3/A4 objects absent; is_cms_role() unchanged
 ```
 
-### Migrations to apply (targeted `apply_migration`, the A5/A2/P0-002 method — never a broad `db push`)
+### Migrations — ALREADY APPLIED (targeted `apply_migration`, the A5/A2/P0-002 method — never a broad `db push`)
 
-1. `20260909180000_catalog_a1_work_recording_version_lineage.sql`  (name: `catalog_a1_work_recording_version_lineage`)
-2. `20260909180100_catalog_master_vault_storage.sql`  (name: `catalog_master_vault_storage`)
+1. `20260909180000_catalog_a1_work_recording_version_lineage.sql` — **APPLIED** (ledger `20260910012021` `catalog_a1_work_recording_version_lineage`)
+2. `20260909180100_catalog_master_vault_storage.sql` — **APPLIED** (ledger `20260910012109` `catalog_master_vault_storage`)
 
-Apply in that order (bucket migration is independent, but keep it second). Both are forward-only and idempotent.
+Both are forward-only and idempotent. Do not re-apply.
 
-### Immediately verify
+### Post-apply verification — ALREADY RUN (read-only, passed 2026-09-10)
 
 ```
 - ledger has 2 new apply-time entries, nothing else
@@ -333,13 +349,13 @@ Use one genuine existing `auth.users` UUID (the founder's) for `created_by` / `u
 |---|---|---|
 | Catalog domain / foundation | ~90% | types reconciled to schema; pure logic for provenance/rights/lineage/vault/intake/destinations all present + tested |
 | Rights / policy / audit persistence | 100% (production-proven) | P0-002; unchanged and reused here |
-| MasterVault readiness | ~80% | contract + key module + private-bucket migration + real Supabase adapter (server-proxied path) all done and tested; **not applied**; direct-browser-upload + reconciliation job + 2nd-copy DR still future |
-| A1 readiness | ~85% | audited, 6 fixes, promoted migration + real adapter + in-memory fixture + structural tests + SQL harness; **not applied**; verification *worker* itself not built (job table + claim primitive are) |
+| MasterVault readiness | ~85% | contract + key module + private-bucket migration + real Supabase adapter (server-proxied path) all done and tested; **MIGRATION-APPLIED + STRUCTURALLY VERIFIED (ledger `20260910012109`); NOT YET PRODUCTION-PROVEN** (zero objects); direct-browser-upload + reconciliation job + 2nd-copy DR still future |
+| A1 readiness | ~90% | audited, 6 fixes, promoted migration + real adapter + in-memory fixture + structural tests + SQL harness; **MIGRATION-APPLIED + STRUCTURALLY VERIFIED (ledger `20260910012021`); NOT YET PRODUCTION-PROVEN** (zero rows); verification *worker* itself not built (job table + claim primitive are) |
 | A3 / A4 readiness | 0% | untouched, deferred by design |
-| Catalog Command Center overall | ~55–65% | persistence spine (A5+A2 live, A1 ready) + domain layer done; Review Queue / Routing Desk / intake UI + A3/A4 + worker still ahead |
+| Catalog Command Center overall | ~65% | persistence spine (A5+A2 production-proven; A1 + MasterVault storage MIGRATION-APPLIED + STRUCTURALLY VERIFIED) + domain layer done; end-to-end production proof + Review Queue / Routing Desk / intake UI + A3/A4 + worker still ahead |
 
 ### CATALOG V1 DONE — definition
 
 1. one real private master stored in MasterVault · 2. Work exists · 3. Recording exists · 4. Asset Version exists · 5. provenance recorded · 6. checksum recorded · 7. lineage proven where applicable · 8. verification/review state exists · 9. rights attached · 10. immutable audit evidence exists · 11. founder can retrieve/review the asset · 12. no public master exposure · 13. no A3/A4/DSP requirement.
 
-**A successful P0-003 production proof (runbook §8) satisfies every one of these 13 points.** This PR delivers everything needed to run that proof; it does not itself perform any production mutation.
+**A successful P0-003 production proof (runbook §8) satisfies every one of these 13 points.** This PR delivered everything needed to run that proof; the two schema migrations have since been MIGRATION-APPLIED to production and STRUCTURALLY VERIFIED (see the status note at the top), but the end-to-end proof with one real founder-provided master file has **not** been executed — the slice is NOT YET PRODUCTION-PROVEN and remains **awaiting founder-authorized end-to-end production proof with one real master file**.

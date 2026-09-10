@@ -2,6 +2,8 @@
 
 **Status:** Design only, 2026-09-09. No bucket created, no policy applied, no object uploaded. Supersedes/extends `SUMG_MASTER_VAULT_PRODUCTION_READINESS.md` (production storage audit — still accurate, not repeated here) and `SUMG_MASTER_VAULT_IMPLEMENTATION_PREFLIGHT.md` (SHA-256/transaction design — moved to `SUMG_MANUAL_INTAKE_STATE_MACHINE.md`, this doc covers what's left: the bucket's own security contract, storage↔DB reconciliation, and disaster recovery).
 
+> **UPDATE 2026-09-10:** the bucket contract in this doc has since been implemented and is **MIGRATION-APPLIED to production and STRUCTURALLY VERIFIED** (migration `20260909180100_catalog_master_vault_storage.sql`, ledger `20260910012109`). `sumg-master-vault` is private, 250 MB limit, 8-entry audio MIME allowlist, with exactly the `master vault cms read` + `master vault cms write` policies and no update/delete policy. It is **NOT YET PRODUCTION-PROVEN** — zero objects stored, no end-to-end run. See `SUMG_CAT_P0_003_MASTERVAULT_A1.md`.
+
 ---
 
 ## 1. Master Vault security contract
