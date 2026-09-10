@@ -137,10 +137,46 @@ test("callback requires an authenticated user and validates state BEFORE code ex
 })
 
 test("callback fails closed on missing session, missing state, missing code", () => {
-  assert.match(CALLBACK_SRC, /if\s*\(\s*!user\s*\)\s*return fail\(/)
+  assert.match(CALLBACK_SRC, /if\s*\(\s*!user\s*\|\|[\s\S]*?\)\s*return fail\(/)
   assert.match(CALLBACK_SRC, /isPlausibleOAuthStateToken\(state\)\s*\)\s*return fail\(/)
   assert.match(CALLBACK_SRC, /if\s*\(\s*!code\s*\)\s*return fail\(/)
   assert.match(CALLBACK_SRC, /if\s*\(\s*!channelId\s*\)\s*return fail\(/)
+})
+
+test("callback re-checks executive role at callback time (revoked role ⇒ fail closed) BEFORE consume / exchange / write", () => {
+  // Uses the canonical role model, not a duplicated role list.
+  assert.match(
+    CALLBACK_SRC,
+    /import\s*\{[^}]*\bisExecutiveRole\b[^}]*\}\s*from\s*["']@\/lib\/auth["']/,
+    "callback must import isExecutiveRole from @/lib/auth",
+  )
+  assert.doesNotMatch(CALLBACK_SRC, /\[["']owner["']\s*,\s*["']co_owner["']/, "must not inline a second role list")
+  assert.doesNotMatch(CALLBACK_SRC, /app_metadata|auth\.jwt\(\)/, "must not re-implement role parsing")
+
+  assert.match(CALLBACK_SRC, /!isExecutiveRole\(\s*user\.role\s*\)\s*\)\s*return fail\(/)
+
+  const idxRoleGate = CALLBACK_SRC.search(/!isExecutiveRole\(/)
+  const idxConsume = CALLBACK_SRC.search(/consumeOAuthState\(/)
+  const idxExchange = CALLBACK_SRC.search(/exchangeCode\(/)
+  const idxPersist = CALLBACK_SRC.search(/\.from\("yt_channels"\)\s*\n?\s*\.update\(/)
+  assert.ok(idxRoleGate !== -1, "role gate present")
+  assert.ok(idxRoleGate < idxConsume, "role checked before state consumption")
+  assert.ok(idxRoleGate < idxExchange, "role checked before code exchange")
+  assert.ok(idxRoleGate < idxPersist, "role checked before credential write")
+})
+
+test("isExecutiveRole is a real fail-closed check over exactly owner/co_owner/admin (unchanged by P0-005)", () => {
+  const authSrc = read("lib/auth.ts")
+  assert.match(
+    authSrc,
+    /EXECUTIVE_ROLES\s*=\s*\[\s*["']owner["']\s*,\s*["']co_owner["']\s*,\s*["']admin["']\s*\]/,
+    "EXECUTIVE_ROLES must be unchanged — P0-005 does not redesign RBAC",
+  )
+  assert.match(
+    authSrc,
+    /export function isExecutiveRole\(role: string\): boolean \{\s*return EXECUTIVE_ROLES\.includes\(/,
+    "isExecutiveRole must be the canonical membership check",
+  )
 })
 
 test("callback resolves the channel ONLY from consumed state, never from a query param / body", () => {

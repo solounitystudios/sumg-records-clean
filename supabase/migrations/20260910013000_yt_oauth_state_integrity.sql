@@ -35,7 +35,13 @@ CREATE TABLE IF NOT EXISTS public.yt_oauth_states (
   id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   -- SHA-256 hex of the plaintext state token. There is intentionally NO
   -- plaintext state column — the plaintext lives only in the Google auth URL.
-  state_hash   TEXT        NOT NULL UNIQUE,
+  -- The shape CHECK is defense-in-depth: it makes it impossible to persist a
+  -- raw token (43-char base64url) or any non-SHA-256 value in this column,
+  -- even if a future code change passed the wrong thing. hashOAuthStateToken()
+  -- always produces exactly 64 lowercase hex chars.
+  state_hash   TEXT        NOT NULL UNIQUE
+                           CONSTRAINT yt_oauth_states_hash_is_sha256_hex
+                           CHECK (state_hash ~ '^[0-9a-f]{64}$'),
   -- Intended YouTube channel. CASCADE: a deleted channel cannot leave a
   -- danglingly-consumable state row.
   channel_id   UUID        NOT NULL REFERENCES public.yt_channels(id) ON DELETE CASCADE,

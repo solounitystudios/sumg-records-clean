@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getAuthUser } from "@/lib/auth"
+import { getAuthUser, isExecutiveRole } from "@/lib/auth"
 import { supabase } from "@/lib/db/supabase"
 import { exchangeCode } from "@/lib/youtube/oauth"
 import { isPlausibleOAuthStateToken } from "@/lib/youtube/oauth-state"
@@ -14,9 +14,11 @@ import { consumeOAuthState } from "@/lib/youtube/oauth-state-store"
  * The `state` returned by Google is an opaque single-use token. The target
  * channel is resolved ONLY from the atomically-consumed `yt_oauth_states` row —
  * never from a query param or request body. The flow fails closed if there is
- * no session, if the session user is not the admin who initiated the flow, if
- * the state is unknown / expired / already consumed, or if the bound channel
- * no longer exists.
+ * no session, if the current session user is not presently an executive role
+ * (role revoked after initiation ⇒ rejected — checked BEFORE state consumption,
+ * code exchange, and credential persistence), if the session user is not the
+ * admin who initiated the flow, if the state is unknown / expired / already
+ * consumed, or if the bound channel no longer exists.
  *
  * User-facing errors are coarse reason codes only — no SQL/PostgREST detail,
  * no token/secret/state values.
@@ -44,9 +46,14 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get("code")
   if (!code) return fail("missing_code")
 
-  // 5. Resolve the authenticated user — fail closed with no session.
+  // 5. Resolve the authenticated user — fail closed with no session, and fail
+  //    closed if that user is NOT presently an executive role. This re-checks
+  //    authority at callback time using the canonical role model
+  //    (lib/auth.ts): a user whose admin role was revoked between initiating
+  //    the flow and returning here is rejected before any state consumption,
+  //    code exchange, or credential write.
   const user = await getAuthUser()
-  if (!user) return fail("not_authenticated")
+  if (!user || !isExecutiveRole(user.role)) return fail("not_authorized")
 
   // 6-8. Atomically consume the state bound to (hash, this user); get channel_id.
   //      Any mismatch (unknown/expired/consumed/wrong-user) yields null.

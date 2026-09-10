@@ -31,6 +31,11 @@ test("state_hash is UNIQUE and there is NO plaintext state column", () => {
   assert.doesNotMatch(CODE, /^\s*state\s+TEXT/mi)
 })
 
+test("state_hash carries a SHA-256-hex shape CHECK (raw token / wrong-algo value cannot be stored)", () => {
+  assert.match(CODE, /CHECK \(state_hash ~ '\^\[0-9a-f\]\{64\}\$'\)/)
+  // a 43-char base64url raw token would not satisfy that pattern
+})
+
 test("channel FK → yt_channels and user binding FK → auth.users", () => {
   assert.match(CODE, /channel_id\s+UUID\s+NOT NULL\s+REFERENCES public\.yt_channels\(id\)\s+ON DELETE CASCADE/)
   assert.match(CODE, /initiated_by\s+UUID\s+NOT NULL\s+REFERENCES auth\.users\(id\)\s+ON DELETE CASCADE/)
