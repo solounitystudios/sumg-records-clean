@@ -46,3 +46,47 @@ jobs:
           # lookups that are otherwise guarded by hasSupabase() / null checks.
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: placeholder_key
+
+  worker:
+    name: Worker (Node 20 deterministic build + startup)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Node 20 on purpose: this is the version worker/Dockerfile runs. It is the
+      # runtime where @supabase/realtime-js >= 2.106 throws at createClient()
+      # ("Node.js 20 detected without native WebSocket support"). SUMG-OPS-P0-001.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install (npm ci — deterministic, lockfile-exact)
+        working-directory: worker
+        run: npm ci
+
+      - name: Build
+        working-directory: worker
+        run: npm run build
+
+      - name: Startup probe — Supabase client must construct on Node 20
+        working-directory: worker
+        env:
+          SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: placeholder_key
+        run: |
+          node -e "
+            const rjs = require('@supabase/realtime-js/package.json').version;
+            const sjs = require('@supabase/supabase-js/package.json').version;
+            // Loading this module runs createClient() at top level — the exact
+            // production startup path. On Node < 22 a realtime-js that requires a
+            // native WebSocket throws here and fails this job.
+            require('./dist/supabase.js');
+            console.log('OK  node ' + process.version + '  supabase-js ' + sjs + '  realtime-js ' + rjs + '  createClient constructed');
+          "
